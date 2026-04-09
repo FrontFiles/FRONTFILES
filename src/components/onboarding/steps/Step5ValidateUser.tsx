@@ -65,7 +65,7 @@ export function Step5ValidateUser({ profileDraft, identityAnchor, finalValidatio
           </span>
         </div>
         <h1 className="text-4xl font-bold text-black tracking-tight mb-3">
-          Final Validation
+          Creator Validation
         </h1>
         <p className="text-slate-600 text-base leading-relaxed max-w-xl">
           Before your Vault is created, we run a final consistency check between your confirmed profile and your verified identity.

@@ -87,10 +87,10 @@ export function Step2CrossCheck({ identityAnchor, crossCheckComplete, crossCheck
           </span>
         </div>
         <h1 className="text-4xl font-bold text-black tracking-tight mb-3">
-          Credibility Check
+          Credibility Cross-Check
         </h1>
         <p className="text-slate-600 text-base leading-relaxed max-w-xl">
-          Frontfiles performs an AI-assisted cross-check of your professional presence to corroborate your credentials. This is not surveillance — it is structured verification using publicly available data.
+          Frontfiles performs an AI-assisted cross-check of your professional presence to corroborate your credentials. This is not surveillance, it is structured verification using publicly available data.
         </p>
       </div>
 

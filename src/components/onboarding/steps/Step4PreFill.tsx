@@ -67,10 +67,10 @@ export function Step4PreFill({ profileDraft, dispatch, onComplete }: Step4Props)
           </span>
         </div>
         <h1 className="text-4xl font-bold text-black tracking-tight mb-3">
-          Profile Setup
+          Profile Pre-fill
         </h1>
         <p className="text-slate-600 text-base leading-relaxed max-w-xl">
-          Your profile has been pre-filled from your cross-check. Review each section carefully — you can edit any field. Confirm each section before continuing.
+          Your profile has been pre-filled from your cross-check. Review each section carefully, you can edit any field. Confirm each section before continuing.
         </p>
       </div>
 

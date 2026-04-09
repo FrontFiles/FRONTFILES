@@ -91,7 +91,7 @@ export function Step1IdVerification({ identityVerification, identityAnchor, disp
           <InfoRow
             icon={<CreditCard className="w-4 h-4 text-black" />}
             title="Third-party verification"
-            body="Your identity is verified by Onfido, an independent KYC provider. Frontfiles holds only the verification result and an anonymised identity anchor — not your raw biometric data."
+            body="Your identity is verified by Onfido, an independent KYC provider. Frontfiles holds only the verification result and an anonymised identity anchor, not your raw biometric data."
           />
           <InfoRow
             icon={<ShieldOff className="w-4 h-4 text-black" />}

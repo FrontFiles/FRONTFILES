@@ -2,11 +2,11 @@ import type { OnboardingStep, ValidationOutcomeStatus } from './types'
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   { id: 1, label: 'ID Verification', description: 'Verify your identity with a third-party provider' },
-  { id: 2, label: 'Credibility Check', description: 'AI-assisted professional presence cross-check' },
+  { id: 2, label: 'Credibility Cross-Check', description: 'AI-assisted professional presence cross-check' },
   { id: 3, label: 'Data Validation', description: 'Review cross-check results' },
-  { id: 4, label: 'Profile Setup', description: 'Review and confirm your profile information' },
-  { id: 5, label: 'Final Validation', description: 'Confirm profile consistency' },
-  { id: 6, label: 'Vault Activation', description: 'Your Vault is created and ready' },
+  { id: 4, label: 'Profile Pre-fill', description: 'Review and confirm your pre-filled profile' },
+  { id: 5, label: 'Creator Validation', description: 'Confirm profile consistency' },
+  { id: 6, label: 'Vault Creation', description: 'Your Vault is created and ready' },
 ]
 
 export const VALIDATION_STATUS_LABELS: Record<ValidationOutcomeStatus, string> = {

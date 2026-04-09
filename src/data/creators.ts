@@ -1,0 +1,176 @@
+// ═══════════════════════════════════════════════════════════════
+// FRONTFILES — Creator Dataset
+// 10 distinct editorial identities with coverage logic
+// ═══════════════════════════════════════════════════════════════
+
+export interface Creator {
+  id: string
+  name: string
+  slug: string
+  locationBase: string
+  regionsCovered: string[]
+  specialties: string[]
+  bio: string
+  trustBadge: 'verified' | 'trusted'
+  languages: string[]
+  avatarRef: string
+  frontfolioSummary: string
+  featuredStoryIds: string[]
+  featuredAssetIds: string[]
+}
+
+export const creators: Creator[] = [
+  {
+    id: 'creator-001',
+    name: 'Marco Oliveira',
+    slug: 'marcooliveira',
+    locationBase: 'Porto Alegre, Brazil',
+    regionsCovered: ['Rio Grande do Sul', 'Southern Brazil', 'São Paulo'],
+    specialties: ['Flood documentation', 'Displacement coverage', 'Aerial survey', 'Settlement reporting'],
+    bio: 'Video and photo journalist covering displacement, flood events, and urban settlement disputes across southern Brazil since 2016. Formerly embedded with Defesa Civil RS during the 2024 Guaíba floods.',
+    trustBadge: 'verified',
+    languages: ['Portuguese', 'Spanish', 'English'],
+    avatarRef: '/assets/profile_longhair_camera.png',
+    frontfolioSummary: '47 certified assets across 6 Stories. Primary coverage: flood displacement and informal settlement disputes in Rio Grande do Sul.',
+    featuredStoryIds: ['story-001', 'story-011'],
+    featuredAssetIds: ['asset-001', 'asset-004', 'asset-043'],
+  },
+  {
+    id: 'creator-002',
+    name: 'Ana Sousa',
+    slug: 'anasousa',
+    locationBase: 'Lisbon, Portugal',
+    regionsCovered: ['Lisbon', 'Setúbal', 'Alentejo'],
+    specialties: ['Parliamentary photography', 'Institutional documentation', 'Coastal reporting', 'Storm coverage'],
+    bio: 'Institutional and parliamentary photographer based in Lisbon. Covers the Assembleia da República, municipal governance in the greater Lisbon area, and coastal impact stories along the Setúbal coast.',
+    trustBadge: 'verified',
+    languages: ['Portuguese', 'English', 'French'],
+    avatarRef: '/assets/profile_braids_bw.png',
+    frontfolioSummary: '38 certified assets across 4 Stories. Primary coverage: parliamentary sessions, coastal erosion, and storm damage in central Portugal.',
+    featuredStoryIds: ['story-002', 'story-003', 'story-014'],
+    featuredAssetIds: ['asset-006', 'asset-010', 'asset-046'],
+  },
+  {
+    id: 'creator-003',
+    name: 'Dimitris Katsaros',
+    slug: 'dimitriskatsaros',
+    locationBase: 'Alexandroupoli, Greece',
+    regionsCovered: ['Evros', 'Northern Greece', 'Eastern Aegean'],
+    specialties: ['Border documentation', 'Migration route reporting', 'Logistics photography', 'Checkpoint coverage'],
+    bio: 'Documentarian covering the Evros border region since 2019. Focuses on crossing infrastructure, asylum processing, and the logistics of border enforcement at the EU external frontier.',
+    trustBadge: 'verified',
+    languages: ['Greek', 'English', 'Turkish'],
+    avatarRef: '/assets/avatars/dimitris-katsaros.png',
+    frontfolioSummary: '29 certified assets across 3 Stories. Primary coverage: border crossing logistics and asylum infrastructure at Evros.',
+    featuredStoryIds: ['story-004'],
+    featuredAssetIds: ['asset-013', 'asset-015'],
+  },
+  {
+    id: 'creator-004',
+    name: 'Lucia Ferrante',
+    slug: 'luciaferrante',
+    locationBase: 'Palermo, Italy',
+    regionsCovered: ['Sicily', 'Southern Italy', 'Calabria'],
+    specialties: ['Court reporting', 'Police accountability', 'Environmental documentation', 'Coastal fishing communities'],
+    bio: 'Reporter and photographer covering courts, police accountability cases, and environmental degradation across Sicily. Long-running documentation of coastal fishing communities and institutional access disputes.',
+    trustBadge: 'verified',
+    languages: ['Italian', 'English'],
+    avatarRef: '/assets/profile_laughing_curls.png',
+    frontfolioSummary: '34 certified assets across 3 Stories. Primary coverage: court proceedings, police misconduct cases, and coastal livelihoods in Sicily.',
+    featuredStoryIds: ['story-010', 'story-003b'],
+    featuredAssetIds: ['asset-034', 'asset-036'],
+  },
+  {
+    id: 'creator-005',
+    name: 'Yara Boukhari',
+    slug: 'yaraboukhari',
+    locationBase: 'Marseille, France',
+    regionsCovered: ['Marseille', 'Bouches-du-Rhône', 'Provence'],
+    specialties: ['Public health reporting', 'Hospital systems documentation', 'Port logistics', 'Heatwave impact'],
+    bio: 'Public health and logistics reporter based in Marseille. Covers hospital corridor pressure during heatwave events, port congestion at Fos-sur-Mer, and frontline healthcare infrastructure across southern France.',
+    trustBadge: 'verified',
+    languages: ['French', 'Arabic', 'English'],
+    avatarRef: '/assets/avatars/yara-boukhari.png',
+    frontfolioSummary: '31 certified assets across 3 Stories. Primary coverage: hospital overload during heat events and port congestion in Marseille.',
+    featuredStoryIds: ['story-006', 'story-012'],
+    featuredAssetIds: ['asset-020', 'asset-024'],
+  },
+  {
+    id: 'creator-006',
+    name: 'Tomasz Nowak',
+    slug: 'tomasznowak',
+    locationBase: 'Warsaw, Poland',
+    regionsCovered: ['Warsaw', 'Łódź', 'Central Poland'],
+    specialties: ['Labor strike coverage', 'Transit disruption', 'Election rally documentation', 'Public transport infrastructure'],
+    bio: 'Visual reporter covering labor disputes, transit strikes, and election security perimeters across central Poland. Multi-format documentation of commuter infrastructure breakdowns and rally staging areas.',
+    trustBadge: 'verified',
+    languages: ['Polish', 'English', 'German'],
+    avatarRef: '/assets/profile_glasses_camera.png',
+    frontfolioSummary: '26 certified assets across 3 Stories. Primary coverage: transit strikes, election rally logistics, and labor disputes in Warsaw and Łódź.',
+    featuredStoryIds: ['story-007', 'story-013'],
+    featuredAssetIds: ['asset-025', 'asset-029'],
+  },
+  {
+    id: 'creator-007',
+    name: 'Elena Vasile',
+    slug: 'elenavasile',
+    locationBase: 'Bucharest, Romania',
+    regionsCovered: ['Bucharest', 'Dolj', 'Wallachia'],
+    specialties: ['Student demonstration coverage', 'Education policy reporting', 'Municipal politics', 'Youth mobilization'],
+    bio: 'Reporter covering student demonstrations, education funding disputes, and municipal governance in Bucharest. Sustained coverage of the 2025–2026 Romanian university funding protests and campus security responses.',
+    trustBadge: 'trusted',
+    languages: ['Romanian', 'English', 'French'],
+    avatarRef: '/assets/avatars/elena-vasile.png',
+    frontfolioSummary: '22 certified assets across 2 Stories. Primary coverage: student protests and education policy disputes in Bucharest.',
+    featuredStoryIds: ['story-008'],
+    featuredAssetIds: ['asset-030', 'asset-031'],
+  },
+  {
+    id: 'creator-008',
+    name: 'Carmen Ruiz',
+    slug: 'carmenruiz',
+    locationBase: 'Seville, Spain',
+    regionsCovered: ['Andalusia', 'Huelva', 'Almería'],
+    specialties: ['Data-led infographics', 'Drought mapping', 'Wildfire recovery documentation', 'Agricultural impact visualization'],
+    bio: 'Infographic journalist and data visualizer covering drought response, wildfire recovery, and agricultural impact across Andalusia. Produces certified infographics, maps, and illustrated data packages.',
+    trustBadge: 'verified',
+    languages: ['Spanish', 'English', 'Portuguese'],
+    avatarRef: '/assets/avatars/carmen-ruiz.png',
+    frontfolioSummary: '19 certified assets across 2 Stories. Primary coverage: wildfire aftermath and drought response in Andalusia using data visualization and infographic formats.',
+    featuredStoryIds: ['story-005', 'story-009'],
+    featuredAssetIds: ['asset-017', 'asset-033'],
+  },
+  {
+    id: 'creator-009',
+    name: 'Nikos Papadopoulos',
+    slug: 'nikospapadopoulos',
+    locationBase: 'Thessaloniki, Greece',
+    regionsCovered: ['Northern Greece', 'Evros', 'Thessaloniki'],
+    specialties: ['Asylum infrastructure', 'Humanitarian logistics', 'Processing center documentation'],
+    bio: 'Humanitarian logistics photographer covering asylum processing centers, reception facilities, and aid distribution across northern Greece. Independent documentation since 2020.',
+    trustBadge: 'trusted',
+    languages: ['Greek', 'English'],
+    avatarRef: '/assets/avatars/nikos-papadopoulos.png',
+    frontfolioSummary: '15 certified assets across 2 Stories. Primary coverage: asylum processing facilities and humanitarian aid distribution in Evros and Thessaloniki.',
+    featuredStoryIds: ['story-004'],
+    featuredAssetIds: ['asset-016'],
+  },
+  {
+    id: 'creator-010',
+    name: 'Sarah Chen',
+    slug: 'sarahchen',
+    locationBase: 'Hong Kong',
+    regionsCovered: ['China', 'Hong Kong', 'Taiwan', 'Southeast Asia'],
+    specialties: ['Conflict reporting', 'Climate documentation', 'Technology', 'Regional politics'],
+    bio: 'Award-winning journalist covering conflict, climate, and technology across Asia Pacific for over 12 years. Previously with Reuters and the South China Morning Post.',
+    trustBadge: 'verified',
+    languages: ['English', 'Mandarin', 'Cantonese'],
+    avatarRef: '/assets/profile_laughing_curls.png',
+    frontfolioSummary: '33 certified assets across 3 Stories. Primary coverage: climate collapse, semiconductor industry, and press freedom in Asia Pacific.',
+    featuredStoryIds: ['story-sc-001', 'story-sc-002'],
+    featuredAssetIds: ['asset-sc-001', 'asset-sc-005'],
+  },
+]
+
+export const creatorMap = Object.fromEntries(creators.map(c => [c.id, c]))
+export const creatorBySlug = Object.fromEntries(creators.map(c => [c.slug, c]))

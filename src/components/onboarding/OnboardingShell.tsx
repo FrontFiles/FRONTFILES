@@ -102,28 +102,17 @@ export function OnboardingShell({ state, dispatch, goNext }: OnboardingShellProp
   }
 
   return (
-    <div className="flex h-full min-h-screen bg-white">
-      {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex items-center h-14 px-8 border-b-2 border-black bg-white">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 bg-black flex items-center justify-center shrink-0">
-            <div className="w-3 h-3 bg-white" />
-          </div>
-          <span className="text-black font-bold tracking-tight text-[15px] uppercase">Frontfiles</span>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-slate-500 uppercase tracking-widest font-medium">Creator Onboarding</span>
-          <div className="w-px h-4 bg-slate-300" />
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white text-xs font-bold tracking-wide">
-            {state.currentStep}<span className="text-blue-200 font-normal"> / 6</span>
-          </span>
-        </div>
-      </div>
+    <div className="flex flex-col flex-1 min-h-screen bg-white">
+      {/* Logo header */}
+      <header className="h-14 flex items-center px-8 border-b-2 border-black shrink-0">
+        <a href="/" className="text-lg font-black tracking-tight leading-none">
+          <span className="text-black">FRONT</span><span className="text-blue-600">FILES</span>
+        </a>
+      </header>
 
-      {/* Body */}
-      <div className="flex w-full pt-14">
+      <div className="flex flex-1">
         {/* Left sidebar */}
-        <div className="hidden lg:flex shrink-0 w-64 h-[calc(100vh-3.5rem)] sticky top-14 overflow-y-auto bg-white border-r border-slate-200">
+        <div className="hidden lg:flex shrink-0 w-64 overflow-y-auto bg-white border-r border-slate-200">
           <StepIndicator
             currentStep={state.currentStep}
             completedSteps={state.completedSteps}

@@ -152,7 +152,7 @@ export function Step6VaultCreation({ vaultId, profileDraft, identityAnchor }: St
       <div className="border border-slate-200 px-4 py-3">
         <p className="text-xs text-slate-400 leading-relaxed">
           Your account is in good standing. Files you upload will be publicly accessible unless you mark them as private.
-          Frontfiles does not guarantee editorial placement — Vault verification is a credential of authenticity, not a commissioning relationship.
+          Frontfiles does not guarantee editorial placement. Vault verification is a credential of authenticity, not a commissioning relationship.
         </p>
       </div>
     </div>
@@ -163,7 +163,7 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{label}</span>
-      <span className="text-sm text-black font-medium truncate">{value || '—'}</span>
+      <span className="text-sm text-black font-medium truncate">{value || '·'}</span>
     </div>
   )
 }
