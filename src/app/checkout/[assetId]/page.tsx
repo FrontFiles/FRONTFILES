@@ -110,7 +110,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ assetId: st
             {STEP_ORDER.map((step, i) => (
               <div key={step} className="flex items-center">
                 <div className={`flex items-center gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-widest ${
-                  i === currentStepIdx ? 'bg-blue-600 text-white' :
+                  i === currentStepIdx ? 'bg-[#0000ff] text-white' :
                   i < currentStepIdx ? 'bg-black text-white' :
                   'bg-slate-100 text-slate-400'
                 }`}>
@@ -144,7 +144,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ assetId: st
             <Panel title="Transaction complete" borderStyle="blue">
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-600 flex items-center justify-center">
+                  <div className="w-8 h-8 bg-[#0000ff] flex items-center justify-center">
                     <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white">
                       <path d="M4 12L9 17L20 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -157,7 +157,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ assetId: st
                 <div className="border border-slate-200 px-3 py-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-400">Certified Package</span>
-                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">Certificate + Licence + Invoice + Receipt</span>
+                    <span className="text-[10px] font-bold text-[#0000ff] uppercase tracking-wide">Certificate + Licence + Invoice + Receipt</span>
                   </div>
                 </div>
               </div>
@@ -204,7 +204,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ assetId: st
                   <button onClick={() => dispatch({ type: 'GO_BACK' })} className="h-9 px-4 border border-slate-200 text-slate-400 text-xs font-bold uppercase tracking-wide hover:border-black hover:text-black transition-colors">
                     Back
                   </button>
-                  <button onClick={() => dispatch({ type: 'REVIEW_DECLARATION' })} className="h-9 px-4 bg-blue-600 text-white text-xs font-bold uppercase tracking-wide hover:bg-blue-700 transition-colors flex-1">
+                  <button onClick={() => dispatch({ type: 'REVIEW_DECLARATION' })} className="h-9 px-4 bg-[#0000ff] text-white text-xs font-bold uppercase tracking-wide hover:bg-[#0000cc] transition-colors flex-1">
                     I have reviewed the declaration
                   </button>
                 </div>
@@ -233,7 +233,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ assetId: st
                   <button onClick={() => dispatch({ type: 'GO_BACK' })} className="h-9 px-4 border border-slate-200 text-slate-400 text-xs font-bold uppercase tracking-wide hover:border-black hover:text-black transition-colors">
                     Back
                   </button>
-                  <button onClick={() => dispatch({ type: 'CONFIRM_BEFORE_SIGNING' })} className="h-9 px-4 bg-blue-600 text-white text-xs font-bold uppercase tracking-wide hover:bg-blue-700 transition-colors flex-1">
+                  <button onClick={() => dispatch({ type: 'CONFIRM_BEFORE_SIGNING' })} className="h-9 px-4 bg-[#0000ff] text-white text-xs font-bold uppercase tracking-wide hover:bg-[#0000cc] transition-colors flex-1">
                     Confirm and proceed to payment
                   </button>
                 </div>
@@ -259,7 +259,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ assetId: st
                   <button onClick={() => dispatch({ type: 'GO_BACK' })} className="h-9 px-4 border border-slate-200 text-slate-400 text-xs font-bold uppercase tracking-wide hover:border-black hover:text-black transition-colors">
                     Back
                   </button>
-                  <button onClick={() => dispatch({ type: 'CONFIRM_PRICE' })} className="h-9 px-4 bg-blue-600 text-white text-xs font-bold uppercase tracking-wide hover:bg-blue-700 transition-colors flex-1">
+                  <button onClick={() => dispatch({ type: 'CONFIRM_PRICE' })} className="h-9 px-4 bg-[#0000ff] text-white text-xs font-bold uppercase tracking-wide hover:bg-[#0000cc] transition-colors flex-1">
                     Confirm price
                   </button>
                 </div>
@@ -279,7 +279,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ assetId: st
                   <button onClick={() => dispatch({ type: 'GO_BACK' })} className="h-9 px-4 border border-slate-200 text-slate-400 text-xs font-bold uppercase tracking-wide hover:border-black hover:text-black transition-colors">
                     Back
                   </button>
-                  <button onClick={() => dispatch({ type: 'COMPLETE_PAYMENT' })} className="h-9 px-4 bg-black text-white text-xs font-bold uppercase tracking-wide hover:bg-blue-600 transition-colors flex-1">
+                  <button onClick={() => dispatch({ type: 'COMPLETE_PAYMENT' })} className="h-9 px-4 bg-black text-white text-xs font-bold uppercase tracking-wide hover:bg-[#0000ff] transition-colors flex-1">
                     Complete payment
                   </button>
                 </div>

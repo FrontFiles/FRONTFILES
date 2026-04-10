@@ -31,7 +31,7 @@ export function PublishBar() {
       {/* Counts */}
       <div className="flex items-center gap-3 text-[10px] font-mono">
         <span className="text-slate-500">{included.length} files</span>
-        <span className="text-blue-600">{assigned.length} assigned</span>
+        <span className="text-[#0000ff]">{assigned.length} assigned</span>
         {unassigned.length > 0 && (
           <button
             onClick={() => dispatch({ type: 'SET_FILTER_PRESET', preset: 'unassigned' })}
@@ -42,7 +42,7 @@ export function PublishBar() {
         )}
         {excluded > 0 && <span className="text-slate-300">{excluded} excluded</span>}
         {selectedCount > 0 && (
-          <span className="text-blue-700 bg-blue-100 px-1.5 py-0.5">
+          <span className="text-[#0000cc] bg-[#0000ff]/10 px-1.5 py-0.5">
             {selectedCount} selected
           </span>
         )}

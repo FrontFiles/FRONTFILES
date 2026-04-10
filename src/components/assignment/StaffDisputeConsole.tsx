@@ -4,7 +4,7 @@
  * Staff Dispute Console — Detail view and resolution controls for a single disputed assignment.
  *
  * Layout: 8-col main + 4-col right rail (mirrors AssignmentOverview grid).
- * Design canon: black + blue-600 + white. No radius. Hard borders. Dense typography.
+ * Design canon: black + #0000ff + white. No radius. Hard borders. Dense typography.
  */
 
 import { useState } from 'react'
@@ -353,7 +353,7 @@ function EventTypeBadge({ type }: { type: CertificationEventType }) {
     <span className={cn(
       'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border shrink-0',
       isDispute ? 'border-black text-black' :
-      isEscrow ? 'border-blue-600 text-blue-600' :
+      isEscrow ? 'border-[#0000ff] text-[#0000ff]' :
       'border-black/15 text-black/30',
     )}>
       {type.replace(/_/g, ' ')}

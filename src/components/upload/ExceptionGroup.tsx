@@ -42,7 +42,7 @@ export function ExceptionGroup({ reason, assets, onQuickFix, onBulkFix }: Except
           {quickFixAction && (
             <button
               onClick={() => onBulkFix?.(assetIds, quickFixAction.action)}
-              className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+              className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest border border-[#0000ff] text-[#0000ff] hover:bg-[#0000ff] hover:text-white transition-colors"
             >
               {quickFixAction.label} All
             </button>
@@ -62,7 +62,7 @@ export function ExceptionGroup({ reason, assets, onQuickFix, onBulkFix }: Except
             {quickFixAction && (
               <button
                 onClick={() => onQuickFix?.([ asset.id ], quickFixAction.action)}
-                className="text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline"
+                className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] hover:underline"
               >
                 {quickFixAction.label}
               </button>

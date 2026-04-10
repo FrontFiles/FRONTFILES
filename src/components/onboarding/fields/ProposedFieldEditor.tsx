@@ -59,7 +59,7 @@ export function ProposedFieldEditor({ label, field, onChange, multiline = false,
             </span>
           )}
           {isIdentity && (
-            <span className="text-[9px] font-bold tracking-widest text-blue-600 uppercase border border-blue-600 px-1.5 py-0.5">
+            <span className="text-[9px] font-bold tracking-widest text-[#0000ff] uppercase border border-[#0000ff] px-1.5 py-0.5">
               ID Anchor
             </span>
           )}
@@ -89,7 +89,7 @@ export function ProposedFieldEditor({ label, field, onChange, multiline = false,
         <div className="flex items-center gap-2">
           <div className="flex-1 h-0.5 bg-slate-200 overflow-hidden">
             <div
-              className="h-full bg-blue-600 transition-all"
+              className="h-full bg-[#0000ff] transition-all"
               style={{ width: `${confidencePct}%` }}
             />
           </div>
@@ -106,14 +106,14 @@ export function ProposedFieldEditor({ label, field, onChange, multiline = false,
             <Textarea
               value={draft}
               onChange={e => setDraft(e.target.value)}
-              className="bg-white border-2 border-black text-black placeholder:text-slate-300 text-sm rounded-none focus-visible:border-blue-600 focus-visible:ring-0 min-h-24 resize-none"
+              className="bg-white border-2 border-black text-black placeholder:text-slate-300 text-sm rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0 min-h-24 resize-none"
               autoFocus
             />
           ) : (
             <Input
               value={draft}
               onChange={e => setDraft(e.target.value)}
-              className="h-9 bg-white border-2 border-black text-black placeholder:text-slate-300 text-sm rounded-none focus-visible:border-blue-600 focus-visible:ring-0"
+              className="h-9 bg-white border-2 border-black text-black placeholder:text-slate-300 text-sm rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0"
               autoFocus
             />
           )}
@@ -121,7 +121,7 @@ export function ProposedFieldEditor({ label, field, onChange, multiline = false,
             <Button
               onClick={handleSave}
               size="sm"
-              className="h-7 px-3 bg-blue-600 text-white hover:bg-blue-700 font-bold text-xs rounded-none uppercase tracking-wide"
+              className="h-7 px-3 bg-[#0000ff] text-white hover:bg-[#0000cc] font-bold text-xs rounded-none uppercase tracking-wide"
             >
               Save
             </Button>
@@ -140,11 +140,11 @@ export function ProposedFieldEditor({ label, field, onChange, multiline = false,
           className={cn(
             'group relative border px-3 py-2.5 transition-colors',
             field.confirmed
-              ? 'bg-white border-2 border-blue-600'
+              ? 'bg-white border-2 border-[#0000ff]'
               : isAi
               ? 'bg-slate-50 border border-dashed border-slate-400'
               : isIdentity
-              ? 'bg-white border border-blue-600/30'
+              ? 'bg-white border border-[#0000ff]/30'
               : 'bg-white border border-slate-200'
           )}
         >
@@ -162,7 +162,7 @@ export function ProposedFieldEditor({ label, field, onChange, multiline = false,
                 <Button
                   onClick={handleConfirm}
                   size="xs"
-                  className="h-6 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-none uppercase tracking-wide"
+                  className="h-6 px-2 bg-[#0000ff] hover:bg-[#0000cc] text-white font-bold text-xs rounded-none uppercase tracking-wide"
                 >
                   Confirm
                 </Button>

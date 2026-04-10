@@ -271,7 +271,7 @@ export function ReviewConsole() {
               <div className="flex flex-col gap-1">
                 {milestone.requiredEvidenceTypes.map(t => (
                   <div key={t} className="flex items-center gap-2">
-                    <span className="text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border border-blue-600/30 text-blue-600/60">
+                    <span className="text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border border-[#0000ff]/30 text-[#0000ff]/60">
                       {t.replace(/_/g, ' ')}
                     </span>
                     {allEvidence.some(e => e.kind === t) ? (
@@ -311,7 +311,7 @@ export function ReviewConsole() {
                   <div key={e.id} className="border border-black/15 p-3">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-[9px] font-bold text-black">{e.label}</span>
-                      <span className="text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border border-blue-600/30 text-blue-600/60">
+                      <span className="text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border border-[#0000ff]/30 text-[#0000ff]/60">
                         Service log
                       </span>
                     </div>

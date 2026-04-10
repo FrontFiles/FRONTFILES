@@ -36,9 +36,9 @@ export function CommitScreen({ assets, dispatch }: CommitScreenProps) {
       </div>
 
       {/* Ready to commit */}
-      <div className="border-2 border-blue-600 p-4 space-y-3">
+      <div className="border-2 border-[#0000ff] p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-widest text-blue-600">
+          <span className="text-xs font-bold uppercase tracking-widest text-[#0000ff]">
             COMMITTING {readyAssets.length} ASSETS
           </span>
           <span className="text-sm font-mono font-bold">
@@ -84,7 +84,7 @@ export function CommitScreen({ assets, dispatch }: CommitScreenProps) {
 
         {/* Stories */}
         {summary.storySummary.length > 0 && (
-          <div className="space-y-1 border-t border-blue-200 pt-2">
+          <div className="space-y-1 border-t border-[#0000ff]/15 pt-2">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">STORIES</div>
             {summary.storySummary.map((s, i) => (
               <div key={i} className="flex items-center justify-between text-[10px] font-mono">
@@ -96,10 +96,10 @@ export function CommitScreen({ assets, dispatch }: CommitScreenProps) {
         )}
 
         {/* Asset list */}
-        <div className="border-t border-blue-200 pt-2 space-y-0.5 max-h-[250px] overflow-y-auto">
+        <div className="border-t border-[#0000ff]/15 pt-2 space-y-0.5 max-h-[250px] overflow-y-auto">
           {readyAssets.map(asset => (
-            <div key={asset.id} className="flex items-center gap-2 py-1 text-[10px] font-mono border-b border-blue-100">
-              <span className="w-10 font-bold uppercase text-blue-600">
+            <div key={asset.id} className="flex items-center gap-2 py-1 text-[10px] font-mono border-b border-[#0000ff]/10">
+              <span className="w-10 font-bold uppercase text-[#0000ff]">
                 {asset.format ? ASSET_FORMAT_LABELS[asset.format]?.slice(0, 5) : '?'}
               </span>
               <span className="flex-1 truncate">{asset.title || asset.fileName}</span>
@@ -109,7 +109,7 @@ export function CommitScreen({ assets, dispatch }: CommitScreenProps) {
               </span>
               <span className={cn(
                 'px-1 py-0.5 text-[9px] uppercase',
-                asset.declarationState === 'fully_validated' ? 'border border-blue-600 text-blue-600' : 'border border-slate-300 text-slate-500'
+                asset.declarationState === 'fully_validated' ? 'border border-[#0000ff] text-[#0000ff]' : 'border border-slate-300 text-slate-500'
               )}>
                 {asset.declarationState?.replace(/_/g, ' ') ?? 'pending'}
               </span>
@@ -147,7 +147,7 @@ export function CommitScreen({ assets, dispatch }: CommitScreenProps) {
             </span>
             <button
               onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'exceptions' })}
-              className="text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline"
+              className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] hover:underline"
             >
               Fix in Exception Queue
             </button>
@@ -169,7 +169,7 @@ export function CommitScreen({ assets, dispatch }: CommitScreenProps) {
           className={cn(
             'flex-1 py-3 text-sm font-bold uppercase tracking-widest border-2 transition-colors',
             readyAssets.length > 0
-              ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
+              ? 'border-[#0000ff] bg-[#0000ff] text-white hover:bg-[#0000cc]'
               : 'border-slate-200 text-slate-300 cursor-not-allowed'
           )}
         >

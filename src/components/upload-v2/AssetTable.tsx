@@ -184,14 +184,14 @@ export function AssetTable() {
     <div ref={tableRef} tabIndex={0} className="flex flex-col h-full outline-none">
       {/* Bulk actions bar (shown when multi-select) */}
       {state.ui.selectedAssetIds.length > 1 && (
-        <div className="px-3 py-1.5 border-b border-black bg-blue-50 flex items-center gap-2 flex-shrink-0">
-          <span className="text-[10px] font-mono text-blue-700">
+        <div className="px-3 py-1.5 border-b border-black bg-[#0000ff]/5 flex items-center gap-2 flex-shrink-0">
+          <span className="text-[10px] font-mono text-[#0000cc]">
             {state.ui.selectedAssetIds.length} selected
           </span>
           <div className="relative">
             <button
               onClick={() => setShowBulkAssign(!showBulkAssign)}
-              className="px-2 py-1 text-[10px] font-bold uppercase border border-blue-600 text-blue-600 hover:bg-blue-100"
+              className="px-2 py-1 text-[10px] font-bold uppercase border border-[#0000ff] text-[#0000ff] hover:bg-[#0000ff]/10"
             >
               Assign to Story
             </button>
@@ -243,7 +243,7 @@ export function AssetTable() {
                 }
               }
             }}
-            className="px-2 py-1 text-[10px] font-bold uppercase border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50"
+            className="px-2 py-1 text-[10px] font-bold uppercase border border-dashed border-[#0000ff]/60 text-[#0000ff] hover:bg-[#0000ff]/5"
           >
             Apply Suggested Privacy
           </button>
@@ -256,7 +256,7 @@ export function AssetTable() {
                 }
               }
             }}
-            className="px-2 py-1 text-[10px] font-bold uppercase border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50"
+            className="px-2 py-1 text-[10px] font-bold uppercase border border-dashed border-[#0000ff]/60 text-[#0000ff] hover:bg-[#0000ff]/5"
           >
             Apply Suggested Licences
           </button>
@@ -269,7 +269,7 @@ export function AssetTable() {
                 }
               }
             }}
-            className="px-2 py-1 text-[10px] font-bold uppercase border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50"
+            className="px-2 py-1 text-[10px] font-bold uppercase border border-dashed border-[#0000ff]/60 text-[#0000ff] hover:bg-[#0000ff]/5"
           >
             Apply Suggested Prices
           </button>
@@ -416,12 +416,12 @@ function AssetRow({
   const isAnalysing = asset.analysisStatus !== 'complete' && asset.analysisStatus !== 'failed'
   const isFailed = asset.analysisStatus === 'failed'
 
-  const getExceptionBorderColor = (): string => {
-    if (isFailed) return 'border-l-black'
-    if (asset.excluded) return 'border-l-slate-300'
-    if (hasBlocking) return 'border-l-red-500'
-    if (hasAdvisory) return 'border-l-amber-400'
-    return 'border-l-transparent'
+  const getExceptionBorder = (): string => {
+    if (isFailed) return 'border-l-[3px] border-l-black'
+    if (asset.excluded) return 'border-l-[3px] border-l-slate-300'
+    if (hasBlocking) return 'border-l-[2px] border-l-black'
+    if (hasAdvisory) return 'border-l-[1px] border-l-black border-dashed'
+    return 'border-l-[3px] border-l-transparent'
   }
 
   const rowPy = isCompact ? 'py-0.5' : 'py-1.5'
@@ -429,11 +429,11 @@ function AssetRow({
   return (
     <div
       className={cn(
-        'px-3 grid gap-1 items-center text-xs border-b border-slate-50 border-l-3 cursor-pointer transition-colors',
+        'px-3 grid gap-1 items-center text-xs border-b border-slate-50 cursor-pointer transition-colors',
         rowPy,
         gridCols,
-        getExceptionBorderColor(),
-        isFocused && 'bg-blue-50',
+        getExceptionBorder(),
+        isFocused && 'bg-[#0000ff]/5',
         isSelectedRow && !isFocused && 'bg-slate-50',
         asset.excluded && 'opacity-40',
         isFailed && 'bg-slate-50 opacity-60',
@@ -454,9 +454,9 @@ function AssetRow({
       <div className="flex items-center justify-center">
         {isFailed && <span className="text-[8px] font-bold bg-black text-white px-1 py-0.5 uppercase tracking-wide">Failed</span>}
         {!isFailed && isAnalysing && <Loader2 size={12} className="text-slate-300 animate-spin" />}
-        {!isFailed && !isAnalysing && hasBlocking && <AlertTriangle size={12} className="text-red-500" />}
-        {!isFailed && !isAnalysing && !hasBlocking && hasAdvisory && <AlertTriangle size={12} className="text-amber-400" />}
-        {!isFailed && !isAnalysing && !hasBlocking && !hasAdvisory && !asset.excluded && <Check size={12} className="text-blue-600" />}
+        {!isFailed && !isAnalysing && hasBlocking && <AlertTriangle size={12} className="text-black" />}
+        {!isFailed && !isAnalysing && !hasBlocking && hasAdvisory && <AlertTriangle size={12} className="text-slate-400" />}
+        {!isFailed && !isAnalysing && !hasBlocking && !hasAdvisory && !asset.excluded && <Check size={12} className="text-[#0000ff]" />}
       </div>
 
       {/* Title (inline editable) */}
@@ -468,11 +468,11 @@ function AssetRow({
             onChange={e => setEditValue(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null) }}
-            className="w-full text-xs border-b-2 border-blue-600 bg-transparent outline-none py-0.5"
+            className="w-full text-xs border-b-2 border-[#0000ff] bg-transparent outline-none py-0.5"
           />
         ) : (
           <span
-            className="truncate block cursor-text hover:bg-blue-50 px-1 py-0.5 -mx-1"
+            className="truncate block cursor-text hover:bg-[#0000ff]/5 px-1 py-0.5 -mx-1"
             onClick={() => startEdit(asset.id, 'title', asset.editable.title)}
             title={asset.editable.title || asset.filename}
           >
@@ -499,7 +499,7 @@ function AssetRow({
                 if (e.key === 'Escape') { setCreatingStoryForAsset(null); setNewStoryNameInline('') }
               }}
               placeholder="Name..."
-              className="flex-1 text-[10px] border-b border-blue-600 bg-transparent outline-none py-0.5 min-w-0"
+              className="flex-1 text-[10px] border-b border-[#0000ff] bg-transparent outline-none py-0.5 min-w-0"
             />
             <button onClick={() => { setCreatingStoryForAsset(null); setNewStoryNameInline('') }} className="p-0.5">
               <X size={8} className="text-slate-400" />
@@ -521,7 +521,7 @@ function AssetRow({
             }}
             className={cn(
               'w-full text-[10px] border px-1 py-0.5 bg-white truncate',
-              !asset.storyGroupId ? 'border-red-300 text-red-500' : 'border-slate-200',
+              !asset.storyGroupId ? 'border-black border-dashed text-slate-500' : 'border-slate-200',
             )}
           >
             <option value="">{'\u2014'} None {'\u2014'}</option>
@@ -543,10 +543,10 @@ function AssetRow({
           }}
           className={cn(
             'text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 border w-full text-center',
-            asset.editable.privacy === 'PUBLIC' && 'border-blue-600 text-blue-600 bg-blue-50',
+            asset.editable.privacy === 'PUBLIC' && 'border-[#0000ff] text-[#0000ff] bg-[#0000ff]/5',
             asset.editable.privacy === 'PRIVATE' && 'border-slate-400 text-slate-500 bg-slate-50',
-            asset.editable.privacy === 'RESTRICTED' && 'border-amber-500 text-amber-600 bg-amber-50',
-            !asset.editable.privacy && 'border-red-300 text-red-400',
+            asset.editable.privacy === 'RESTRICTED' && 'border-black text-black bg-slate-50',
+            !asset.editable.privacy && 'border-black border-dashed text-slate-400',
           )}
         >
           {asset.editable.privacy ?? (asset.proposal?.privacySuggestion ? `${asset.proposal.privacySuggestion}?` : 'Set')}
@@ -563,12 +563,12 @@ function AssetRow({
             onChange={e => setEditValue(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null) }}
-            className="w-full text-xs border-b-2 border-blue-600 bg-transparent outline-none py-0.5 text-right"
+            className="w-full text-xs border-b-2 border-[#0000ff] bg-transparent outline-none py-0.5 text-right"
           />
         ) : (
           <span
             className={cn(
-              'block text-right cursor-text hover:bg-blue-50 px-1 py-0.5',
+              'block text-right cursor-text hover:bg-[#0000ff]/5 px-1 py-0.5',
               asset.editable.price !== null ? 'font-mono' : 'text-slate-300 italic text-[10px]',
             )}
             onClick={() => startEdit(asset.id, 'price', asset.editable.price !== null ? (asset.editable.price / 100).toString() : '')}
@@ -588,10 +588,10 @@ function AssetRow({
           {asset.declarationState ? (
             <span className={cn(
               'font-bold uppercase tracking-wide',
-              asset.declarationState === 'fully_validated' && 'text-blue-600',
-              asset.declarationState === 'corroborated' && 'text-green-600',
-              asset.declarationState === 'provenance_pending' && 'text-amber-600',
-              asset.declarationState === 'manifest_invalid' && 'text-red-600',
+              asset.declarationState === 'fully_validated' && 'text-[#0000ff]',
+              asset.declarationState === 'corroborated' && 'text-[#0000ff]',
+              asset.declarationState === 'provenance_pending' && 'text-slate-500',
+              asset.declarationState === 'manifest_invalid' && 'text-black',
               !['fully_validated', 'corroborated', 'provenance_pending', 'manifest_invalid'].includes(asset.declarationState) && 'text-slate-400',
             )}>
               {DECLARATION_STATE_LABELS[asset.declarationState]}
@@ -606,15 +606,15 @@ function AssetRow({
       {!isCompact && (
         <div className="flex items-center gap-0.5 overflow-hidden">
           {exceptions.length === 0 && !asset.excluded && (
-            <span className="text-[9px] text-blue-500 font-bold uppercase">OK</span>
+            <span className="text-[9px] text-[#0000ff] font-bold uppercase">OK</span>
           )}
           {exceptions.filter(e => e.severity === 'blocking').length > 0 && (
-            <span className="bg-red-100 text-red-600 text-[8px] font-bold uppercase px-1 py-0.5 whitespace-nowrap">
+            <span className="bg-black text-white text-[8px] font-bold uppercase px-1 py-0.5 whitespace-nowrap">
               {exceptions.filter(e => e.severity === 'blocking').length} block
             </span>
           )}
           {exceptions.filter(e => e.severity === 'advisory').length > 0 && (
-            <span className="bg-amber-100 text-amber-600 text-[8px] font-bold uppercase px-1 py-0.5 whitespace-nowrap">
+            <span className="border border-black text-black text-[8px] font-bold uppercase px-1 py-0.5 whitespace-nowrap">
               {exceptions.filter(e => e.severity === 'advisory').length} adv
             </span>
           )}
@@ -627,7 +627,7 @@ function AssetRow({
           ? asset.editable.licences.length === 1
             ? LICENCE_TYPE_LABELS[asset.editable.licences[0]]
             : `${asset.editable.licences.length} lic.`
-          : <span className="text-red-300">None</span>
+          : <span className="text-slate-300">None</span>
         }
       </div>
 

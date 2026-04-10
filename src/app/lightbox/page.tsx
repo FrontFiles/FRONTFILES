@@ -140,7 +140,7 @@ export default function LightboxPage() {
                 <MetaRow label="Stories" value={String(sourceStories.length)} />
                 <MetaRow label="Geographies" value={String(lightbox.geographyClusters.length)} />
                 <MetaRow label="Estimated total" value={`\u20AC${totalPrice}`} />
-                <button className="w-full mt-4 bg-blue-600 text-white text-sm font-bold uppercase tracking-wider py-3 hover:bg-blue-700 transition-colors">
+                <button className="w-full mt-4 bg-[#0000ff] text-white text-sm font-bold uppercase tracking-wider py-3 hover:bg-[#0000cc] transition-colors">
                   Proceed to license
                 </button>
               </div>
@@ -172,7 +172,7 @@ export default function LightboxPage() {
                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Discovery signals</h3>
                   <div className="flex flex-col gap-1">
                     {recs.map(r => (
-                      <span key={r.id} className="text-[10px] font-bold uppercase tracking-widest text-blue-600 border border-blue-600 px-2 py-0.5 inline-block w-fit">
+                      <span key={r.id} className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] border border-[#0000ff] px-2 py-0.5 inline-block w-fit">
                         {r.reasonLabel}
                       </span>
                     ))}

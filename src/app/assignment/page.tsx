@@ -54,7 +54,7 @@ export default function AssignmentListPage() {
                 {/* Class badge */}
                 <span className={cn(
                   'text-[8px] font-bold uppercase tracking-[0.12em] px-2 py-1 border shrink-0 w-16 text-center',
-                  a.assignmentClass === 'service' ? 'border-blue-600 text-blue-600' :
+                  a.assignmentClass === 'service' ? 'border-[#0000ff] text-[#0000ff]' :
                   a.assignmentClass === 'hybrid' ? 'border-black text-black bg-black/5' :
                   'border-black text-black'
                 )}>

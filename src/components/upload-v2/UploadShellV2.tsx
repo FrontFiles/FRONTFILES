@@ -34,7 +34,7 @@ function ShellInner() {
               className={cn(
                 'px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest border-r border-black transition-colors',
                 isActive && 'bg-black text-white',
-                isPast && !isActive && 'text-blue-600 hover:bg-blue-50 cursor-pointer',
+                isPast && !isActive && 'text-[#0000ff] hover:bg-[#0000ff]/5 cursor-pointer',
                 !isActive && !isPast && 'text-slate-300 cursor-default',
               )}
             >
@@ -44,7 +44,7 @@ function ShellInner() {
         })}
         <div className="flex-1" />
         {state.ui.newsroomMode && (
-          <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest bg-blue-600 text-white">
+          <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest bg-[#0000ff] text-white">
             Newsroom
           </div>
         )}

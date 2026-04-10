@@ -39,7 +39,7 @@ export function AssignmentOverview() {
             <div className="flex items-center gap-2 mb-3">
               <span className={cn(
                 'text-[8px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 border',
-                a.assignmentClass === 'service' ? 'border-blue-600 text-blue-600' : 'border-black text-black'
+                a.assignmentClass === 'service' ? 'border-[#0000ff] text-[#0000ff]' : 'border-black text-black'
               )}>
                 {ASSIGNMENT_CLASS_LABELS[a.assignmentClass]}
               </span>
@@ -122,8 +122,8 @@ export function AssignmentOverview() {
                 </div>
               ))}
               {awaitingReview.map(m => (
-                <div key={m.id} className="border-2 border-blue-600 p-3">
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-blue-600 block">Awaiting review</span>
+                <div key={m.id} className="border-2 border-[#0000ff] p-3">
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#0000ff] block">Awaiting review</span>
                   <p className="text-[10px] text-black mt-1">{m.title}</p>
                   <p className="text-[8px] font-mono text-black/40 mt-0.5">{m.fulfilmentSubmissions.length} submission(s)</p>
                 </div>

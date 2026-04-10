@@ -271,7 +271,7 @@ export function FulfilmentComposer() {
                 {milestone.requiredEvidenceTypes.map(t => (
                   <span
                     key={t}
-                    className="text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border border-blue-600/30 text-blue-600/60"
+                    className="text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border border-[#0000ff]/30 text-[#0000ff]/60"
                   >
                     {t.replace(/_/g, ' ')}
                   </span>

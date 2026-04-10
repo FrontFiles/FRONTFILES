@@ -1,0 +1,28 @@
+Beneath the Canopy: Tracking Illegal Logging in Brazil's Para State
+
+By Carolina Mendes
+Altamira, Para, Brazil -- February 2026
+
+The satellite images are unambiguous. Viewed in sequence from January 2024 to December 2025, they show a section of primary rainforest in southeastern Para state -- roughly eleven thousand hectares, an area larger than the city of Paris -- reduced to a patchwork of bare earth, burn scars, and isolated tree stands. The deforestation follows a pattern well known to researchers: access roads cut first, then selective logging of the most valuable hardwoods, then clear-cutting and burning to prepare the land for cattle grazing.
+
+What the satellite images cannot show is who is responsible. And that gap between detection and enforcement is where the Amazon's destruction continues to accelerate, despite renewed government promises and international funding commitments.
+
+This investigation, conducted over six months with cooperation from the Brazilian Institute of Space Research (INPE), the Federal Public Ministry, and three indigenous communities in the Xingu River basin, reveals a logging operation that has systematically evaded enforcement by exploiting jurisdictional gaps between federal and state agencies, fraudulent timber transport documents, and the chronic underfunding of Brazil's environmental police force, IBAMA.
+
+INPE's DETER deforestation alert system flagged the area in question multiple times between March and August 2024. Each alert should have triggered an enforcement response. According to records obtained through Brazil's freedom of information law, IBAMA received the alerts and opened case files. But no field inspection occurred until November 2024, eight months after the first flag. By then, the most intensive phase of logging was complete.
+
+The delay was not anomalous. IBAMA officials, speaking on condition they not be identified by name, described an agency stretched beyond its operational capacity. One regional coordinator responsible for an area roughly the size of France said his office had twelve field agents, three functioning vehicles, and a helicopter budget that allowed approximately forty flight hours per year. "We choose which fires to fight," he said. "We cannot fight them all."
+
+The timber extracted from the Para site entered the legal supply chain through a laundering mechanism that investigators describe as endemic in the Brazilian Amazon. Logs are transported with documents -- known as GFs, or Guias Florestais -- that are either forged or issued against legitimate forest management plans in other locations. A single authorized management plan can generate documents that cover far more timber than the plan actually permits, because verification is rare and penalties are weak.
+
+Federal prosecutors have opened an investigation into the specific transport documents associated with the Para operation. Court records show that at least three sawmills in the Maraba region received timber from the site. The sawmills' owners denied knowledge that the wood was illegally sourced, a defense that prosecutors say is routine and nearly impossible to disprove under current law.
+
+The human cost of the operation is borne most directly by the Arara and Parakana indigenous communities, whose territorial boundaries lie within thirty kilometers of the deforested area. Leaders from both communities reported increased incursions by armed men during the peak logging period, contamination of water sources used for drinking and fishing, and the displacement of game animals that are a primary protein source.
+
+Kaiapo Arara, a chief of the Arara people, described the situation in terms that mixed grief with exhaustion. "Every year they come closer. Every year we send letters, we file complaints, we talk to the prosecutors. And every year more forest is gone." His community has documented the encroachment through its own GPS mapping project, supported by a partnership with the Instituto Socioambiental, a Brazilian nonprofit.
+
+The international dimension of the problem has grown more complex. European Union regulations requiring deforestation-free supply chains, which took effect in 2024, were intended to reduce demand for commodities linked to forest destruction. But enforcement on the consumer end depends on traceability systems that remain incomplete. Cattle raised on illegally cleared land are routinely laundered through intermediate ranches before reaching slaughterhouses that supply export markets.
+
+Brazil's Environment Minister has publicly committed to eliminating illegal deforestation by 2030, and recent data from INPE shows that overall deforestation rates in the Amazon declined in 2025 compared to the peak years of 2020 through 2022. But researchers caution that aggregate statistics mask regional variation. In eastern Para, deforestation has not declined. In some municipalities, it has increased.
+
+At the edge of the cleared area, where the forest gives way abruptly to exposed red soil, a single Brazil nut tree stands alone. It is a protected species under Brazilian law, and cutting it is a criminal offense. It was left standing, apparently, because it was not worth the legal risk. Everything around it is gone.

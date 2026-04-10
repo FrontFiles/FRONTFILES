@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { VaultLeftRail } from '@/components/platform/VaultLeftRail'
 import { VaultAssetList } from '@/components/platform/VaultAssetList'
 import { VaultDetailDrawer } from '@/components/platform/VaultDetailDrawer'
@@ -88,7 +89,7 @@ export default function VaultPage() {
                   if (mix.infographic > 0) mixParts.push(`${mix.infographic} infographic`)
                   if (mix.vector > 0) mixParts.push(`${mix.vector} vector`)
                   return (
-                    <div key={story.id} className="border-2 border-black overflow-hidden cursor-pointer hover:opacity-95 transition-opacity">
+                    <Link key={story.id} href={`/story/${story.id}`} className="border-2 border-black overflow-hidden hover:opacity-95 transition-opacity">
                       <div className="aspect-video relative overflow-hidden bg-slate-100">
                         {story.coverImageUrl ? (
                           <img src={story.coverImageUrl} alt={story.title} className="w-full h-full object-cover" />
@@ -126,7 +127,7 @@ export default function VaultPage() {
                           </span>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   )
                 })}
               </div>
@@ -138,7 +139,7 @@ export default function VaultPage() {
               <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Articles</h2>
               <div className="flex flex-col gap-3 max-w-2xl">
                 {mockArticles.map(article => (
-                  <div key={article.id} className="border border-slate-200 hover:border-slate-400 transition-colors cursor-pointer overflow-hidden flex">
+                  <Link key={article.id} href={`/article/${article.id}`} className="border border-slate-200 hover:border-slate-400 transition-colors overflow-hidden flex">
                     <div className="w-48 shrink-0 self-stretch overflow-hidden bg-slate-100 relative">
                       {article.coverImageUrl ? (
                         <img src={article.coverImageUrl} alt={article.title} className="w-full h-full object-cover" />
@@ -165,7 +166,7 @@ export default function VaultPage() {
                         <span className="font-mono text-[10px] text-slate-400">{article.wordCount.toLocaleString()} words</span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -177,13 +178,13 @@ export default function VaultPage() {
               {mockCollections.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 max-w-2xl">
                   {mockCollections.map(coll => (
-                    <div key={coll.id} className="border-2 border-black px-4 py-3">
+                    <Link key={coll.id} href={`/collection/${coll.id}`} className="border-2 border-black px-4 py-3 hover:opacity-90 transition-opacity">
                       <div className="text-sm font-bold uppercase tracking-wide text-black">{coll.title}</div>
                       <div className="text-[10px] font-mono text-slate-400 mt-0.5">{coll.itemCount} items</div>
                       <div className="flex items-center gap-2 mt-2">
                         <StateBadge variant={coll.privacy.toLowerCase() as 'public' | 'private' | 'restricted'} />
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (

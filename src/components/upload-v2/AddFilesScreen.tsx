@@ -87,7 +87,7 @@ export function AddFilesScreen() {
         <div
           className={cn(
             'border-2 border-dashed p-12 text-center transition-colors cursor-pointer',
-            isDragOver ? 'border-blue-600 bg-blue-50' : 'border-black hover:bg-slate-50',
+            isDragOver ? 'border-[#0000ff] bg-[#0000ff]/5' : 'border-black hover:bg-slate-50',
           )}
           onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
           onDragLeave={() => setIsDragOver(false)}
@@ -210,7 +210,7 @@ export function AddFilesScreen() {
                         className={cn(
                           'px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide border transition-colors',
                           isActive
-                            ? 'border-blue-600 bg-blue-600 text-white'
+                            ? 'border-[#0000ff] bg-[#0000ff] text-white'
                             : 'border-slate-300 text-slate-500 hover:border-black hover:text-black',
                         )}
                       >

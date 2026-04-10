@@ -18,12 +18,12 @@ export function PublishReadinessGate({ job, onPublish }: PublishReadinessGatePro
 
   if (job.state === 'publishing') {
     return (
-      <div className="border-2 border-blue-600">
-        <div className="px-6 py-3 bg-blue-600">
+      <div className="border-2 border-[#0000ff]">
+        <div className="px-6 py-3 bg-[#0000ff]">
           <span className="text-sm font-bold text-white uppercase tracking-wide">Publishing to Vault</span>
         </div>
         <div className="px-6 py-5 flex items-center gap-3">
-          <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 animate-spin" />
+          <div className="w-4 h-4 border-2 border-[#0000ff]/30 border-t-[#0000ff] animate-spin" />
           <span className="text-sm text-black font-bold">Committing asset to Vault…</span>
         </div>
       </div>
@@ -32,13 +32,13 @@ export function PublishReadinessGate({ job, onPublish }: PublishReadinessGatePro
 
   if (job.state === 'published') {
     return (
-      <div className="border-2 border-blue-600">
-        <div className="px-6 py-3 bg-blue-600">
+      <div className="border-2 border-[#0000ff]">
+        <div className="px-6 py-3 bg-[#0000ff]">
           <span className="text-sm font-bold text-white uppercase tracking-wide">Published</span>
         </div>
         <div className="px-6 py-5 flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-600 flex items-center justify-center">
+            <div className="w-4 h-4 bg-[#0000ff] flex items-center justify-center">
               <svg viewBox="0 0 10 10" fill="none" className="w-2.5 h-2.5 text-white">
                 <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -60,11 +60,11 @@ export function PublishReadinessGate({ job, onPublish }: PublishReadinessGatePro
   return (
     <div className={cn(
       'border-2',
-      readiness.allRequirementsMet ? 'border-blue-600' : 'border-black'
+      readiness.allRequirementsMet ? 'border-[#0000ff]' : 'border-black'
     )}>
       <div className={cn(
         'px-6 py-3',
-        readiness.allRequirementsMet ? 'bg-blue-600' : 'bg-black'
+        readiness.allRequirementsMet ? 'bg-[#0000ff]' : 'bg-black'
       )}>
         <span className="text-sm font-bold text-white uppercase tracking-wide">Publish readiness</span>
       </div>
@@ -98,7 +98,7 @@ export function PublishReadinessGate({ job, onPublish }: PublishReadinessGatePro
           className={cn(
             'h-11 px-8 font-bold text-sm rounded-none uppercase tracking-wide w-fit',
             readiness.allRequirementsMet
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              ? 'bg-[#0000ff] text-white hover:bg-[#0000cc]'
               : 'bg-slate-200 text-slate-400 cursor-not-allowed'
           )}
         >

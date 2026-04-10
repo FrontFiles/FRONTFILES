@@ -208,6 +208,16 @@ export async function validateConfirmedProfile(profile: CreatorProfileDraft, anc
   }
 }
 
+const TAKEN_USERNAMES = ['frontfiles', 'admin', 'sarahchen']
+
+export async function checkUsernameAvailability(username: string): Promise<{ available: boolean; reason: string | null }> {
+  await delay(600)
+  if (TAKEN_USERNAMES.includes(username.toLowerCase())) {
+    return { available: false, reason: 'This username is already taken' }
+  }
+  return { available: true, reason: null }
+}
+
 export async function createVaultAccount(_profile: CreatorProfileDraft, _anchor: IdentityAnchor): Promise<{ vaultId: string; createdAt: string }> {
   await delay(2000)
   return {

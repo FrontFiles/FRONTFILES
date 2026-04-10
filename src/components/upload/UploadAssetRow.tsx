@@ -17,20 +17,20 @@ export function UploadAssetRow({ asset, selected, onToggleSelect, onEdit }: Uplo
   const stateColor = {
     uploading: 'text-slate-500',
     processing: 'text-slate-500',
-    ready: 'text-blue-600',
+    ready: 'text-[#0000ff]',
     warning: 'text-black',
     blocked: 'text-black',
-    committed: 'text-blue-600',
+    committed: 'text-[#0000ff]',
     failed: 'text-black',
   }[asset.state]
 
   const stateBg = {
     uploading: '',
     processing: '',
-    ready: 'bg-blue-50',
+    ready: 'bg-[#0000ff]/5',
     warning: 'bg-yellow-50',
     blocked: '',
-    committed: 'bg-blue-50',
+    committed: 'bg-[#0000ff]/5',
     failed: 'bg-red-50',
   }[asset.state]
 
@@ -38,7 +38,7 @@ export function UploadAssetRow({ asset, selected, onToggleSelect, onEdit }: Uplo
     <tr
       className={cn(
         'border-b border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors',
-        selected && 'bg-blue-50 hover:bg-blue-50',
+        selected && 'bg-[#0000ff]/5 hover:bg-[#0000ff]/5',
       )}
       onClick={onEdit}
     >
@@ -48,7 +48,7 @@ export function UploadAssetRow({ asset, selected, onToggleSelect, onEdit }: Uplo
           type="checkbox"
           checked={selected}
           onChange={onToggleSelect}
-          className="w-3.5 h-3.5 accent-blue-600"
+          className="w-3.5 h-3.5 accent-[#0000ff]"
         />
       </td>
 
@@ -118,7 +118,7 @@ export function UploadAssetRow({ asset, selected, onToggleSelect, onEdit }: Uplo
           {asset.state === 'uploading' ? (
             <div className="flex items-center gap-1">
               <div className="w-16 h-1 bg-slate-200">
-                <div className="h-full bg-blue-600 transition-all" style={{ width: `${asset.uploadProgress}%` }} />
+                <div className="h-full bg-[#0000ff] transition-all" style={{ width: `${asset.uploadProgress}%` }} />
               </div>
               <span className="text-[9px] font-mono text-slate-400">{asset.uploadProgress}%</span>
             </div>

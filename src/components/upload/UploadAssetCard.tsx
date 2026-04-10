@@ -17,10 +17,10 @@ export function UploadAssetCard({ asset, selected, onToggleSelect, onEdit }: Upl
   const borderColor = {
     uploading: 'border-slate-200',
     processing: 'border-slate-200',
-    ready: 'border-blue-600',
+    ready: 'border-[#0000ff]',
     warning: 'border-black',
     blocked: 'border-black',
-    committed: 'border-blue-600',
+    committed: 'border-[#0000ff]',
     failed: 'border-black',
   }[asset.state]
 
@@ -29,7 +29,7 @@ export function UploadAssetCard({ asset, selected, onToggleSelect, onEdit }: Upl
       className={cn(
         'border-2 cursor-pointer transition-colors group',
         borderColor,
-        selected && 'ring-2 ring-blue-600 ring-offset-1',
+        selected && 'ring-2 ring-[#0000ff] ring-offset-1',
       )}
       onClick={onEdit}
     >
@@ -49,7 +49,7 @@ export function UploadAssetCard({ asset, selected, onToggleSelect, onEdit }: Upl
         {asset.state === 'uploading' && (
           <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
             <div className="w-3/4 h-1 bg-white/30">
-              <div className="h-full bg-blue-600 transition-all" style={{ width: `${asset.uploadProgress}%` }} />
+              <div className="h-full bg-[#0000ff] transition-all" style={{ width: `${asset.uploadProgress}%` }} />
             </div>
             <span className="text-[10px] font-mono text-white mt-1">{asset.uploadProgress}%</span>
           </div>
@@ -73,7 +73,7 @@ export function UploadAssetCard({ asset, selected, onToggleSelect, onEdit }: Upl
             type="checkbox"
             checked={selected}
             onChange={onToggleSelect}
-            className="w-3.5 h-3.5 accent-blue-600"
+            className="w-3.5 h-3.5 accent-[#0000ff]"
           />
         </div>
 
@@ -81,10 +81,10 @@ export function UploadAssetCard({ asset, selected, onToggleSelect, onEdit }: Upl
         {asset.state !== 'uploading' && asset.state !== 'processing' && (
           <span className={cn(
             'absolute bottom-1 right-1 text-[9px] font-bold uppercase tracking-widest px-1 py-0.5',
-            asset.state === 'ready' && 'bg-blue-600 text-white',
+            asset.state === 'ready' && 'bg-[#0000ff] text-white',
             asset.state === 'warning' && 'bg-white text-black border border-black',
             asset.state === 'blocked' && 'bg-black text-white',
-            asset.state === 'committed' && 'bg-blue-600 text-white',
+            asset.state === 'committed' && 'bg-[#0000ff] text-white',
             asset.state === 'failed' && 'bg-black text-white',
           )}>
             {BATCH_STATE_LABELS[asset.state]}

@@ -19,7 +19,7 @@ export function AnalysisPanel({ job }: AnalysisPanelProps) {
         </div>
         <div className="px-6 py-5 flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 animate-spin" />
+            <div className="w-4 h-4 border-2 border-[#0000ff]/30 border-t-[#0000ff] animate-spin" />
             <span className="text-sm text-black font-bold">Analysis in progress</span>
           </div>
           <div className="flex flex-col gap-2">
@@ -95,7 +95,7 @@ export function AnalysisPanel({ job }: AnalysisPanelProps) {
         {result.declarationState && !result.manifestInvalid && (
           <div className={cn(
             'border-2 px-4 py-3',
-            result.declarationState === 'fully_validated' ? 'border-blue-600' : 'border-black'
+            result.declarationState === 'fully_validated' ? 'border-[#0000ff]' : 'border-black'
           )}>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
               Validation Declaration
@@ -168,7 +168,7 @@ function AnalysisStep({ label, status, detail }: { label: string; status: 'compl
         </div>
       )}
       {status === 'running' && (
-        <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 animate-spin shrink-0" />
+        <div className="w-4 h-4 border-2 border-[#0000ff]/30 border-t-[#0000ff] animate-spin shrink-0" />
       )}
       {status === 'pending' && (
         <div className="w-4 h-4 border border-slate-300 shrink-0" />

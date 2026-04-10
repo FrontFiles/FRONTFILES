@@ -579,7 +579,7 @@ function TimelineEntry({
       <div
         className={cn(
           'shrink-0 mt-0.5',
-          isActive ? 'text-blue-600' : isFuture ? 'text-black/15' : 'text-black/30',
+          isActive ? 'text-[#0000ff]' : isFuture ? 'text-black/15' : 'text-black/30',
         )}
       >
         {icon}
@@ -588,7 +588,7 @@ function TimelineEntry({
         <span
           className={cn(
             'text-[9px] font-bold uppercase tracking-wider block',
-            isActive ? 'text-blue-600' : isFuture ? 'text-black/20' : 'text-black/50',
+            isActive ? 'text-[#0000ff]' : isFuture ? 'text-black/20' : 'text-black/50',
           )}
         >
           {label}

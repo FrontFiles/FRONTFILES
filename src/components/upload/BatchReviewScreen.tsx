@@ -125,7 +125,7 @@ export function BatchReviewScreen({
                           dispatch({ type: 'SELECT_ASSETS', assetIds: filteredAssets.map(a => a.id) })
                         }
                       }}
-                      className="w-3.5 h-3.5 accent-blue-600"
+                      className="w-3.5 h-3.5 accent-[#0000ff]"
                     />
                   </th>
                   <th className="w-12 px-1 py-2" />
@@ -180,7 +180,7 @@ export function BatchReviewScreen({
             {exceptions.length > 0 && (
               <button
                 onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'exceptions' })}
-                className="text-[10px] font-bold uppercase tracking-widest text-black border-b border-black hover:text-blue-600 hover:border-blue-600 transition-colors"
+                className="text-[10px] font-bold uppercase tracking-widest text-black border-b border-black hover:text-[#0000ff] hover:border-[#0000ff] transition-colors"
               >
                 {exceptions.length} EXCEPTIONS
               </button>
@@ -203,7 +203,7 @@ export function BatchReviewScreen({
               className={cn(
                 'px-4 py-2 text-xs font-bold uppercase tracking-widest border-2 transition-colors',
                 summary.readyAssets.length > 0
-                  ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'border-[#0000ff] bg-[#0000ff] text-white hover:bg-[#0000cc]'
                   : 'border-slate-200 text-slate-300 cursor-not-allowed'
               )}
             >

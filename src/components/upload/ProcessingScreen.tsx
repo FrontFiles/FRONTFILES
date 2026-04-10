@@ -34,7 +34,7 @@ export function ProcessingScreen({ assets, dispatch }: ProcessingScreenProps) {
         {/* Overall progress bar */}
         <div className="w-full h-2 bg-slate-200">
           <div
-            className={cn('h-full transition-all duration-300', allDone ? 'bg-blue-600' : 'bg-black')}
+            className={cn('h-full transition-all duration-300', allDone ? 'bg-[#0000ff]' : 'bg-black')}
             style={{ width: `${counters.total > 0 ? (doneCount / counters.total) * 100 : 0}%` }}
           />
         </div>
@@ -68,7 +68,7 @@ export function ProcessingScreen({ assets, dispatch }: ProcessingScreenProps) {
               {asset.state === 'uploading' ? (
                 <>
                   <div className="flex-1 h-1 bg-slate-200">
-                    <div className="h-full bg-blue-600 transition-all" style={{ width: `${asset.uploadProgress}%` }} />
+                    <div className="h-full bg-[#0000ff] transition-all" style={{ width: `${asset.uploadProgress}%` }} />
                   </div>
                   <span className="text-[9px] font-mono text-slate-400 w-8 text-right">{asset.uploadProgress}%</span>
                 </>
@@ -81,7 +81,7 @@ export function ProcessingScreen({ assets, dispatch }: ProcessingScreenProps) {
                   <span className="text-[10px] font-bold uppercase tracking-widest text-black">FAILED</span>
                   <button
                     onClick={() => dispatch({ type: 'RETRY_ASSETS', assetIds: [asset.id] })}
-                    className="text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline"
+                    className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] hover:underline"
                   >
                     Retry
                   </button>
@@ -89,7 +89,7 @@ export function ProcessingScreen({ assets, dispatch }: ProcessingScreenProps) {
               ) : (
                 <span className={cn(
                   'text-[10px] font-bold uppercase tracking-widest',
-                  asset.state === 'ready' ? 'text-blue-600' : 'text-black'
+                  asset.state === 'ready' ? 'text-[#0000ff]' : 'text-black'
                 )}>
                   {BATCH_STATE_LABELS[asset.state]}
                 </span>
@@ -101,7 +101,7 @@ export function ProcessingScreen({ assets, dispatch }: ProcessingScreenProps) {
               {asset.declarationState && (
                 <span className={cn(
                   'text-[9px] font-bold uppercase tracking-widest px-1 py-0.5 border',
-                  asset.declarationState === 'fully_validated' ? 'border-blue-600 text-blue-600' : 'border-slate-400 text-slate-500'
+                  asset.declarationState === 'fully_validated' ? 'border-[#0000ff] text-[#0000ff]' : 'border-slate-400 text-slate-500'
                 )}>
                   {asset.declarationState.replace(/_/g, ' ')}
                 </span>
@@ -118,7 +118,7 @@ export function ProcessingScreen({ assets, dispatch }: ProcessingScreenProps) {
           className={cn(
             'flex-1 py-3 text-sm font-bold uppercase tracking-widest border-2 transition-colors',
             allDone
-              ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
+              ? 'border-[#0000ff] bg-[#0000ff] text-white hover:bg-[#0000cc]'
               : 'border-black text-black hover:bg-black hover:text-white'
           )}
         >
@@ -134,13 +134,13 @@ function StatusLane({ label, count, done }: { label: string; count: number; done
     <div className="text-center space-y-1">
       <div className={cn(
         'text-[10px] font-bold uppercase tracking-widest',
-        done ? 'text-blue-600' : 'text-slate-500'
+        done ? 'text-[#0000ff]' : 'text-slate-500'
       )}>
         {label}
       </div>
       <div className={cn(
         'text-lg font-bold font-mono',
-        done ? 'text-blue-600' : count > 0 ? 'text-black' : 'text-slate-300'
+        done ? 'text-[#0000ff]' : count > 0 ? 'text-black' : 'text-slate-300'
       )}>
         {done ? '✓' : count}
       </div>

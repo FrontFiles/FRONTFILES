@@ -16,6 +16,9 @@ export type { AssetData, AssetFormat, PrivacyLevel, ValidationDeclaration } from
 export { articles, articleMap, articleBySlug } from './articles'
 export type { ArticleData } from './articles'
 
+export { collections, collectionMap, collectionBySlug } from './collections'
+export type { CollectionData } from './collections'
+
 // Reference data
 export { geographies, geographyMap } from './geographies'
 export type { Geography } from './geographies'

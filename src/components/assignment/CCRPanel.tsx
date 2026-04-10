@@ -52,7 +52,7 @@ function CCRCard({ ccr }: { ccr: CommissionChangeRequest }) {
   return (
     <div className={cn(
       'border-2 p-4',
-      isPending ? 'border-blue-600' :
+      isPending ? 'border-[#0000ff]' :
       isApproved ? 'border-black' :
       'border-black/20'
     )}>
@@ -61,7 +61,7 @@ function CCRCard({ ccr }: { ccr: CommissionChangeRequest }) {
         <div className="flex items-center gap-2">
           <span className={cn(
             'text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 border',
-            isPending ? 'border-blue-600 text-blue-600' :
+            isPending ? 'border-[#0000ff] text-[#0000ff]' :
             isApproved ? 'bg-black text-white border-black' :
             'border-black/20 text-black/40'
           )}>
@@ -100,7 +100,7 @@ function CCRCard({ ccr }: { ccr: CommissionChangeRequest }) {
       {isPending && (
         <div className="border-t border-black/10 pt-2 mt-2 flex items-center justify-between">
           <span className="text-[8px] text-black/30">Response deadline</span>
-          <span className="text-[8px] font-mono font-bold text-blue-600">
+          <span className="text-[8px] font-mono font-bold text-[#0000ff]">
             {new Date(ccr.responseDeadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>

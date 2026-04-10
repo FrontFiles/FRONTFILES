@@ -54,8 +54,8 @@ export function MetadataCompletionPanel({ job, onConfirm }: MetadataCompletionPa
   if (job.state !== 'awaiting_creator_confirmation' && job.state !== 'ready_for_completion') {
     if (confirmed) {
       return (
-        <div className="border-2 border-blue-600">
-          <div className="px-6 py-3 border-b-2 border-blue-600">
+        <div className="border-2 border-[#0000ff]">
+          <div className="px-6 py-3 border-b-2 border-[#0000ff]">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-black flex items-center justify-center">
                 <svg viewBox="0 0 10 10" fill="none" className="w-2.5 h-2.5 text-white">
@@ -96,7 +96,7 @@ export function MetadataCompletionPanel({ job, onConfirm }: MetadataCompletionPa
           <Input
             value={title}
             onChange={e => setTitle(e.target.value)}
-            className="h-9 border-2 border-black text-sm text-black rounded-none focus-visible:border-blue-600 focus-visible:ring-0"
+            className="h-9 border-2 border-black text-sm text-black rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0"
             placeholder="Asset title"
           />
         </div>
@@ -110,7 +110,7 @@ export function MetadataCompletionPanel({ job, onConfirm }: MetadataCompletionPa
           <Textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="border-2 border-black text-sm text-black rounded-none focus-visible:border-blue-600 focus-visible:ring-0 min-h-20 resize-none"
+            className="border-2 border-black text-sm text-black rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0 min-h-20 resize-none"
             placeholder="Describe this content"
           />
         </div>
@@ -137,7 +137,7 @@ export function MetadataCompletionPanel({ job, onConfirm }: MetadataCompletionPa
               value={tagsInput}
               onChange={e => setTagsInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-              className="h-8 border border-slate-300 text-sm rounded-none focus-visible:border-blue-600 focus-visible:ring-0"
+              className="h-8 border border-slate-300 text-sm rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0"
               placeholder="Add a tag…"
             />
             <Button onClick={handleAddTag} disabled={!tagsInput.trim()} variant="outline" className="h-8 px-3 border-2 border-black text-xs rounded-none font-bold uppercase tracking-wide">Add</Button>
@@ -166,7 +166,7 @@ export function MetadataCompletionPanel({ job, onConfirm }: MetadataCompletionPa
               value={geoInput}
               onChange={e => setGeoInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddGeoTag())}
-              className="h-8 border border-slate-300 text-sm rounded-none focus-visible:border-blue-600 focus-visible:ring-0"
+              className="h-8 border border-slate-300 text-sm rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0"
               placeholder="Add a location…"
             />
             <Button onClick={handleAddGeoTag} disabled={!geoInput.trim()} variant="outline" className="h-8 px-3 border-2 border-black text-xs rounded-none font-bold uppercase tracking-wide">Add</Button>
@@ -179,7 +179,7 @@ export function MetadataCompletionPanel({ job, onConfirm }: MetadataCompletionPa
           disabled={!canConfirm}
           className={cn(
             'h-11 px-8 font-bold text-sm rounded-none uppercase tracking-wide w-fit',
-            canConfirm ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            canConfirm ? 'bg-[#0000ff] text-white hover:bg-[#0000cc]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
           )}
         >
           Confirm metadata
@@ -199,7 +199,7 @@ function SourceBadge({ field }: { field: ProposalField<unknown> }) {
   }
   if (field.source === 'extracted') {
     return (
-      <span className="text-[9px] font-bold tracking-widest uppercase border border-blue-600 text-blue-600 px-1.5 py-0.5">
+      <span className="text-[9px] font-bold tracking-widest uppercase border border-[#0000ff] text-[#0000ff] px-1.5 py-0.5">
         Extracted
       </span>
     )

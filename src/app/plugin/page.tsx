@@ -48,7 +48,7 @@ export default function PluginPage() {
                       Coming soon
                     </span>
                   ) : (
-                    <button className="h-10 px-4 bg-blue-600 text-white text-xs font-bold uppercase tracking-wide hover:bg-blue-700 transition-colors shrink-0">
+                    <button className="h-10 px-4 bg-[#0000ff] text-white text-xs font-bold uppercase tracking-wide hover:bg-[#0000cc] transition-colors shrink-0">
                       Subscribe
                     </button>
                   )}

@@ -80,7 +80,7 @@ export function ExceptionQueueScreen({ assets, dispatch }: ExceptionQueueScreenP
                 </div>
                 <button
                   onClick={() => dispatch({ type: 'RETRY_ASSETS', assetIds: groupAssets.map(a => a.id) })}
-                  className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+                  className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest border border-[#0000ff] text-[#0000ff] hover:bg-[#0000ff] hover:text-white transition-colors"
                 >
                   Retry All
                 </button>
@@ -92,7 +92,7 @@ export function ExceptionQueueScreen({ assets, dispatch }: ExceptionQueueScreenP
                     <span className="text-[10px] font-mono text-slate-400">{a.failureReason}</span>
                     <button
                       onClick={() => dispatch({ type: 'RETRY_ASSETS', assetIds: [a.id] })}
-                      className="text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline"
+                      className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] hover:underline"
                     >
                       Retry
                     </button>
@@ -115,12 +115,12 @@ export function ExceptionQueueScreen({ assets, dispatch }: ExceptionQueueScreenP
       })}
 
       {exceptions.length === 0 && (
-        <div className="border-2 border-blue-600 p-8 text-center space-y-2">
-          <div className="text-sm font-bold uppercase tracking-widest text-blue-600">No exceptions</div>
+        <div className="border-2 border-[#0000ff] p-8 text-center space-y-2">
+          <div className="text-sm font-bold uppercase tracking-widest text-[#0000ff]">No exceptions</div>
           <div className="text-[10px] font-mono text-slate-400">All assets are ready or in progress</div>
           <button
             onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'review' })}
-            className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors mt-2"
+            className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 border-[#0000ff] text-[#0000ff] hover:bg-[#0000ff] hover:text-white transition-colors mt-2"
           >
             Return to Review
           </button>

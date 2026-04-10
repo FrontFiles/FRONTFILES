@@ -223,7 +223,7 @@ export function AssignmentShell({ assignment, initialRole }: { assignment: Assig
                 <span className={cn(
                   'text-[8px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 border',
                   a.assignmentClass === 'material' ? 'border-black text-black' :
-                  a.assignmentClass === 'service' ? 'border-blue-600 text-blue-600' :
+                  a.assignmentClass === 'service' ? 'border-[#0000ff] text-[#0000ff]' :
                   'border-black text-black bg-black/5'
                 )}>
                   {ASSIGNMENT_CLASS_LABELS[a.assignmentClass]}
@@ -236,7 +236,7 @@ export function AssignmentShell({ assignment, initialRole }: { assignment: Assig
                   Waiting: <span className="font-bold text-black/50">{waiting}</span>
                 </span>
                 {pendingCCR && (
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-blue-600 border border-blue-600 px-1.5 py-0.5">
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#0000ff] border border-[#0000ff] px-1.5 py-0.5">
                     CCR pending
                   </span>
                 )}
@@ -338,7 +338,7 @@ function FulfilmentTab({ viewerRole }: { viewerRole: ViewerRole }) {
           </div>
           <div className="flex flex-col gap-2">
             {reviewable.map(m => (
-              <div key={m.id} className="border-2 border-blue-600 p-3 flex items-center gap-3">
+              <div key={m.id} className="border-2 border-[#0000ff] p-3 flex items-center gap-3">
                 <span className="text-[9px] font-mono text-black/25 w-4">{m.ordinal}</span>
                 <span className="text-xs font-bold text-black flex-1">{m.title}</span>
                 <span className="text-[9px] font-mono text-black/40">{m.fulfilmentSubmissions.length} submission(s)</span>
@@ -395,7 +395,7 @@ function FulfilmentTab({ viewerRole }: { viewerRole: ViewerRole }) {
                   <span className="text-xs font-bold text-black">{m.title}</span>
                   <span className={cn(
                     'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border ml-auto',
-                    m.milestoneType === 'service' ? 'border-blue-600 text-blue-600' : 'border-black/20 text-black/40',
+                    m.milestoneType === 'service' ? 'border-[#0000ff] text-[#0000ff]' : 'border-black/20 text-black/40',
                   )}>
                     {m.milestoneType}
                   </span>
@@ -414,7 +414,7 @@ function FulfilmentTab({ viewerRole }: { viewerRole: ViewerRole }) {
                           <div key={item.id} className="flex items-center gap-2 py-0.5">
                             <span className={cn(
                               'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border',
-                              item.kind === 'vault_asset' ? 'border-black/20 text-black/40' : 'border-blue-600/30 text-blue-600/60',
+                              item.kind === 'vault_asset' ? 'border-black/20 text-black/40' : 'border-[#0000ff]/30 text-[#0000ff]/60',
                             )}>
                               {item.kind.replace(/_/g, ' ')}
                             </span>

@@ -69,7 +69,7 @@ export function MultiValueEditor({ label, entries, onChange, placeholder, classN
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder ?? `Add ${label.toLowerCase()}…`}
-          className="h-8 bg-white border border-slate-300 text-black placeholder:text-slate-300 text-sm rounded-none focus-visible:border-blue-600 focus-visible:ring-0"
+          className="h-8 bg-white border border-slate-300 text-black placeholder:text-slate-300 text-sm rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0"
         />
         <Button
           onClick={handleAdd}
@@ -94,7 +94,7 @@ function EntryChip({ entry, onRemove }: { entry: MultiValueEntry; onRemove: () =
       className={cn(
         'inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 text-xs font-medium border transition-colors',
         isAi && 'bg-white text-black border-black',
-        isIdentity && 'bg-blue-600 border-blue-600 text-white',
+        isIdentity && 'bg-[#0000ff] border-[#0000ff] text-white',
         !isAi && !isIdentity && 'bg-slate-100 border-slate-300 text-black'
       )}
     >
@@ -102,14 +102,14 @@ function EntryChip({ entry, onRemove }: { entry: MultiValueEntry; onRemove: () =
         <span className="text-[9px] font-bold tracking-widest text-slate-500 uppercase">AI</span>
       )}
       {isIdentity && (
-        <span className="text-[9px] font-bold tracking-widest text-blue-200 uppercase">ID</span>
+        <span className="text-[9px] font-bold tracking-widest text-white/60 uppercase">ID</span>
       )}
       <span>{entry.value}</span>
       <button
         onClick={onRemove}
         className={cn(
           'ml-0.5 flex items-center justify-center w-4 h-4 transition-colors text-[10px]',
-          isIdentity && 'text-blue-200 hover:text-white',
+          isIdentity && 'text-white/60 hover:text-white',
           !isIdentity && 'text-slate-400 hover:text-black'
         )}
         aria-label={`Remove ${entry.value}`}

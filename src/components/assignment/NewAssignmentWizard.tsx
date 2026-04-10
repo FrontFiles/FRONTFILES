@@ -4,7 +4,7 @@
  * New Assignment Wizard — Multi-step brief creation flow.
  *
  * Steps: Context -> Brief -> Rights -> Milestones -> Review & Issue
- * Design canon: black + blue-600 + white. No radius. Hard borders. Dense typography.
+ * Design canon: black + #0000ff + white. No radius. Hard borders. Dense typography.
  */
 
 import { useState } from 'react'
@@ -368,7 +368,7 @@ export function NewAssignmentWizard() {
                   'text-[10px] font-bold uppercase tracking-wider px-6 py-2 border-2 transition-colors',
                   submitting
                     ? 'bg-black/10 text-black/30 border-black/15 cursor-not-allowed'
-                    : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700',
+                    : 'bg-[#0000ff] text-white border-[#0000ff] hover:bg-[#0000cc]',
                 )}
               >
                 {submitting ? 'Issuing...' : 'Issue Brief'}
@@ -643,7 +643,7 @@ function StepRights({
 
       {/* Service Terms */}
       {needsServiceTerms && (
-        <div className="border-2 border-blue-600 p-4">
+        <div className="border-2 border-[#0000ff] p-4">
           <SectionLabel label="Service Terms" />
           <div className="flex flex-col gap-3">
             <div>
@@ -813,7 +813,7 @@ function StepMilestones({
                           className={cn(
                             'text-[8px] font-bold uppercase tracking-wider px-2.5 py-1.5 border-2 transition-colors flex-1',
                             ms.milestoneType === t
-                              ? t === 'service' ? 'border-blue-600 bg-blue-600 text-white' : 'border-black bg-black text-white'
+                              ? t === 'service' ? 'border-[#0000ff] bg-[#0000ff] text-white' : 'border-black bg-black text-white'
                               : 'border-black/15 text-black/30 hover:border-black/30',
                           )}
                         >
@@ -1041,8 +1041,8 @@ function StepReview({
         )}
         {needsServiceTerms && (
           <div>
-            <span className="text-[8px] font-bold uppercase tracking-wider text-blue-600 block mb-1.5">Service Terms</span>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pl-2 border-l border-blue-600/20">
+            <span className="text-[8px] font-bold uppercase tracking-wider text-[#0000ff] block mb-1.5">Service Terms</span>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pl-2 border-l border-[#0000ff]/20">
               <ReviewField label="Scope of Work" value={form.serviceTerms.scopeOfWork} />
               <ReviewField label="Confidentiality" value={form.serviceTerms.confidentiality} />
               <ReviewField label="Attendance" value={form.serviceTerms.attendanceObligations} />

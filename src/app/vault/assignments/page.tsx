@@ -3,20 +3,35 @@
 import { useState } from 'react'
 import { VaultLeftRail, type VaultSection } from '@/components/platform/VaultLeftRail'
 import { Panel, EmptyPanel } from '@/components/platform/Panel'
+import type { PrivacyState, AssignmentState } from '@/lib/types'
 import { ASSIGNMENT_STATE_LABELS } from '@/lib/types'
-import type { PrivacyState, Assignment, AssignmentState } from '@/lib/types'
+
+type MockAssignment = {
+  id: string
+  buyerId: string
+  creatorId: string
+  state: AssignmentState
+  brief: string
+  deliverables: string
+  deadline: string
+  budget: number
+  escrowAmount: number
+  createdAt: string
+  deliveredAt: string | null
+  confirmedAt: string | null
+}
 
 const ASSIGNMENT_STATE_STYLES: Record<AssignmentState, string> = {
-  brief_issued: 'border-blue-600 text-blue-600',
-  escrow_captured: 'border-blue-600 text-blue-600',
-  in_progress: 'bg-blue-600 text-white border-blue-600',
+  brief_issued: 'border-[#0000ff] text-[#0000ff]',
+  escrow_captured: 'border-[#0000ff] text-[#0000ff]',
+  in_progress: 'bg-[#0000ff] text-white border-[#0000ff]',
   delivered: 'border-black text-black',
   confirmed: 'bg-black text-white border-black',
   disputed: 'border-2 border-dashed border-black text-black',
   cancelled: 'border-slate-200 text-slate-300',
 }
 
-const mockAssignments: Assignment[] = [
+const mockAssignments: MockAssignment[] = [
   {
     id: 'asgn-001',
     buyerId: 'buyer-001',
@@ -100,7 +115,7 @@ export default function AssignmentsPage() {
   )
 }
 
-function AssignmentCard({ assignment }: { assignment: Assignment }) {
+function AssignmentCard({ assignment }: { assignment: MockAssignment }) {
   const daysRemaining = Math.max(0, Math.ceil((new Date(assignment.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
 
   return (
@@ -137,7 +152,7 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
 
       {assignment.state === 'in_progress' && (
         <div className="mt-3 flex gap-2">
-          <button className="h-8 px-3 text-xs bg-blue-600 text-white font-bold uppercase tracking-wide hover:bg-blue-700 transition-colors">
+          <button className="h-8 px-3 text-xs bg-[#0000ff] text-white font-bold uppercase tracking-wide hover:bg-[#0000cc] transition-colors">
             Submit delivery
           </button>
         </div>

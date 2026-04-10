@@ -16,7 +16,7 @@ const SEGMENTS: { key: keyof BatchCounters; label: string; style: string; active
   { key: 'blocked', label: 'BLOCKED', style: 'text-black', activeStyle: 'bg-black text-white' },
   { key: 'uploading', label: 'UPLOADING', style: 'text-slate-500', activeStyle: 'bg-slate-500 text-white' },
   { key: 'processing', label: 'PROCESSING', style: 'text-slate-500', activeStyle: 'bg-slate-500 text-white' },
-  { key: 'committed', label: 'COMMITTED', style: 'text-blue-600', activeStyle: 'bg-blue-600 text-white' },
+  { key: 'committed', label: 'COMMITTED', style: 'text-[#0000ff]', activeStyle: 'bg-[#0000ff] text-white' },
   { key: 'failed', label: 'FAILED', style: 'text-black', activeStyle: 'bg-black text-white' },
 ]
 

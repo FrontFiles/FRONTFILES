@@ -27,6 +27,35 @@ const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false })
 
 export type MapMode = 'creators' | 'assets' | 'stories'
 
+// Format icon SVG components for the rail
+const FORMAT_RAIL_ICONS: Record<string, React.ReactNode> = {
+  photo: <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>,
+  video: <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>,
+  audio: <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 3v9.28a4.5 4.5 0 1 0 2 3.72V7h4V3h-6zM9.5 19a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>,
+  text: <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>,
+  infographic: <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>,
+  illustration: <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a.996.996 0 0 0 0-1.41z"/></svg>,
+  vector: <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 14H7v-4h4v4zm0-6H7V7h4v4zm6 6h-4v-4h4v4zm0-6h-4V7h4v4z"/></svg>,
+}
+
+function FormatIcon({ format, className }: { format?: string; className?: string }) {
+  const key = format?.toLowerCase() || 'photo'
+  return <span className={className}>{FORMAT_RAIL_ICONS[key] || FORMAT_RAIL_ICONS.photo}</span>
+}
+
+const MAP_FILTER_OPTIONS = [
+  'All', 'Frontfiler', 'Article', 'Story', 'Collection',
+  'Photo', 'Video', 'Audio', 'Text', 'Infographic', 'Illustration', 'Vector',
+] as const
+type MapFilter = typeof MAP_FILTER_OPTIONS[number]
+
+function filterToMode(filter: MapFilter): MapMode {
+  if (filter === 'Frontfiler') return 'creators'
+  if (filter === 'Story' || filter === 'Article' || filter === 'Collection') return 'stories'
+  if (filter === 'All') return 'creators'
+  return 'assets'
+}
+
 export interface MapPoint {
   id: string
   label: string
@@ -47,10 +76,14 @@ export interface MapPoint {
   creatorAvatarUrl?: string | null
 }
 
-export function DiscoveryMap() {
-  const [mode, setMode] = useState<MapMode>('creators')
+export type MapSize = 'hidden' | 'small' | 'large'
+
+export function DiscoveryMap({ mapSize, onMapSizeChange }: { mapSize: MapSize; onMapSizeChange: (s: MapSize) => void }) {
+  const [mapFilter, setMapFilter] = useState<MapFilter>('All')
+  const mode = filterToMode(mapFilter)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const setMapSize = onMapSizeChange
   const railRef = useRef<HTMLDivElement>(null)
 
   const searchCreators = useMemo(() => getSearchCreators(), [])
@@ -116,81 +149,106 @@ export function DiscoveryMap() {
 
   return (
     <div className="flex flex-col gap-0">
-      {/* Mode switcher */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-0">
-          {(['creators', 'assets', 'stories'] as MapMode[]).map(m => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setSelectedId(null); setHoveredId(null) }}
-              className={cn(
-                'px-4 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] border-2 transition-colors',
-                m === mode ? 'bg-black text-white border-black' : 'bg-white text-black/30 border-black hover:text-black',
-                m !== 'creators' && '-ml-[2px]'
-              )}
-            >
-              {m}
-            </button>
-          ))}
+      {/* Filter dropdown + info + Geo Discovery controls */}
+      <div className="flex items-end justify-between mb-3">
+        {/* Left: Geo Discovery + map size buttons */}
+        <div className="flex items-end gap-4">
+          <div>
+            <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-black/25 block">FrontSearch</span>
+            <span className="text-[13px] font-serif italic text-black tracking-tight leading-none">Geo Discovery</span>
+          </div>
+          <div className="flex items-center gap-0">
+            {([['hidden', 'Hide'], ['small', 'Compact'], ['large', 'Expand']] as [typeof mapSize, string][]).map(([s, label], i) => (
+              <button
+                key={s}
+                onClick={() => setMapSize(s)}
+                className={`px-3 py-1 text-[9px] font-bold uppercase tracking-[0.12em] border-2 transition-colors ${
+                  mapSize === s ? 'bg-[#0000ff] text-white border-[#0000ff]' : 'bg-white text-black/30 border-black hover:text-black'
+                } ${i > 0 ? '-ml-[2px]' : ''}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
+        {/* Right: results count + filter dropdown */}
         <div className="flex items-center gap-3">
           <span className="text-[9px] font-mono text-black/25">{points.length} results</span>
           <span className="text-[8px] text-black/20 uppercase tracking-[0.12em] font-bold">
-            {mode === 'creators' ? 'Creator base locations' : mode === 'assets' ? 'Asset geographic clusters' : 'Story coverage regions'}
+            Format
           </span>
+          <select
+            value={mapFilter}
+            onChange={(e) => { setMapFilter(e.target.value as MapFilter); setSelectedId(null); setHoveredId(null) }}
+            className={cn(
+              'text-[9px] font-bold uppercase tracking-[0.1em] bg-white text-black border-2 border-black px-2.5 py-1.5 appearance-none cursor-pointer hover:border-[#0000ff] focus:border-[#0000ff] focus:outline-none pr-6',
+              mapSize === 'large' ? 'w-[220px]' : 'w-[160px]',
+            )}
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+          >
+            {MAP_FILTER_OPTIONS.map(opt => (
+              <option key={opt} value={opt}>{opt.toUpperCase()}</option>
+            ))}
+          </select>
         </div>
       </div>
 
       {/* Map + result rail — hard frame */}
-      <div className="flex gap-0 border-2 border-black" style={{ height: 520 }}>
-        {/* Map canvas — ~65% */}
-        <div className="flex-[65] relative bg-white overflow-hidden">
-          <LeafletMap
-            points={points}
-            selectedId={selectedId}
-            hoveredId={hoveredId}
-            onSelect={handleSelect}
-            onHover={setHoveredId}
-            mode={mode}
-          />
-          <div className="absolute bottom-1.5 left-2 z-[1000]">
-            <p className="text-[7px] text-black/15 uppercase tracking-[0.1em]">
-              Geographic tags from certification metadata. Not a verification of event location.
-            </p>
-          </div>
-        </div>
-
-        {/* Result rail — ~35% */}
-        <div ref={railRef} className="flex-[35] border-l-2 border-black bg-white overflow-y-auto flex flex-col">
-          <div className="px-3 py-2 border-b-2 border-black/10 bg-black/[0.02] shrink-0">
-            <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-black/30">
-              {mode === 'creators' ? 'Creators' : mode === 'assets' ? 'Asset clusters' : 'Stories'}
-              <span className="ml-1.5 font-mono text-black/20">{points.length}</span>
-            </span>
+      {mapSize !== 'hidden' && (
+        <div
+          className="flex gap-0 border-2 border-black"
+          style={{ height: mapSize === 'large' ? 780 : 390 }}
+        >
+          {/* Map canvas — fills remaining space */}
+          <div className="flex-1 relative bg-white overflow-hidden">
+            <LeafletMap
+              points={points}
+              selectedId={selectedId}
+              hoveredId={hoveredId}
+              onSelect={handleSelect}
+              onHover={setHoveredId}
+              mode={mode}
+              mapSize={mapSize}
+              formatFilter={mapFilter}
+            />
+            <div className="absolute bottom-1.5 left-2 z-[1000]">
+              <p className="text-[7px] text-black/15 uppercase tracking-[0.1em]">
+                Geographic tags from certification metadata. Not a verification of event location.
+              </p>
+            </div>
           </div>
 
-          {points.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-[10px] text-black/25 uppercase tracking-wide">No results in this mode</p>
+          {/* Result rail — fits card width */}
+          <div ref={railRef} className={cn(
+            'shrink-0 border-l-2 border-black bg-white flex flex-col',
+            mapSize === 'large' ? 'w-[220px]' : 'w-[160px]',
+          )}>
+            <div className="flex-1 overflow-y-auto">
+            {points.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center h-full">
+                <p className="text-[10px] text-black/25 uppercase tracking-wide">No results</p>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {points.map((point, i) => (
+                  <RailRow
+                    key={point.id}
+                    point={point}
+                    mode={mode}
+                    isSelected={point.id === selectedId}
+                    isHovered={point.id === hoveredId}
+                    isFirst={i === 0}
+                    onSelect={() => handleSelect(point.id)}
+                    onHover={(h) => setHoveredId(h ? point.id : null)}
+                  />
+                ))}
+              </div>
+            )}
             </div>
-          ) : (
-            <div className="flex flex-col flex-1">
-              {points.map((point, i) => (
-                <RailRow
-                  key={point.id}
-                  point={point}
-                  mode={mode}
-                  isSelected={point.id === selectedId}
-                  isHovered={point.id === hoveredId}
-                  isFirst={i === 0}
-                  onSelect={() => handleSelect(point.id)}
-                  onHover={(h) => setHoveredId(h ? point.id : null)}
-                />
-              ))}
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
 
       {/* Selected detail strip */}
       {selected && (
@@ -213,6 +271,19 @@ function RailRow({ point, mode, isSelected, isHovered, isFirst, onSelect, onHove
   onSelect: () => void
   onHover: (h: boolean) => void
 }) {
+  if (mode === 'creators') {
+    return (
+      <CreatorCard
+        point={point}
+        isSelected={isSelected}
+        isHovered={isHovered}
+        isFirst={isFirst}
+        onSelect={onSelect}
+        onHover={onHover}
+      />
+    )
+  }
+
   return (
     <button
       data-point-id={point.id}
@@ -222,65 +293,15 @@ function RailRow({ point, mode, isSelected, isHovered, isFirst, onSelect, onHove
       onFocus={() => onHover(true)}
       onBlur={() => onHover(false)}
       className={cn(
-        'w-full text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset',
+        'w-full text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0000ff] focus-visible:ring-inset',
         !isFirst && 'border-t border-black/8',
         isSelected
-          ? 'bg-blue-600 text-white'
+          ? 'bg-[#0000ff] text-white'
           : isHovered
             ? 'bg-black/[0.04] text-black'
             : 'text-black hover:bg-black/[0.02]'
       )}
     >
-      {mode === 'creators' && (
-        <div className="px-3 py-2.5 flex items-start gap-2.5">
-          <Avatar
-            src={point.avatarUrl}
-            name={point.label}
-            size="md"
-            className={isSelected ? 'border-white/30' : ''}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <p className={cn('text-[11px] font-bold leading-none', isSelected ? 'text-white' : 'text-black')}>{point.label}</p>
-              {point.trustBadge && (
-                <span className={cn(
-                  'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border',
-                  isSelected
-                    ? 'border-white/40 text-white/70'
-                    : point.trustBadge === 'verified' ? 'border-blue-600 text-blue-600' : 'border-black/20 text-black/40'
-                )}>
-                  {point.trustBadge === 'verified' ? 'V' : 'T'}
-                </span>
-              )}
-            </div>
-            <p className={cn('text-[9px] mt-1 leading-none', isSelected ? 'text-white/50' : 'text-black/30')}>{point.sublabel}</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className={cn('text-[8px] font-mono', isSelected ? 'text-white/50' : 'text-black/25')}>{point.count} assets</span>
-              {point.storyCount !== undefined && point.storyCount > 0 && (
-                <>
-                  <span className={cn('text-[8px]', isSelected ? 'text-white/30' : 'text-black/15')}>·</span>
-                  <span className={cn('text-[8px] font-mono', isSelected ? 'text-white/50' : 'text-black/25')}>{point.storyCount} stories</span>
-                </>
-              )}
-            </div>
-            {point.sampleAssets.length > 0 && (
-              <div className="flex gap-0.5 mt-2">
-                {point.sampleAssets.slice(0, 4).map(a => (
-                  <div key={a.id} className={cn('w-7 h-7 shrink-0 overflow-hidden bg-black/5 border', isSelected ? 'border-white/20' : 'border-black/10')}>
-                    <img src={a.thumbnailUrl} alt={a.title} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                {point.sampleAssets.length > 4 && (
-                  <div className={cn('w-7 h-7 shrink-0 flex items-center justify-center text-[7px] font-bold border', isSelected ? 'border-white/20 text-white/50 bg-white/10' : 'border-black/10 text-black/30 bg-black/5')}>
-                    +{point.sampleAssets.length - 4}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {mode === 'assets' && (
         <div className="px-3 py-2 flex items-center gap-2.5">
           {point.sampleAssets[0] ? (
@@ -288,8 +309,8 @@ function RailRow({ point, mode, isSelected, isHovered, isFirst, onSelect, onHove
               <img src={point.sampleAssets[0].thumbnailUrl} alt="" className="w-full h-full object-cover" />
             </div>
           ) : (
-            <div className={cn('w-10 h-10 shrink-0 flex items-center justify-center text-[8px] font-bold uppercase border', isSelected ? 'border-white/20 text-white/40 bg-white/10' : 'border-black/10 text-black/20 bg-black/5')}>
-              {point.formats?.[0]?.slice(0, 3) ?? '—'}
+            <div className={cn('w-10 h-10 shrink-0 flex items-center justify-center border', isSelected ? 'border-white/20 text-white/50 bg-white/10' : 'border-black/10 text-black/30 bg-black/5')}>
+              <FormatIcon format={point.formats?.[0]} />
             </div>
           )}
           <div className="min-w-0 flex-1">
@@ -333,6 +354,165 @@ function RailRow({ point, mode, isSelected, isHovered, isFirst, onSelect, onHove
 }
 
 // ══════════════════════════════════════════════════════
+// CREATOR CARD — image background with slideshow
+// ══════════════════════════════════════════════════════
+
+function CreatorCard({ point, isSelected, isHovered, isFirst, onSelect, onHover }: {
+  point: MapPoint
+  isSelected: boolean
+  isHovered: boolean
+  isFirst: boolean
+  onSelect: () => void
+  onHover: (h: boolean) => void
+}) {
+  const [slideIndex, setSlideIndex] = useState(0)
+  const dragStartX = useRef(0)
+  const dragging = useRef(false)
+  const didDrag = useRef(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const assets = point.sampleAssets
+  const total = assets.length
+
+  const slideRef = useRef(slideIndex)
+  slideRef.current = slideIndex
+
+  const goTo = useCallback((i: number) => {
+    if (total <= 1) return
+    setSlideIndex(((i % total) + total) % total)
+  }, [total])
+
+  const goToRef = useRef(goTo)
+  goToRef.current = goTo
+
+  // Unified drag: works for both mouse and touch
+  const onDragStart = useCallback((startX: number) => {
+    dragStartX.current = startX
+    dragging.current = true
+    didDrag.current = false
+  }, [])
+
+  const onDragEnd = useCallback((endX: number) => {
+    if (!dragging.current) return
+    dragging.current = false
+    const dx = endX - dragStartX.current
+    if (Math.abs(dx) > 30) {
+      didDrag.current = true
+      goToRef.current(slideRef.current + (dx < 0 ? 1 : -1))
+    }
+  }, [])
+
+  // Mouse drag + two-finger trackpad swipe
+  const wheelAccum = useRef(0)
+  const wheelTimer = useRef<ReturnType<typeof setTimeout>>(null)
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el || total <= 1) return
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (dragging.current && Math.abs(e.clientX - dragStartX.current) > 5) {
+        didDrag.current = true
+      }
+    }
+    const onMouseUp = (e: MouseEvent) => onDragEnd(e.clientX)
+
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) return
+      e.preventDefault()
+      wheelAccum.current += e.deltaX
+      if (wheelTimer.current) clearTimeout(wheelTimer.current)
+      wheelTimer.current = setTimeout(() => { wheelAccum.current = 0 }, 200)
+      if (Math.abs(wheelAccum.current) > 50) {
+        goToRef.current(slideRef.current + (wheelAccum.current > 0 ? 1 : -1))
+        wheelAccum.current = 0
+      }
+    }
+
+    el.addEventListener('mousemove', onMouseMove)
+    el.addEventListener('wheel', onWheel, { passive: false })
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      el.removeEventListener('mousemove', onMouseMove)
+      el.removeEventListener('wheel', onWheel)
+      window.removeEventListener('mouseup', onMouseUp)
+      if (wheelTimer.current) clearTimeout(wheelTimer.current)
+    }
+  }, [total, onDragEnd])
+
+  return (
+    <div
+      ref={cardRef}
+      data-point-id={point.id}
+      role="button"
+      tabIndex={0}
+      onClick={(e) => { if (didDrag.current) { didDrag.current = false; e.stopPropagation(); return } onSelect() }}
+      onMouseDown={(e) => { if (total > 1) { e.preventDefault(); onDragStart(e.clientX) } }}
+      onTouchStart={(e) => { if (total > 1) onDragStart(e.touches[0].clientX) }}
+      onTouchEnd={(e) => onDragEnd(e.changedTouches[0].clientX)}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => { onHover(false); dragging.current = false }}
+      onFocus={() => onHover(true)}
+      onBlur={() => onHover(false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() }
+        if (e.key === 'ArrowLeft') goTo(slideIndex - 1)
+        if (e.key === 'ArrowRight') goTo(slideIndex + 1)
+      }}
+      className={cn(
+        'w-full text-left cursor-grab active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0000ff] focus-visible:ring-inset relative overflow-hidden aspect-[4/3] select-none',
+        !isFirst && 'border-t border-black/8',
+        isSelected ? 'ring-2 ring-inset ring-[#0000ff]' : '',
+      )}
+    >
+      {/* Background image */}
+      {assets.length > 0 && (
+        <img
+          key={assets[slideIndex]?.id}
+          src={assets[slideIndex]?.thumbnailUrl}
+          alt=""
+          draggable={false}
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        />
+      )}
+
+      {/* Dark overlay for text legibility */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 pointer-events-none" />
+
+      {/* Content — bottom-aligned */}
+      <div className="absolute inset-0 flex flex-col justify-end p-3 pointer-events-none">
+        <div className="flex items-end gap-2.5">
+          <Avatar
+            src={point.avatarUrl}
+            name={point.label}
+            size="md"
+            className="border-white/30 shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-bold text-white leading-none drop-shadow-sm">{point.label}</p>
+            <p className="text-[10px] text-white/60 mt-1 leading-none">{point.sublabel}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Slide dots — top right */}
+      {total > 1 && (
+        <div className="absolute top-2 right-2 flex gap-1 z-20 pointer-events-none">
+          {assets.slice(0, Math.min(total, 15)).map((_, i) => (
+            <span
+              key={i}
+              className={cn(
+                'w-1.5 h-1.5 transition-colors',
+                i === slideIndex ? 'bg-white' : 'bg-white/40'
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════
 // SELECTED DETAIL STRIP — below the map
 // ══════════════════════════════════════════════════════
 
@@ -345,16 +525,16 @@ function SelectedStrip({ point, mode }: { point: MapPoint; mode: MapMode }) {
 
   return (
     <div className="border-2 border-black border-t-0 bg-white flex items-center gap-0">
-      <div className="w-1 self-stretch bg-blue-600 shrink-0" />
+      <div className="w-1 self-stretch bg-[#0000ff] shrink-0" />
       {mode === 'creators' && (
         <div className="shrink-0 px-3">
           <Avatar src={point.avatarUrl} name={point.label} size="md" />
         </div>
       )}
       {mode !== 'creators' && point.sampleAssets[0] && (
-        <div className="w-16 h-12 bg-black/5 shrink-0 overflow-hidden border-r border-black/10">
+        <Link href={`/asset/${point.sampleAssets[0].id}`} className="w-16 h-12 bg-black/5 shrink-0 overflow-hidden border-r border-black/10">
           <img src={point.sampleAssets[0].thumbnailUrl} alt="" className="w-full h-full object-cover" />
-        </div>
+        </Link>
       )}
       <div className="min-w-0 flex-1 px-3 py-2.5">
         <p className="text-[11px] font-bold text-black leading-none">{point.label}</p>
@@ -367,15 +547,15 @@ function SelectedStrip({ point, mode }: { point: MapPoint; mode: MapMode }) {
       {point.sampleAssets.length > 0 && (
         <div className="flex gap-0.5 px-2 shrink-0">
           {point.sampleAssets.slice(0, 3).map(a => (
-            <div key={a.id} className="w-10 h-10 shrink-0 overflow-hidden bg-black/5 border border-black/10">
+            <Link key={a.id} href={`/asset/${a.id}`} className="w-10 h-10 shrink-0 overflow-hidden bg-black/5 border border-black/10 hover:border-[#0000ff] transition-colors">
               <img src={a.thumbnailUrl} alt={a.title} className="w-full h-full object-cover" />
-            </div>
+            </Link>
           ))}
         </div>
       )}
       <Link
         href={href}
-        className="shrink-0 h-full px-5 bg-black text-white text-[8px] font-bold uppercase tracking-[0.12em] inline-flex items-center hover:bg-blue-600 transition-colors py-3.5"
+        className="shrink-0 h-full px-5 bg-black text-white text-[8px] font-bold uppercase tracking-[0.12em] inline-flex items-center hover:bg-[#0000ff] transition-colors py-3.5"
       >
         {mode === 'creators' ? 'View creator' : mode === 'stories' ? 'View story' : 'Search area'}
       </Link>

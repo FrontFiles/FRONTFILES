@@ -8,7 +8,7 @@ import type { PrivacyState, Dispute, DisputeState } from '@/lib/types'
 
 const DISPUTE_STATE_STYLES: Record<DisputeState, string> = {
   filed: 'border-2 border-dashed border-black text-black',
-  under_review: 'border-blue-600 text-blue-600',
+  under_review: 'border-[#0000ff] text-[#0000ff]',
   upheld: 'bg-black text-white border-black',
   not_upheld: 'border-slate-300 text-slate-400',
   escalated_external: 'border-2 border-black text-black',

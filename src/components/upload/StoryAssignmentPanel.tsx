@@ -23,8 +23,8 @@ export function StoryAssignmentPanel({ job, stories, onAssignStory, onCreateStor
   // Show confirmed state
   if (job.storyAssignment && !isAssignableState(job.state)) {
     return (
-      <div className="border-2 border-blue-600">
-        <div className="px-6 py-3 border-b-2 border-blue-600">
+      <div className="border-2 border-[#0000ff]">
+        <div className="px-6 py-3 border-b-2 border-[#0000ff]">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-black flex items-center justify-center">
               <svg viewBox="0 0 10 10" fill="none" className="w-2.5 h-2.5 text-white">
@@ -68,12 +68,12 @@ export function StoryAssignmentPanel({ job, stories, onAssignStory, onCreateStor
 
         {/* Current assignment */}
         {job.storyAssignment && (
-          <div className="border-2 border-blue-600 px-4 py-3 flex items-center justify-between">
+          <div className="border-2 border-[#0000ff] px-4 py-3 flex items-center justify-between">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-0.5">Assigned to</span>
               <span className="text-sm text-black font-medium">{job.storyAssignment.title}</span>
               {job.storyAssignment.isNew && (
-                <span className="text-[9px] font-bold tracking-widest uppercase border border-blue-600 text-blue-600 px-1.5 py-0.5 ml-2">New</span>
+                <span className="text-[9px] font-bold tracking-widest uppercase border border-[#0000ff] text-[#0000ff] px-1.5 py-0.5 ml-2">New</span>
               )}
             </div>
             <button onClick={onClearStory} className="text-xs text-slate-400 hover:text-black font-bold uppercase tracking-wide">Change</button>
@@ -89,7 +89,7 @@ export function StoryAssignmentPanel({ job, stories, onAssignStory, onCreateStor
               <Input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="h-8 border border-slate-300 text-sm rounded-none focus-visible:border-blue-600 focus-visible:ring-0"
+                className="h-8 border border-slate-300 text-sm rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0"
                 placeholder="Search stories…"
               />
               <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
@@ -117,7 +117,7 @@ export function StoryAssignmentPanel({ job, stories, onAssignStory, onCreateStor
                   value={newStoryTitle}
                   onChange={e => setNewStoryTitle(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleCreateStory())}
-                  className="h-9 border-2 border-black text-sm rounded-none focus-visible:border-blue-600 focus-visible:ring-0"
+                  className="h-9 border-2 border-black text-sm rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0"
                   placeholder="Story title"
                 />
                 <Button

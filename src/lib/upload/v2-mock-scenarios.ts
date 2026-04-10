@@ -13,7 +13,8 @@
  * - Express eligibility is strict: 1 group, all complete, high confidence, no manifest-invalid
  */
 
-import type { AssetFormat, LicenceType, PrivacyState, ValidationDeclarationState, ExtractedMetadata, MetadataConflict } from './types'
+import type { AssetFormat, LicenceType, PrivacyState, ValidationDeclarationState } from './types'
+import type { ExtractedMetadata, MetadataConflict } from './v2-types'
 import type { ScenarioId } from './v2-scenario-registry'
 export type { ScenarioId } from './v2-scenario-registry'
 

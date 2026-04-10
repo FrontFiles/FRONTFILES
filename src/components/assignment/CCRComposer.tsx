@@ -196,7 +196,7 @@ function CCRSubmitForm() {
         </div>
         <button
           onClick={addField}
-          className="text-[9px] font-bold uppercase tracking-wider text-blue-600 hover:text-black mb-4"
+          className="text-[9px] font-bold uppercase tracking-wider text-[#0000ff] hover:text-black mb-4"
         >
           + Add field
         </button>
@@ -266,8 +266,8 @@ function CCRResponseForm() {
   }
 
   return (
-    <div className="border-2 border-blue-600 mb-6">
-      <div className="px-4 py-3 border-b-2 border-blue-600 bg-blue-600">
+    <div className="border-2 border-[#0000ff] mb-6">
+      <div className="px-4 py-3 border-b-2 border-[#0000ff] bg-[#0000ff]">
         <span className="text-sm font-bold text-white uppercase tracking-wide">Pending change request</span>
       </div>
       <div className="p-4">

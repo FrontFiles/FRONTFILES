@@ -122,7 +122,7 @@ export function StoryGroupsPanel() {
               key={group.id}
               className={cn(
                 'border-2 transition-colors',
-                isSelected ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200 hover:border-slate-400',
+                isSelected ? 'border-[#0000ff] bg-[#0000ff]/5/50' : 'border-slate-200 hover:border-slate-400',
               )}
               onContextMenu={e => {
                 e.preventDefault()
@@ -149,9 +149,9 @@ export function StoryGroupsPanel() {
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span className={cn(
                       'text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5',
-                      group.kind === 'proposed' && 'bg-blue-100 text-blue-700',
-                      group.kind === 'matched-existing' && 'bg-amber-100 text-amber-700',
-                      group.kind === 'creator' && 'bg-green-100 text-green-700',
+                      group.kind === 'proposed' && 'bg-[#0000ff]/10 text-[#0000cc]',
+                      group.kind === 'matched-existing' && 'bg-slate-100 text-black',
+                      group.kind === 'creator' && 'bg-black text-white',
                     )}>
                       {group.kind === 'proposed' ? 'Proposed' : group.kind === 'matched-existing' ? 'Existing' : 'Created'}
                     </span>
@@ -159,7 +159,7 @@ export function StoryGroupsPanel() {
                       {groupAssets.length}
                     </span>
                     {blockingCount > 0 && (
-                      <span className="text-[9px] font-mono text-red-500">{blockingCount} blocked</span>
+                      <span className="text-[9px] font-mono font-bold text-black">{blockingCount} blocked</span>
                     )}
                   </div>
 
@@ -174,9 +174,9 @@ export function StoryGroupsPanel() {
                           if (e.key === 'Enter') handleRename(group.id)
                           if (e.key === 'Escape') setEditingId(null)
                         }}
-                        className="flex-1 text-xs font-bold border-b-2 border-blue-600 bg-transparent outline-none py-0.5"
+                        className="flex-1 text-xs font-bold border-b-2 border-[#0000ff] bg-transparent outline-none py-0.5"
                       />
-                      <button onClick={() => handleRename(group.id)} className="p-0.5"><Check size={12} className="text-blue-600" /></button>
+                      <button onClick={() => handleRename(group.id)} className="p-0.5"><Check size={12} className="text-[#0000ff]" /></button>
                       <button onClick={() => setEditingId(null)} className="p-0.5"><X size={12} className="text-slate-400" /></button>
                     </div>
                   ) : (
@@ -205,8 +205,8 @@ export function StoryGroupsPanel() {
                   {/* Existing story match */}
                   {group.kind === 'matched-existing' && group.existingStoryTitle && (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <Globe size={10} className="text-amber-600" />
-                      <span className="text-[10px] text-amber-700 truncate">
+                      <Globe size={10} className="text-slate-500" />
+                      <span className="text-[10px] text-slate-600 truncate">
                         {group.existingStoryTitle} ({group.existingStoryAssetCount})
                       </span>
                     </div>
@@ -232,9 +232,9 @@ export function StoryGroupsPanel() {
                         className={cn(
                           'w-8 h-8 border text-[8px] font-mono flex items-center justify-center cursor-pointer transition-colors overflow-hidden relative',
                           state.ui.focusedAssetId === a.id
-                            ? 'border-blue-600 bg-blue-100'
+                            ? 'border-[#0000ff] bg-[#0000ff]/10'
                             : hasBlocking
-                              ? 'border-red-300 bg-red-50 hover:border-red-500'
+                              ? 'border-black bg-slate-50 hover:bg-slate-100'
                               : 'border-slate-200 bg-slate-50 hover:border-slate-400',
                         )}
                         onClick={e => { e.stopPropagation(); dispatch({ type: 'SELECT_ASSET', assetId: a.id }) }}
@@ -261,14 +261,14 @@ export function StoryGroupsPanel() {
 
         {/* Unassigned section */}
         {unassigned.length > 0 && (
-          <div className="border-2 border-red-200 bg-red-50/30">
+          <div className="border-2 border-dashed border-black">
             <div
-              className="flex items-center gap-2 px-2.5 py-2 cursor-pointer"
+              className="flex items-center gap-2 px-2.5 py-2 cursor-pointer hover:bg-slate-50"
               onClick={() => dispatch({ type: 'SET_FILTER_PRESET', preset: 'unassigned' })}
             >
-              <FolderOpen size={14} className="text-red-400" />
-              <span className="text-xs font-bold text-red-600">Not yet assigned</span>
-              <span className="text-[10px] font-mono text-red-400 ml-auto">{unassigned.length}</span>
+              <FolderOpen size={14} className="text-black" />
+              <span className="text-xs font-bold text-black">Not yet assigned</span>
+              <span className="text-[10px] font-mono text-slate-500 ml-auto">{unassigned.length}</span>
             </div>
           </div>
         )}
@@ -325,7 +325,7 @@ export function StoryGroupsPanel() {
           )}
           <button
             onClick={() => handleContextAction('delete', contextMenu.groupId)}
-            className="w-full text-left px-3 py-2 text-xs hover:bg-red-50 text-red-600 flex items-center gap-2 border-t border-slate-100"
+            className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 text-black flex items-center gap-2 border-t border-slate-100"
           >
             <Trash2 size={12} /> Delete Story
           </button>

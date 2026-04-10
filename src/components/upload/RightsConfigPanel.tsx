@@ -65,7 +65,7 @@ export function RightsConfigPanel({ job, onSetPrivacy, onSetPricing, onSetLicenc
                 className={cn(
                   'flex flex-col px-4 py-3 border-2 transition-colors text-left',
                   job.privacy === opt
-                    ? 'border-blue-600 bg-blue-50'
+                    ? 'border-[#0000ff] bg-[#0000ff]/5'
                     : 'border-slate-200 hover:border-black'
                 )}
               >
@@ -91,7 +91,7 @@ export function RightsConfigPanel({ job, onSetPrivacy, onSetPricing, onSetLicenc
                 step="0.01"
                 value={priceInput}
                 onChange={e => handlePriceChange(e.target.value)}
-                className="h-9 w-32 border-2 border-black text-sm rounded-none focus-visible:border-blue-600 focus-visible:ring-0 font-mono"
+                className="h-9 w-32 border-2 border-black text-sm rounded-none focus-visible:border-[#0000ff] focus-visible:ring-0 font-mono"
                 placeholder="0.00"
               />
               <span className="text-xs text-slate-400">EUR</span>

@@ -25,7 +25,7 @@ export function TrustBadge({ tier, badge, size = 'md', className }: TrustBadgePr
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <div className={cn('bg-blue-600 flex items-center justify-center shrink-0', dim)}>
+      <div className={cn('bg-[#0000ff] flex items-center justify-center shrink-0', dim)}>
         <svg viewBox="0 0 24 24" fill="none" className={cn('text-white', iconDim)}>
           <path
             d="M12 2L4 5.5v6c0 5.25 3.4 10.2 8 12 4.6-1.8 8-6.75 8-12v-6L12 2z"

@@ -54,7 +54,7 @@ export function VaultAssetList({ assets, selectedId, onSelect }: VaultAssetListP
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search assets…"
-            className="w-full h-9 border border-slate-300 bg-white text-sm text-black pl-8 pr-3 placeholder:text-slate-300 focus:outline-none focus:border-blue-600"
+            className="w-full h-9 border border-slate-300 bg-white text-sm text-black pl-8 pr-3 placeholder:text-slate-300 focus:outline-none focus:border-[#0000ff]"
           />
         </div>
         <select className="h-9 border border-slate-300 bg-white text-xs text-black px-2 font-bold uppercase tracking-wide">
@@ -98,9 +98,9 @@ export function VaultAssetList({ assets, selectedId, onSelect }: VaultAssetListP
               onClick={() => onSelect(asset.id)}
               className={cn(
                 'grid grid-cols-[2rem_1fr_4rem_5.5rem_5.5rem_5.5rem_5.5rem] gap-2 px-4 py-3 border-b border-slate-200 cursor-pointer transition-colors items-center',
-                selectedId === asset.id && 'bg-blue-50 border-l-2 border-l-blue-600',
+                selectedId === asset.id && 'bg-[#0000ff]/5 border-l-2 border-l-[#0000ff]',
                 selectedId !== asset.id && 'hover:bg-slate-50',
-                selectedIds.has(asset.id) && 'bg-blue-50'
+                selectedIds.has(asset.id) && 'bg-[#0000ff]/5'
               )}
             >
               {/* Checkbox */}

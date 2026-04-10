@@ -77,7 +77,7 @@ export function ReviewHeaderBar({ totalAssets, totalGroups }: ReviewHeaderBarPro
             {totalGroups} {totalGroups === 1 ? 'story' : 'stories'}
           </span>
           {readiness.ready && (
-            <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 text-[9px] font-bold uppercase">
+            <span className="bg-[#0000ff]/10 text-[#0000cc] px-1.5 py-0.5 text-[9px] font-bold uppercase">
               Ready
             </span>
           )}
@@ -146,7 +146,7 @@ export function ReviewHeaderBar({ totalAssets, totalGroups }: ReviewHeaderBarPro
             className={cn(
               'flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wide border-2 transition-colors',
               state.ui.newsroomMode
-                ? 'border-blue-600 bg-blue-600 text-white'
+                ? 'border-[#0000ff] bg-[#0000ff] text-white'
                 : 'border-slate-200 text-slate-400 hover:border-black hover:text-black',
             )}
             title="Newsroom mode: compact + keyboard navigation"
@@ -158,7 +158,7 @@ export function ReviewHeaderBar({ totalAssets, totalGroups }: ReviewHeaderBarPro
           {unassignedCount > 0 && (
             <button
               onClick={() => dispatch({ type: 'ACCEPT_ALL_PROPOSED_ASSIGNMENTS' })}
-              className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide border-2 border-blue-600 text-blue-600 hover:bg-blue-50 transition-colors"
+              className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide border-2 border-[#0000ff] text-[#0000ff] hover:bg-[#0000ff]/5 transition-colors"
             >
               Accept all proposals
             </button>

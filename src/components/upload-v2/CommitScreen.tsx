@@ -112,7 +112,7 @@ function PreCommitView() {
                       </span>
                       <span className={cn(
                         'text-[10px] font-bold uppercase',
-                        asset.editable.privacy === 'PUBLIC' ? 'text-blue-600' : asset.editable.privacy === 'RESTRICTED' ? 'text-amber-600' : 'text-slate-400',
+                        asset.editable.privacy === 'PUBLIC' ? 'text-[#0000ff]' : asset.editable.privacy === 'RESTRICTED' ? 'text-black' : 'text-slate-400',
                       )}>
                         {asset.editable.privacy ?? '—'}
                       </span>
@@ -121,9 +121,9 @@ function PreCommitView() {
                       </span>
                       <div className="flex items-center gap-1">
                         <OutcomeIcon size={10} className={cn(
-                          outcome === 'ready_for_discovery_and_transaction' ? 'text-blue-600' :
-                          outcome === 'transactable_via_link' ? 'text-amber-600' :
-                          outcome === 'blocked' ? 'text-red-500' : 'text-slate-400',
+                          outcome === 'ready_for_discovery_and_transaction' ? 'text-[#0000ff]' :
+                          outcome === 'transactable_via_link' ? 'text-black' :
+                          outcome === 'blocked' ? 'text-black' : 'text-slate-400',
                         )} />
                         <span className="text-[10px] text-slate-500 truncate">{OUTCOME_LABELS[outcome]}</span>
                       </div>
@@ -151,7 +151,7 @@ function PreCommitView() {
                     </div>
                     <button
                       onClick={() => dispatch({ type: 'SET_STAGE', stage: 'review' })}
-                      className="text-[10px] font-bold uppercase tracking-wide text-blue-600 hover:underline"
+                      className="text-[10px] font-bold uppercase tracking-wide text-[#0000ff] hover:underline"
                     >
                       Fix in Review
                     </button>
@@ -219,7 +219,7 @@ function CompletionView() {
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Success header */}
         <div className="text-center py-6">
-          <CheckCircle2 size={48} className="mx-auto text-blue-600 mb-3" />
+          <CheckCircle2 size={48} className="mx-auto text-[#0000ff] mb-3" />
           <h2 className="text-lg font-bold uppercase tracking-wide">
             {summary.totalCommitted} asset{summary.totalCommitted !== 1 ? 's' : ''} published
           </h2>
@@ -262,12 +262,12 @@ function CompletionView() {
                 <div className="text-[10px] text-slate-400 mt-0.5">
                   {story.assetCount} asset{story.assetCount !== 1 ? 's' : ''}
                   {story.listedValue > 0 && <> · {centsToEur(story.listedValue)} listed</>}
-                  {story.isNew && <span className="ml-2 bg-blue-100 text-blue-600 px-1.5 py-0.5 text-[9px] font-bold uppercase">New Story</span>}
+                  {story.isNew && <span className="ml-2 bg-[#0000ff]/10 text-[#0000ff] px-1.5 py-0.5 text-[9px] font-bold uppercase">New Story</span>}
                 </div>
               </div>
               <a
                 href={story.vaultUrl}
-                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline"
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-[#0000ff] hover:underline"
               >
                 View in Vault <ExternalLink size={10} />
               </a>
@@ -285,7 +285,7 @@ function CompletionView() {
             {summary.totalBlocked > 0 && (
               <button
                 onClick={() => dispatch({ type: 'SET_STAGE', stage: 'review' })}
-                className="text-[10px] font-bold uppercase tracking-wide text-blue-600 hover:underline"
+                className="text-[10px] font-bold uppercase tracking-wide text-[#0000ff] hover:underline"
               >
                 Return to Review to fix
               </button>

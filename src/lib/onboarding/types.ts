@@ -2,7 +2,10 @@
 
 export type ValidationOutcomeStatus = 'VALIDATED' | 'FLAGGED' | 'STANDARD_BLOCK' | 'HARD_BLOCK'
 export type FieldSource = 'identity' | 'ai-cross-check' | 'user'
-export type OnboardingStepId = 1 | 2 | 3 | 4 | 5 | 6
+export type OnboardingPhaseId = 1 | 2 | 3
+
+/** @deprecated Use OnboardingPhaseId */
+export type OnboardingStepId = OnboardingPhaseId
 
 export interface IdentityVerificationResult {
   status: 'verified' | 'failed' | 'pending' | 'needs_retry'
@@ -87,13 +90,18 @@ export interface OnboardingFlowState {
   crossCheckComplete: boolean
   validationOutcome: ValidationOutcome | null
   profileDraft: CreatorProfileDraft | null
+  username: string | null
+  usernameAvailable: boolean | null
   finalValidationOutcome: ValidationOutcome | null
   vaultCreated: boolean
   vaultId: string | null
 }
 
-export interface OnboardingStep {
-  id: OnboardingStepId
+export interface OnboardingPhase {
+  id: OnboardingPhaseId
   label: string
   description: string
 }
+
+/** @deprecated Use OnboardingPhase */
+export type OnboardingStep = OnboardingPhase

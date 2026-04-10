@@ -93,7 +93,7 @@ export function UploadDropZone({ onFilesSelected, disabled }: UploadDropZoneProp
         onClick={() => !disabled && inputRef.current?.click()}
         className={cn(
           'border-2 border-dashed px-8 py-12 flex flex-col items-center justify-center cursor-pointer transition-colors',
-          dragActive && !disabled && 'border-blue-600 bg-blue-50',
+          dragActive && !disabled && 'border-[#0000ff] bg-[#0000ff]/5',
           !dragActive && !disabled && 'border-black hover:bg-slate-50',
           disabled && 'border-slate-300 cursor-not-allowed opacity-50'
         )}

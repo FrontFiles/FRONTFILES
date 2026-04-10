@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { StateBadge } from './StateBadge'
 import { EmptyPanel } from './Panel'
@@ -46,7 +46,7 @@ export function FrontfolioContent({ assets, stories, articles, collections }: Fr
               className={cn(
                 'px-4 py-2.5 text-sm font-bold uppercase tracking-wide transition-colors',
                 activeTab === tab.key
-                  ? 'border-b-2 border-blue-600 text-black'
+                  ? 'border-b-2 border-[#0000ff] text-black'
                   : 'text-slate-400 hover:text-black'
               )}
             >
@@ -125,12 +125,11 @@ const FORMAT_ICON: Record<string, string> = {
 }
 
 function AssetCard({ asset }: { asset: VaultAsset }) {
-  const router = useRouter()
   const social = mockSocialCounts[asset.id]
   return (
-    <div
-      className="border border-slate-200 hover:border-slate-400 transition-colors cursor-pointer"
-      onClick={() => router.push(`/asset/${asset.id}`)}
+    <Link
+      href={`/asset/${asset.id}`}
+      className="block border border-slate-200 hover:border-slate-400 transition-colors"
     >
       <div className="aspect-video bg-slate-100 flex items-center justify-center relative overflow-hidden">
         {asset.thumbnailUrl ? (
@@ -143,7 +142,7 @@ function AssetCard({ asset }: { asset: VaultAsset }) {
         </span>
         {asset.declarationState === 'fully_validated' && (
           <div className="absolute top-2 right-2 bg-white/90 p-0.5">
-            <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 text-blue-600">
+            <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 text-[#0000ff]">
               <path d="M8 1L3 3.5v4c0 3.5 2.1 6.8 5 7.5 2.9-.7 5-4 5-7.5v-4L8 1z" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.15" />
               <path d="M5.5 8l2 2L10.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -158,7 +157,7 @@ function AssetCard({ asset }: { asset: VaultAsset }) {
       </div>
       <div
         className="bg-white px-3 pb-2.5 flex items-center gap-2"
-        onClick={e => e.stopPropagation()}
+        onClick={e => { e.preventDefault(); e.stopPropagation() }}
       >
         {social && (
           <>
@@ -172,12 +171,11 @@ function AssetCard({ asset }: { asset: VaultAsset }) {
           </span>
         )}
       </div>
-    </div>
+    </Link>
   )
 }
 
 function StoryCard({ story }: { story: Story }) {
-  const router = useRouter()
   const social = mockSocialCounts[story.id]
   const mix = story.contentMix
   const mixParts: string[] = []
@@ -190,9 +188,9 @@ function StoryCard({ story }: { story: Story }) {
   if (mix.vector > 0) mixParts.push(`${mix.vector} vector`)
 
   return (
-    <div
-      className="border-2 border-black cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
-      onClick={() => router.push(`/story/${story.id}`)}
+    <Link
+      href={`/story/${story.id}`}
+      className="block border-2 border-black hover:opacity-95 transition-opacity overflow-hidden"
     >
       <div className="aspect-video relative overflow-hidden bg-slate-100">
         {story.coverImageUrl ? (
@@ -229,24 +227,23 @@ function StoryCard({ story }: { story: Story }) {
             {story.publishedAt ? new Date(story.publishedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unpublished'}
           </span>
           {social && (
-            <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 ml-auto" onClick={e => { e.preventDefault(); e.stopPropagation() }}>
               <LikeButton initialCount={social.likes} initialLiked={social.userLiked} size="sm" />
               <CommentCount count={social.comments} />
             </div>
           )}
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
 
 function ArticleCard({ article }: { article: Article }) {
-  const router = useRouter()
   const social = mockSocialCounts[article.id]
   return (
-    <div
-      className="border border-slate-200 hover:border-slate-400 transition-colors cursor-pointer overflow-hidden flex"
-      onClick={() => router.push(`/article/${article.id}`)}
+    <Link
+      href={`/article/${article.id}`}
+      className="block border border-slate-200 hover:border-slate-400 transition-colors overflow-hidden flex"
     >
       <div className="w-48 shrink-0 aspect-video relative overflow-hidden bg-slate-100 self-stretch">
         {article.coverImageUrl ? (
@@ -266,7 +263,7 @@ function ArticleCard({ article }: { article: Article }) {
           <h3 className="text-sm font-bold text-black leading-snug">{article.title}</h3>
           <p className="text-xs text-slate-600 mt-1.5 line-clamp-2 leading-relaxed">{article.excerpt}</p>
         </div>
-        <div className="flex items-center gap-3 mt-3" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mt-3" onClick={e => { e.preventDefault(); e.stopPropagation() }}>
           <span className="font-mono text-[10px] text-slate-400">
             {article.publishedAt ? new Date(article.publishedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unpublished'}
           </span>
@@ -279,13 +276,13 @@ function ArticleCard({ article }: { article: Article }) {
           )}
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
 
 function CollectionCard({ collection }: { collection: Collection }) {
   return (
-    <div className="border-2 border-black cursor-pointer hover:bg-slate-50 transition-colors">
+    <Link href={`/collection/${collection.id}`} className="block border-2 border-black hover:bg-slate-50 transition-colors">
       <div className="grid grid-cols-2 gap-px bg-slate-200">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="aspect-video bg-slate-100 overflow-hidden flex items-center justify-center">
@@ -301,6 +298,6 @@ function CollectionCard({ collection }: { collection: Collection }) {
         <div className="text-sm font-bold uppercase tracking-wide text-black">{collection.title}</div>
         <div className="text-[10px] font-mono text-slate-400 mt-0.5">{collection.itemCount} items</div>
       </div>
-    </div>
+    </Link>
   )
 }

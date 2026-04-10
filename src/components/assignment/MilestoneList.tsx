@@ -35,7 +35,7 @@ export function MilestoneList() {
                   <span className="text-xs font-bold text-black">{milestone.title}</span>
                   <span className={cn(
                     'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border shrink-0',
-                    milestone.milestoneType === 'service' ? 'border-blue-600 text-blue-600' : 'border-black/20 text-black/40'
+                    milestone.milestoneType === 'service' ? 'border-[#0000ff] text-[#0000ff]' : 'border-black/20 text-black/40'
                   )}>
                     {milestone.milestoneType}
                   </span>
@@ -168,7 +168,7 @@ function EvidenceItemRow({ item }: { item: EvidenceItem }) {
       <Icon size={10} className="text-black/20 shrink-0" />
       <span className={cn(
         'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border shrink-0',
-        item.kind === 'vault_asset' ? 'border-black/20 text-black/40' : 'border-blue-600/30 text-blue-600/60'
+        item.kind === 'vault_asset' ? 'border-black/20 text-black/40' : 'border-[#0000ff]/30 text-[#0000ff]/60'
       )}>
         {item.kind.replace(/_/g, ' ')}
       </span>
@@ -191,7 +191,7 @@ function MilestoneStatePill({ state }: { state: string }) {
       'text-[8px] font-bold uppercase tracking-wider px-2 py-1 border shrink-0',
       isComplete ? 'bg-black text-white border-black' :
       state === 'disputed' ? 'border-black text-black' :
-      state === 'active' || state === 'fulfilment_submitted' ? 'border-blue-600 text-blue-600' :
+      state === 'active' || state === 'fulfilment_submitted' ? 'border-[#0000ff] text-[#0000ff]' :
       'border-black/15 text-black/30'
     )}>
       {label}

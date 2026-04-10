@@ -19,7 +19,7 @@ export function Panel({
     emphasis: 'border-2 border-black',
     standard: 'border border-slate-200',
     dashed: 'border-2 border-dashed border-black',
-    blue: 'border-2 border-blue-600',
+    blue: 'border-2 border-[#0000ff]',
   }[borderStyle]
 
   return (
@@ -30,7 +30,7 @@ export function Panel({
         </div>
       )}
       {title && headerStyle === 'blue' && (
-        <div className="px-6 py-3 border-b-2 border-blue-600 bg-blue-600">
+        <div className="px-6 py-3 border-b-2 border-[#0000ff] bg-[#0000ff]">
           <span className="text-sm font-bold text-white uppercase tracking-wide">{title}</span>
         </div>
       )}

@@ -53,7 +53,7 @@ export function UploadJobList({ jobs, activeJobId, onSelectJob, onRemoveJob }: U
           onClick={() => onSelectJob(job.id)}
           className={cn(
             'grid grid-cols-[1fr_5rem_6rem_6rem_2rem] gap-2 px-4 py-3 border-b border-slate-200 cursor-pointer transition-colors items-center',
-            activeJobId === job.id && 'bg-blue-50 border-l-2 border-l-blue-600',
+            activeJobId === job.id && 'bg-[#0000ff]/5 border-l-2 border-l-[#0000ff]',
             activeJobId !== job.id && 'hover:bg-slate-50'
           )}
         >
@@ -63,7 +63,7 @@ export function UploadJobList({ jobs, activeJobId, onSelectJob, onRemoveJob }: U
             {job.state === 'ingesting' && (
               <div className="mt-1 h-1 bg-slate-200 overflow-hidden">
                 <div
-                  className="h-full bg-blue-600 transition-all duration-300"
+                  className="h-full bg-[#0000ff] transition-all duration-300"
                   style={{ width: `${job.uploadProgress}%` }}
                 />
               </div>
@@ -111,10 +111,10 @@ function JobStateBadge({ state, failureReason }: { state: string; failureReason:
         className={cn(
           'text-[9px] font-bold uppercase tracking-widest',
           isError && 'text-black',
-          isActive && 'text-blue-600',
+          isActive && 'text-[#0000ff]',
           isSuccess && 'text-black',
           isAction && 'text-black',
-          isReady && 'text-blue-600',
+          isReady && 'text-[#0000ff]',
           !isError && !isActive && !isSuccess && !isAction && !isReady && 'text-slate-400'
         )}
       >

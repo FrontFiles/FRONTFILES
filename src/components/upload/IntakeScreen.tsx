@@ -54,7 +54,7 @@ export function IntakeScreen({ assets, defaults, dispatch }: IntakeScreenProps) 
         onClick={() => inputRef.current?.click()}
         className={cn(
           'border-2 border-dashed cursor-pointer transition-colors p-8 flex flex-col items-center justify-center min-h-[200px]',
-          isDragging ? 'border-blue-600 bg-blue-50' : 'border-black hover:border-blue-600',
+          isDragging ? 'border-[#0000ff] bg-[#0000ff]/5' : 'border-black hover:border-[#0000ff]',
         )}
       >
         <input
@@ -103,7 +103,7 @@ export function IntakeScreen({ assets, defaults, dispatch }: IntakeScreenProps) 
             })
             handleFiles(mockFiles)
           }}
-          className="w-full py-2.5 border-2 border-dashed border-slate-300 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:border-blue-600 hover:text-blue-600 transition-colors"
+          className="w-full py-2.5 border-2 border-dashed border-slate-300 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:border-[#0000ff] hover:text-[#0000ff] transition-colors"
         >
           Load 12 sample assets (demo)
         </button>
@@ -233,7 +233,7 @@ export function IntakeScreen({ assets, defaults, dispatch }: IntakeScreenProps) 
             type="checkbox"
             checked={defaults.applyRecommendedPrice}
             onChange={e => dispatch({ type: 'SET_DEFAULTS', defaults: { applyRecommendedPrice: e.target.checked } })}
-            className="w-3.5 h-3.5 accent-blue-600"
+            className="w-3.5 h-3.5 accent-[#0000ff]"
           />
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
             Auto-apply recommended prices after processing
@@ -248,7 +248,7 @@ export function IntakeScreen({ assets, defaults, dispatch }: IntakeScreenProps) 
         className={cn(
           'w-full py-3 text-sm font-bold uppercase tracking-widest border-2 transition-colors',
           canStart
-            ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
+            ? 'border-[#0000ff] bg-[#0000ff] text-white hover:bg-[#0000cc]'
             : 'border-slate-200 text-slate-300 cursor-not-allowed'
         )}
       >

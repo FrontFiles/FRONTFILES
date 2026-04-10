@@ -31,8 +31,8 @@ const variantStyles: Record<BadgeVariant, string> = {
   private: 'border border-slate-300 text-slate-400',
   restricted: 'border border-dashed border-slate-400 text-slate-400',
   // Declaration — positive
-  fully_validated: 'border border-blue-600 text-blue-600',
-  corroborated: 'border border-blue-600 text-blue-600',
+  fully_validated: 'border border-[#0000ff] text-[#0000ff]',
+  corroborated: 'border border-[#0000ff] text-[#0000ff]',
   // Declaration — pending
   provenance_pending: 'border border-dashed border-slate-300 text-slate-400',
   under_review: 'border border-dashed border-slate-300 text-slate-400',
@@ -45,7 +45,7 @@ const variantStyles: Record<BadgeVariant, string> = {
   draft: 'text-slate-400',
   // Other
   'buyers-only': 'border border-black text-black',
-  'assembly-verified': 'border border-blue-600 text-blue-600',
+  'assembly-verified': 'border border-[#0000ff] text-[#0000ff]',
 }
 
 const variantLabels: Record<BadgeVariant, string> = {

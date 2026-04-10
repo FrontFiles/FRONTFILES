@@ -4,7 +4,7 @@
  * Staff Dispute Queue — Lists all assignments in disputed state.
  *
  * Staff-side surface for triaging and navigating to individual dispute consoles.
- * Design canon: black + blue-600 + white. No radius. Hard borders. Dense typography.
+ * Design canon: black + #0000ff + white. No radius. Hard borders. Dense typography.
  */
 
 import { cn } from '@/lib/utils'
@@ -115,7 +115,7 @@ export function StaffDisputeQueue() {
                   <ShortDate iso={filed} />
                   <span className={cn(
                     'text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 border text-center',
-                    filer === 'buyer' ? 'border-black text-black' : 'border-blue-600 text-blue-600',
+                    filer === 'buyer' ? 'border-black text-black' : 'border-[#0000ff] text-[#0000ff]',
                   )}>
                     {filer}
                   </span>

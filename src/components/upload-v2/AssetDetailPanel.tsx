@@ -76,7 +76,7 @@ export function AssetDetailPanel() {
                 <span className="text-[9px] font-mono text-slate-400">{em.dimensions.width}x{em.dimensions.height}</span>
               )}
               {asset.duplicateStatus === 'likely_duplicate' && (
-                <span className="text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5">Duplicate</span>
+                <span className="text-[9px] font-bold uppercase tracking-wide border border-black text-black px-1.5 py-0.5">Duplicate</span>
               )}
               {asset.excluded && (
                 <span className="text-[9px] font-bold uppercase tracking-wide bg-slate-200 text-slate-500 px-1.5 py-0.5">Excluded</span>
@@ -153,7 +153,7 @@ export function AssetDetailPanel() {
                   {tag}
                   <button
                     onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field: 'tags', value: asset.editable.tags.filter((_, idx) => idx !== i) })}
-                    className="text-slate-400 hover:text-red-500 text-[8px]"
+                    className="text-slate-400 hover:text-black text-[8px]"
                   >x</button>
                 </span>
               ))}
@@ -174,7 +174,7 @@ export function AssetDetailPanel() {
           <FieldRow label="Location" source={getFieldSource(asset, 'geography')} conflict={getFieldConflict(asset, 'geography')}>
             <div className="flex flex-wrap gap-1">
               {asset.editable.geography.map((g, i) => (
-                <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px]">{g}</span>
+                <span key={i} className="px-1.5 py-0.5 bg-[#0000ff]/5 text-[#0000cc] text-[10px]">{g}</span>
               ))}
               {asset.editable.geography.length === 0 && <span className="text-slate-300 text-[10px]">No location data</span>}
             </div>
@@ -215,7 +215,7 @@ export function AssetDetailPanel() {
                 const g = state.storyGroupsById[c.storyGroupId]
                 return g ? (
                   <div key={c.storyGroupId} className="flex items-center justify-between text-[10px] py-0.5">
-                    <button onClick={() => dispatch({ type: 'ASSIGN_ASSET_TO_STORY', assetId: asset.id, storyGroupId: c.storyGroupId })} className="truncate text-blue-600 hover:underline">{g.name}</button>
+                    <button onClick={() => dispatch({ type: 'ASSIGN_ASSET_TO_STORY', assetId: asset.id, storyGroupId: c.storyGroupId })} className="truncate text-[#0000ff] hover:underline">{g.name}</button>
                     <span className="text-slate-400 font-mono ml-2">{Math.round(c.score * 100)}%</span>
                   </div>
                 ) : null
@@ -245,7 +245,7 @@ export function AssetDetailPanel() {
               <span className="text-[10px] text-slate-500">
                 <SourceBadge source="ai" /> <span className="font-bold ml-1">{proposal.privacySuggestion}</span>
               </span>
-              <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field: 'privacy', value: proposal.privacySuggestion })} className="text-[10px] font-bold text-blue-600 hover:underline">Accept</button>
+              <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field: 'privacy', value: proposal.privacySuggestion })} className="text-[10px] font-bold text-[#0000ff] hover:underline">Accept</button>
             </div>
           )}
         </Section>
@@ -264,7 +264,7 @@ export function AssetDetailPanel() {
                   }}
                   className={cn(
                     'px-1.5 py-0.5 text-[10px] font-bold uppercase border transition-colors',
-                    isActive ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-400',
+                    isActive ? 'border-[#0000ff] bg-[#0000ff] text-white' : 'border-slate-200 text-slate-400 hover:border-slate-400',
                   )}
                 >{LICENCE_TYPE_LABELS[l]}</button>
               )
@@ -275,7 +275,7 @@ export function AssetDetailPanel() {
               <span className="text-[10px] text-slate-500">
                 <SourceBadge source="ai" /> <span className="font-bold ml-1">{proposal.licenceSuggestions.map(l => LICENCE_TYPE_LABELS[l]).join(', ')}</span>
               </span>
-              <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field: 'licences', value: [...proposal.licenceSuggestions] })} className="text-[10px] font-bold text-blue-600 hover:underline">Accept</button>
+              <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field: 'licences', value: [...proposal.licenceSuggestions] })} className="text-[10px] font-bold text-[#0000ff] hover:underline">Accept</button>
             </div>
           )}
         </Section>
@@ -305,12 +305,12 @@ export function AssetDetailPanel() {
               <div className="text-[10px] text-slate-400">{proposal.priceSuggestion.basis}</div>
               {proposal.priceSuggestion.factors.map((f, i) => (
                 <div key={i} className="flex items-center gap-1 text-[10px] text-slate-400">
-                  <span className={cn('w-1 h-1', f.effect === 'increase' ? 'bg-blue-600' : f.effect === 'decrease' ? 'bg-black' : 'bg-slate-300')} />
+                  <span className={cn('w-1 h-1', f.effect === 'increase' ? 'bg-[#0000ff]' : f.effect === 'decrease' ? 'bg-black' : 'bg-slate-300')} />
                   {f.label}
                 </div>
               ))}
               {asset.editable.price === null && (
-                <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field: 'price', value: proposal.priceSuggestion!.amount })} className="mt-1 text-[10px] font-bold text-blue-600 hover:underline">Accept price</button>
+                <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field: 'price', value: proposal.priceSuggestion!.amount })} className="mt-1 text-[10px] font-bold text-[#0000ff] hover:underline">Accept price</button>
               )}
             </div>
           )}
@@ -339,7 +339,7 @@ export function AssetDetailPanel() {
               {em.xmpCreatorTool && <ProvenanceRow label="Creator Tool" value={em.xmpCreatorTool} />}
               {em.c2paPresent && (
                 <ProvenanceRow
-                  icon={<ShieldCheck size={10} className={em.c2paValid ? 'text-blue-600' : 'text-slate-400'} />}
+                  icon={<ShieldCheck size={10} className={em.c2paValid ? 'text-[#0000ff]' : 'text-slate-400'} />}
                   label="C2PA"
                   value={`v${em.c2paVersion} · ${em.c2paValid ? 'Valid' : 'Invalid'}${em.c2paSignerIdentity ? ` · ${em.c2paSignerIdentity}` : ''}`}
                 />
@@ -449,7 +449,7 @@ function ProposalHint({ asset, field, proposal, dispatch }: {
     return (
       <div className="text-[10px] mt-0.5 px-1 py-0.5 border border-dashed border-slate-300 flex items-center justify-between">
         <span className="text-slate-500 truncate"><SourceBadge source="embedded" /> <span className="ml-1">{embeddedVal}</span></span>
-        <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field, value: embeddedVal })} className="text-[9px] font-bold text-blue-600 hover:underline shrink-0 ml-1">Use</button>
+        <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field, value: embeddedVal })} className="text-[9px] font-bold text-[#0000ff] hover:underline shrink-0 ml-1">Use</button>
       </div>
     )
   }
@@ -459,7 +459,7 @@ function ProposalHint({ asset, field, proposal, dispatch }: {
     return (
       <div className="text-[10px] mt-0.5 px-1 py-0.5 border border-dashed border-slate-300 flex items-center justify-between">
         <span className="text-slate-500 truncate"><SourceBadge source="ai" /> <span className="ml-1">{proposedVal}</span></span>
-        <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field, value: proposedVal })} className="text-[9px] font-bold text-blue-600 hover:underline shrink-0 ml-1">Use</button>
+        <button onClick={() => dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field, value: proposedVal })} className="text-[9px] font-bold text-[#0000ff] hover:underline shrink-0 ml-1">Use</button>
       </div>
     )
   }
@@ -478,7 +478,7 @@ function ConflictCard({ conflict: c, assetId, dispatch }: {
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] font-bold uppercase tracking-wide">{String(c.field)}</span>
         {c.resolvedBy && (
-          <span className="text-[9px] font-bold text-blue-600 uppercase tracking-wide flex items-center gap-0.5"><Check size={8} /> Resolved</span>
+          <span className="text-[9px] font-bold text-[#0000ff] uppercase tracking-wide flex items-center gap-0.5"><Check size={8} /> Resolved</span>
         )}
       </div>
       <div className="space-y-0.5">
@@ -515,12 +515,12 @@ function DeclarationCard({ state: declState, em }: { state: string; em: V2Asset[
   return (
     <div className={cn(
       'border-2 px-3 py-2',
-      isValid && 'border-blue-300',
+      isValid && 'border-[#0000ff]/20',
       isPending && 'border-dashed border-black',
       isInvalid && 'border-black bg-slate-50',
     )}>
       <div className="flex items-center gap-2 mb-0.5">
-        {isValid && <ShieldCheck size={12} className="text-blue-600" />}
+        {isValid && <ShieldCheck size={12} className="text-[#0000ff]" />}
         {isPending && <ShieldQuestion size={12} />}
         {isInvalid && <ShieldAlert size={12} />}
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Declaration</span>
@@ -547,7 +547,7 @@ function SourceBadge({ source }: { source: MetadataSource | string }) {
     embedded: { label: 'IPTC', className: 'bg-black text-white' },
     extracted: { label: 'Extr', className: 'bg-slate-600 text-white' },
     ai: { label: 'AI', className: 'bg-white text-black border border-dashed border-black' },
-    creator: { label: 'Confirmed', className: 'bg-blue-600 text-white' },
+    creator: { label: 'Confirmed', className: 'bg-[#0000ff] text-white' },
   }
   const c = config[source] ?? config.ai
   return <span className={cn('px-1 py-0 text-[8px] font-bold uppercase tracking-wide inline-block leading-tight', c.className)}>{c.label}</span>

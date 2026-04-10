@@ -27,7 +27,7 @@ interface GroupingState {
 
 function ConfidenceBadge({ level }: { level: PlacementConfidence }) {
   const styles = {
-    high: 'border-blue-600 text-blue-600',
+    high: 'border-[#0000ff] text-[#0000ff]',
     medium: 'border-slate-500 text-slate-500',
     low: 'border-black text-black bg-black/5',
   }
@@ -53,7 +53,7 @@ function SignalTag({ signal }: { signal: string }) {
 function FormatBadge({ format }: { format: string }) {
   const colors: Record<string, string> = {
     Photo: 'bg-black text-white',
-    Video: 'bg-blue-600 text-white',
+    Video: 'bg-[#0000ff] text-white',
     Audio: 'bg-slate-700 text-white',
     Infographic: 'bg-slate-500 text-white',
     Text: 'bg-slate-400 text-white',
@@ -90,7 +90,7 @@ function FileTile({
       onClick={onSelect}
       className={cn(
         'border cursor-grab active:cursor-grabbing transition-all group',
-        selected ? 'border-blue-600 bg-blue-50' : 'border-slate-200 hover:border-black',
+        selected ? 'border-[#0000ff] bg-[#0000ff]/5' : 'border-slate-200 hover:border-black',
         file.isDuplicate && 'border-dashed opacity-70',
       )}
     >
@@ -126,7 +126,7 @@ function FileTile({
                 <span className="text-[8px] font-mono text-slate-400">EXIF</span>
               )}
               {file.c2paPresent && (
-                <span className="text-[8px] font-mono text-blue-600">C2PA</span>
+                <span className="text-[8px] font-mono text-[#0000ff]">C2PA</span>
               )}
             </div>
             {file.locationDetected && (
@@ -164,8 +164,8 @@ function GroupColumn({
 
   const typeStyles = {
     'proposed-new': {
-      border: 'border-blue-600',
-      badge: 'bg-blue-600 text-white',
+      border: 'border-[#0000ff]',
+      badge: 'bg-[#0000ff] text-white',
       label: 'NEW STORY',
     },
     'matched-existing': {
@@ -195,7 +195,7 @@ function GroupColumn({
       className={cn(
         'border-2 transition-colors flex flex-col',
         style.border,
-        dragOver && 'bg-blue-50 border-blue-600',
+        dragOver && 'bg-[#0000ff]/5 border-[#0000ff]',
       )}
     >
       {/* Group Header */}
@@ -227,7 +227,7 @@ function GroupColumn({
         {/* Expand/Collapse rationale */}
         <button
           onClick={onToggleExpand}
-          className="mt-2 text-[9px] font-bold uppercase tracking-widest text-blue-600 hover:underline"
+          className="mt-2 text-[9px] font-bold uppercase tracking-widest text-[#0000ff] hover:underline"
         >
           {expanded ? 'Hide rationale' : 'Show rationale'}
         </button>
@@ -352,7 +352,7 @@ function FileDetailDrawer({ file, onClose }: { file: UploadFile; onClose: () => 
             <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Geography</span>
             <div className="flex flex-wrap gap-1">
               {file.suggestedGeoTags.map(t => (
-                <span key={t} className="text-[9px] font-bold uppercase tracking-wider border border-blue-300 px-1.5 py-0.5 text-blue-600">
+                <span key={t} className="text-[9px] font-bold uppercase tracking-wider border border-[#0000ff]/20 px-1.5 py-0.5 text-[#0000ff]">
                   {t}
                 </span>
               ))}
@@ -375,7 +375,7 @@ function FileDetailDrawer({ file, onClose }: { file: UploadFile; onClose: () => 
 function MetaSignal({ label, present }: { label: string; present: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className={cn('w-2 h-2', present ? 'bg-blue-600' : 'bg-slate-200')} />
+      <div className={cn('w-2 h-2', present ? 'bg-[#0000ff]' : 'bg-slate-200')} />
       <span className={cn('text-[9px] font-mono', present ? 'text-black' : 'text-slate-300')}>{label}</span>
     </div>
   )
@@ -584,7 +584,7 @@ export function StoryGroupingScreen({ onContinue, onBack }: StoryGroupingScreenP
         </div>
         <button
           onClick={onContinue}
-          className="px-6 py-2.5 text-xs font-bold uppercase tracking-widest border-2 border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          className="px-6 py-2.5 text-xs font-bold uppercase tracking-widest border-2 border-[#0000ff] bg-[#0000ff] text-white hover:bg-[#0000cc] transition-colors"
         >
           Confirm Grouping &amp; Continue
         </button>

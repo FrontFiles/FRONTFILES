@@ -1291,7 +1291,7 @@ export type FieldSource = 'embedded' | 'ai' | 'creator' | 'none'
 
 /** Get the effective source for a field on an asset */
 export function getFieldSource(asset: V2Asset, field: keyof AssetEditableFields): FieldSource {
-  const tracked = asset.editable.metadataSource[field]
+  const tracked = (asset.editable.metadataSource as Record<string, string | undefined>)[field]
   if (tracked) return tracked as FieldSource
   // Infer from state
   const val = asset.editable[field]

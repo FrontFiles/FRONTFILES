@@ -34,7 +34,7 @@ export function AnalysisScreen() {
             />
           </div>
           {progress.failed > 0 && (
-            <p className="text-xs text-red-600 mt-2 font-bold">
+            <p className="text-xs text-black mt-2 font-bold">
               {progress.failed} file{progress.failed > 1 ? 's' : ''} failed analysis
             </p>
           )}
@@ -44,10 +44,10 @@ export function AnalysisScreen() {
         {canEnterReview && progress.inProgress > 0 && (
           <button
             onClick={() => dispatch({ type: 'ENTER_REVIEW_EARLY' })}
-            className="w-full py-3 bg-blue-600 text-white text-sm font-bold uppercase tracking-widest hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 bg-[#0000ff] text-white text-sm font-bold uppercase tracking-widest hover:bg-[#0000cc] transition-colors flex items-center justify-center gap-2"
           >
             Go to Review & Assign
-            <span className="text-blue-200 font-normal lowercase">— analysis continues in background</span>
+            <span className="text-[#0000ff]/15 font-normal lowercase">— analysis continues in background</span>
             <ArrowRight size={14} />
           </button>
         )}
@@ -88,9 +88,9 @@ export function AnalysisScreen() {
                 {/* Upload status */}
                 <div className="flex items-center gap-1.5">
                   {isComplete || isAnalysing ? (
-                    <CheckCircle2 size={12} className="text-blue-600" />
+                    <CheckCircle2 size={12} className="text-[#0000ff]" />
                   ) : isFailed ? (
-                    <XCircle size={12} className="text-red-500" />
+                    <XCircle size={12} className="text-black" />
                   ) : (
                     <>
                       <Loader2 size={12} className="text-slate-400 animate-spin" />
@@ -104,19 +104,19 @@ export function AnalysisScreen() {
                   {isComplete && asset.declarationState ? (
                     <>
                       {asset.declarationState === 'manifest_invalid' ? (
-                        <XCircle size={12} className="text-red-500" />
+                        <XCircle size={12} className="text-black" />
                       ) : (
-                        <CheckCircle2 size={12} className="text-blue-600" />
+                        <CheckCircle2 size={12} className="text-[#0000ff]" />
                       )}
                       <span className={cn(
                         'text-[10px] font-bold uppercase',
-                        asset.declarationState === 'manifest_invalid' ? 'text-red-500' : 'text-slate-500',
+                        asset.declarationState === 'manifest_invalid' ? 'text-black' : 'text-slate-500',
                       )}>
                         {DECLARATION_STATE_LABELS[asset.declarationState]}
                       </span>
                     </>
                   ) : isFailed ? (
-                    <span className="text-red-500 text-[10px] font-bold">Failed</span>
+                    <span className="text-black text-[10px] font-bold">Failed</span>
                   ) : (
                     <Loader2 size={12} className="text-slate-300 animate-spin" />
                   )}
@@ -126,13 +126,13 @@ export function AnalysisScreen() {
                 <div>
                   {isComplete && asset.proposal ? (
                     <div className="flex items-center gap-1.5">
-                      <CheckCircle2 size={12} className="text-blue-600" />
+                      <CheckCircle2 size={12} className="text-[#0000ff]" />
                       <span className="text-[10px] font-mono text-slate-400">
                         {Math.round(asset.proposal.confidence * 100)}%
                       </span>
                     </div>
                   ) : isFailed ? (
-                    <span className="text-red-500 text-[10px] font-bold">Failed</span>
+                    <span className="text-black text-[10px] font-bold">Failed</span>
                   ) : (
                     <Loader2 size={12} className="text-slate-300 animate-spin" />
                   )}
@@ -142,7 +142,7 @@ export function AnalysisScreen() {
                 <div>
                   {isComplete && asset.proposal?.priceSuggestion ? (
                     <div className="flex items-center gap-1.5">
-                      <CheckCircle2 size={12} className="text-blue-600" />
+                      <CheckCircle2 size={12} className="text-[#0000ff]" />
                       <span className="text-[10px] font-mono text-slate-400">
                         {`\u20AC${(asset.proposal.priceSuggestion.amount / 100).toFixed(0)}`}
                       </span>
@@ -150,7 +150,7 @@ export function AnalysisScreen() {
                   ) : isComplete ? (
                     <span className="text-slate-300 text-[10px]">{'\u2014'}</span>
                   ) : isFailed ? (
-                    <span className="text-red-500 text-[10px] font-bold">Failed</span>
+                    <span className="text-black text-[10px] font-bold">Failed</span>
                   ) : (
                     <Loader2 size={12} className="text-slate-300 animate-spin" />
                   )}

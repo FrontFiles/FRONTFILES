@@ -45,7 +45,7 @@ export function VaultLeftRail({
               className={cn(
                 'text-left px-3 py-2 text-sm font-bold transition-colors',
                 activeSection === section.key
-                  ? 'border-l-2 border-blue-600 bg-blue-50 text-black'
+                  ? 'border-l-2 border-[#0000ff] bg-[#0000ff]/5 text-black'
                   : 'text-slate-500 hover:text-black hover:bg-slate-50 border-l-2 border-transparent'
               )}
             >
@@ -76,7 +76,7 @@ export function VaultLeftRail({
       <div className="px-5 py-4 border-t border-slate-200">
         <a
           href="/vault/upload"
-          className="block w-full h-10 bg-blue-600 text-white font-bold text-sm uppercase tracking-wide hover:bg-blue-700 transition-colors text-center leading-10"
+          className="block w-full h-10 bg-[#0000ff] text-white font-bold text-sm uppercase tracking-wide hover:bg-[#0000cc] transition-colors text-center leading-10"
         >
           Upload
         </a>

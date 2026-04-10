@@ -17,7 +17,7 @@ export function RightsPanel() {
         <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-black/25">Assignment rights record</span>
         <span className={cn(
           'text-[8px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 border',
-          a.assignmentClass === 'service' ? 'border-blue-600 text-blue-600' : 'border-black text-black'
+          a.assignmentClass === 'service' ? 'border-[#0000ff] text-[#0000ff]' : 'border-black text-black'
         )}>
           {ASSIGNMENT_CLASS_LABELS[a.assignmentClass]}
         </span>
@@ -45,8 +45,8 @@ export function RightsPanel() {
       {/* Service terms */}
       {rightsRecord.serviceTerms && (
         <section className="mb-6">
-          <div className="border-2 border-blue-600">
-            <div className="bg-blue-600 text-white px-4 py-2">
+          <div className="border-2 border-[#0000ff]">
+            <div className="bg-[#0000ff] text-white px-4 py-2">
               <span className="text-[9px] font-bold uppercase tracking-[0.15em]">Service terms</span>
             </div>
             <div className="p-4 flex flex-col gap-3">

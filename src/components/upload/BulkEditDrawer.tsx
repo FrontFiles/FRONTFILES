@@ -158,7 +158,7 @@ export function BulkEditDrawer({ open, selectedAssets, onClose, onBulkUpdate, on
         {hasRecommendations && (
           <button
             onClick={onApplyRecommendedPrices}
-            className="w-full py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+            className="w-full py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 border-[#0000ff] text-[#0000ff] hover:bg-[#0000ff] hover:text-white transition-colors"
           >
             Apply Recommended Prices
           </button>

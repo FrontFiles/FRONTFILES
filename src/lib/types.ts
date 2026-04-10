@@ -70,6 +70,7 @@ export const DECLARATION_STATE_LABELS: Record<ValidationDeclarationState, string
 export const TRANSACTABLE_DECLARATION_STATES: ValidationDeclarationState[] = [
   'fully_validated',
   'provenance_pending',
+  'corroborated',
   'under_review',
 ]
 
@@ -401,13 +402,57 @@ export const PLATFORM_FEES = {
 } as const
 
 // ══════════════════════════════════════════════
+// USERNAME (Spec §5.1)
+// ══════════════════════════════════════════════
+//
+// Every user has exactly one username. It is globally unique, immutable after
+// a 30-day grace period, and serves as the root-level public URL:
+//
+//   https://frontfiles.com/{username}
+//
+// Rules:
+//   - 3–30 characters
+//   - Lowercase alphanumeric + hyphens only (no leading/trailing hyphen)
+//   - Must not match any platform route or reserved word
+//   - One username per account; one account per username
+//   - Separate from Vault ID (vault-XXXXXXXX), which is an internal identifier
+//
+// The username is the human-readable identity. The Vault ID is the system identifier.
+// Both are permanent. Neither replaces the other.
+
+/** Regex: 3-30 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen */
+export const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])?$/
+
+/** Platform routes and terms that cannot be claimed as usernames */
+export const RESERVED_USERNAMES = [
+  // Platform routes
+  'onboarding', 'signin', 'signup', 'login', 'logout',
+  'vault', 'search', 'asset', 'story', 'article',
+  'lightbox', 'checkout', 'account', 'plugin', 'staff',
+  'creator', 'api', 'admin', 'settings', 'help', 'support',
+  'about', 'terms', 'privacy', 'legal', 'pricing',
+  // Reserved terms
+  'frontfiles', 'frontfolio', 'system', 'null', 'undefined',
+  'root', 'mod', 'moderator', 'official', 'verified',
+  'assignments', 'disputes', 'settlements', 'offers',
+  'composer', 'upload', 'browse', 'discover', 'explore',
+] as const
+
+export function isValidUsername(username: string): boolean {
+  return USERNAME_PATTERN.test(username) && !RESERVED_USERNAMES.includes(username as typeof RESERVED_USERNAMES[number])
+}
+
+// ══════════════════════════════════════════════
 // CREATOR PROFILE (Spec §5, §8.5, §8.6)
 // ══════════════════════════════════════════════
 
 export interface CreatorProfile {
-  handle: string
+  /** Unique, root-level public identifier. URL: frontfiles.com/{username} */
+  username: string
   displayName: string
   professionalTitle: string
+  locationBase: string
+  websiteUrl: string | null
   biography: string
   avatarUrl: string | null
   trustTier: TrustTier
@@ -451,6 +496,11 @@ export interface VaultAsset {
   description: string
   format: AssetFormat
   thumbnailUrl: string | null
+  videoUrl?: string | null
+  audioUrl?: string | null
+  illustrationUrl?: string | null
+  textUrl?: string | null
+  textExcerpt?: string | null
   privacy: PrivacyState
   declarationState: ValidationDeclarationState | null
   publication: PublicationState
@@ -560,6 +610,7 @@ export type CertificationEventType =
   | 'provisional_release'
   | 'assignment_cancelled'
   | 'settlement_queued'
+  | 'review_window_opened'
 
 export interface CertificationEvent {
   id: string
@@ -966,7 +1017,7 @@ export interface SocialCounts {
 }
 
 export interface CommentAuthor {
-  handle: string
+  username: string
   displayName: string
   professionalTitle: string
   trustBadge: TrustBadge | null

@@ -23,7 +23,7 @@ export function RecommendationRail({ group, columns = 3 }: RecommendationRailPro
     <section className="mb-10">
       <div className="flex items-baseline gap-3 border-b border-slate-200 pb-2 mb-4">
         <h3 className="text-xs font-bold uppercase tracking-widest text-black">{group.title}</h3>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 border border-blue-600 px-2 py-0">{group.reasonLabel}</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] border border-[#0000ff] px-2 py-0">{group.reasonLabel}</span>
       </div>
       <div className={`grid ${gridCols} gap-4`}>
         {targetStories.map(s => (

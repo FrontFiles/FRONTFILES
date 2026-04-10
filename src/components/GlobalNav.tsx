@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { DiscoveryNav } from '@/components/discovery/DiscoveryNav'
 
 /** Pages where the global nav is hidden (they have their own chrome). */
-const HIDDEN_ON = ['/', '/onboarding']
+const HIDDEN_ON = ['/', '/onboarding', '/signin']
 
 export function GlobalNav() {
   const pathname = usePathname()

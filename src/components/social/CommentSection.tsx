@@ -84,7 +84,7 @@ export function CommentSection({ comments, targetType, targetId }: CommentSectio
 
           {/* Composer */}
           <form onSubmit={handleSubmit} className="flex gap-2 mt-4">
-            <div className="w-7 h-7 bg-blue-600 flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 bg-[#0000ff] flex items-center justify-center shrink-0">
               <span className="text-[9px] font-bold text-white">SC</span>
             </div>
             <div className="flex-1 flex gap-2">
@@ -130,7 +130,7 @@ function CommentRow({ comment }: { comment: Comment }) {
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-black">{comment.author.displayName}</span>
           {comment.author.trustBadge && (
-            <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 text-blue-600 shrink-0">
+            <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 text-[#0000ff] shrink-0">
               <path d="M8 1L3 3.5v4c0 3.5 2.1 6.8 5 7.5 2.9-.7 5-4 5-7.5v-4L8 1z" stroke="currentColor" strokeWidth="1.2" fill="currentColor" fillOpacity="0.15" />
               <path d="M5.5 8l2 2L10.5 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>

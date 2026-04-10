@@ -17,6 +17,8 @@ export const initialState: OnboardingFlowState = {
   crossCheckComplete: false,
   validationOutcome: null,
   profileDraft: null,
+  username: null,
+  usernameAvailable: null,
   finalValidationOutcome: null,
   vaultCreated: false,
   vaultId: null,
@@ -32,6 +34,7 @@ export type OnboardingAction =
   | { type: 'SET_VALIDATION_OUTCOME'; payload: ValidationOutcome }
   | { type: 'SET_PROFILE_DRAFT'; payload: CreatorProfileDraft }
   | { type: 'UPDATE_PROFILE_DRAFT'; payload: Partial<CreatorProfileDraft> }
+  | { type: 'SET_USERNAME'; payload: { username: string; available: boolean } }
   | { type: 'SET_FINAL_VALIDATION_OUTCOME'; payload: ValidationOutcome }
   | { type: 'SET_VAULT_CREATED'; payload: { vaultId: string } }
   | { type: 'MARK_STEP_COMPLETE'; payload: OnboardingStepId }
@@ -68,6 +71,13 @@ export function onboardingReducer(
       return {
         ...state,
         profileDraft: { ...state.profileDraft, ...action.payload },
+      }
+
+    case 'SET_USERNAME':
+      return {
+        ...state,
+        username: action.payload.username,
+        usernameAvailable: action.payload.available,
       }
 
     case 'SET_FINAL_VALIDATION_OUTCOME':

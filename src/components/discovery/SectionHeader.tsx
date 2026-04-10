@@ -15,7 +15,7 @@ export function SectionHeader({ label, sublabel, href, linkText }: SectionHeader
         {sublabel && <span className="text-xs text-slate-400">{sublabel}</span>}
       </div>
       {href && (
-        <Link href={href} className="text-xs font-bold uppercase tracking-wider text-blue-600 hover:text-black transition-colors">
+        <Link href={href} className="text-xs font-bold uppercase tracking-wider text-[#0000ff] hover:text-black transition-colors">
           {linkText || 'View all'} &rarr;
         </Link>
       )}

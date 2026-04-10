@@ -19,7 +19,7 @@ export default function MessagesPage() {
 
   // Get the other participant (not the current user)
   function otherParticipant(conv: Conversation): CommentAuthor {
-    return conv.participants.find(p => p.handle !== currentUser.handle) ?? conv.participants[0]
+    return conv.participants.find(p => p.username !== currentUser.username) ?? conv.participants[0]
   }
 
   function handleSend(e: React.FormEvent) {
@@ -85,12 +85,12 @@ export default function MessagesPage() {
                         'text-[10px] mt-0.5 truncate',
                         conv.unreadCount > 0 ? 'text-black' : 'text-slate-400'
                       )}>
-                        {conv.lastMessage.sender.handle === currentUser.handle ? 'You: ' : ''}
+                        {conv.lastMessage.sender.username === currentUser.username ? 'You: ' : ''}
                         {conv.lastMessage.body}
                       </p>
                     </div>
                     {conv.unreadCount > 0 && (
-                      <div className="w-2 h-2 bg-blue-600 shrink-0" />
+                      <div className="w-2 h-2 bg-[#0000ff] shrink-0" />
                     )}
                   </div>
                 </button>
@@ -125,7 +125,7 @@ export default function MessagesPage() {
                 </div>
               </div>
               {otherParticipant(activeConv).trustBadge && (
-                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-blue-600">
+                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 text-[#0000ff]">
                   <path d="M8 1L3 3.5v4c0 3.5 2.1 6.8 5 7.5 2.9-.7 5-4 5-7.5v-4L8 1z" stroke="currentColor" strokeWidth="1.2" fill="currentColor" fillOpacity="0.15" />
                   <path d="M5.5 8l2 2L10.5 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -135,7 +135,7 @@ export default function MessagesPage() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-4">
               {activeMessages.map(msg => {
-                const isOwn = msg.sender.handle === currentUser.handle
+                const isOwn = msg.sender.username === currentUser.username
                 const time = new Date(msg.createdAt)
 
                 return (
@@ -145,7 +145,7 @@ export default function MessagesPage() {
                   >
                     <div className={cn(
                       'w-6 h-6 flex items-center justify-center shrink-0',
-                      isOwn ? 'bg-blue-600' : 'bg-slate-100 border border-slate-200'
+                      isOwn ? 'bg-[#0000ff]' : 'bg-slate-100 border border-slate-200'
                     )}>
                       <span className={cn(
                         'text-[8px] font-bold',
@@ -182,7 +182,7 @@ export default function MessagesPage() {
                 value={composerText}
                 onChange={e => setComposerText(e.target.value)}
                 placeholder="Write a message..."
-                className="flex-1 h-10 border-2 border-black bg-white text-xs text-black px-4 placeholder:text-slate-300 focus:outline-none focus:border-blue-600"
+                className="flex-1 h-10 border-2 border-black bg-white text-xs text-black px-4 placeholder:text-slate-300 focus:outline-none focus:border-[#0000ff]"
               />
               <button
                 type="submit"

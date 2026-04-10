@@ -100,7 +100,7 @@ export function UploadShell() {
               className={cn(
                 'px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest border-r border-black transition-colors',
                 isActive && 'bg-black text-white',
-                isPast && !isActive && 'text-blue-600 hover:bg-blue-50 cursor-pointer',
+                isPast && !isActive && 'text-[#0000ff] hover:bg-[#0000ff]/5 cursor-pointer',
                 !isActive && !isPast && 'text-slate-300 cursor-default',
               )}
             >

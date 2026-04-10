@@ -4,7 +4,7 @@
  * Assignment Engine — Shared Building Blocks
  *
  * Extracted from existing components. Reused across buyer, creator, and staff screens.
- * Design canon: black + blue-600 + white. No radius. Hard borders. Dense typography.
+ * Design canon: black + #0000ff + white. No radius. Hard borders. Dense typography.
  */
 
 import { cn } from '@/lib/utils'
@@ -57,7 +57,7 @@ export function ClassBadge({ cls, size = 'sm' }: { cls: AssignmentClass; size?: 
     <span className={cn(
       'font-bold uppercase tracking-[0.12em] border shrink-0',
       size === 'sm' ? 'text-[8px] px-1.5 py-0.5' : 'text-[9px] px-2 py-1',
-      cls === 'service' ? 'border-blue-600 text-blue-600' :
+      cls === 'service' ? 'border-[#0000ff] text-[#0000ff]' :
       cls === 'hybrid' ? 'border-black text-black bg-black/5' :
       'border-black text-black',
     )}>
@@ -89,7 +89,7 @@ export function MilestoneStateBadge({ state }: { state: MilestoneState }) {
       'text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 border shrink-0',
       isComplete ? 'bg-black text-white border-black' :
       isDisputed ? 'border-black text-black' :
-      isActive ? 'border-blue-600 text-blue-600' :
+      isActive ? 'border-[#0000ff] text-[#0000ff]' :
       'border-black/15 text-black/30',
     )}>
       {label}
@@ -101,7 +101,7 @@ export function MilestoneTypeBadge({ type }: { type: MilestoneType }) {
   return (
     <span className={cn(
       'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border shrink-0',
-      type === 'service' ? 'border-blue-600 text-blue-600' : 'border-black/20 text-black/40',
+      type === 'service' ? 'border-[#0000ff] text-[#0000ff]' : 'border-black/20 text-black/40',
     )}>
       {type}
     </span>
@@ -132,7 +132,7 @@ export function CCRStateBadge({ state }: { state: CCRState }) {
   return (
     <span className={cn(
       'text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 border',
-      state === 'pending' ? 'border-blue-600 text-blue-600' :
+      state === 'pending' ? 'border-[#0000ff] text-[#0000ff]' :
       state === 'approved' ? 'bg-black text-white border-black' :
       'border-black/20 text-black/40',
     )}>
@@ -176,7 +176,7 @@ export function EvidenceItemRow({ item }: { item: EvidenceItem }) {
       <Icon size={10} className="text-black/20 shrink-0" />
       <span className={cn(
         'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border shrink-0',
-        item.kind === 'vault_asset' ? 'border-black/20 text-black/40' : 'border-blue-600/30 text-blue-600/60',
+        item.kind === 'vault_asset' ? 'border-black/20 text-black/40' : 'border-[#0000ff]/30 text-[#0000ff]/60',
       )}>
         {item.kind.replace(/_/g, ' ')}
       </span>
@@ -206,7 +206,7 @@ export function EvidenceGrouped({ items }: { items: EvidenceItem[] }) {
           <div className="flex items-center gap-2 mb-1">
             <span className={cn(
               'text-[7px] font-bold uppercase tracking-wider px-1 py-0.5 border',
-              kind === 'vault_asset' ? 'border-black/20 text-black/40' : 'border-blue-600/30 text-blue-600/60',
+              kind === 'vault_asset' ? 'border-black/20 text-black/40' : 'border-[#0000ff]/30 text-[#0000ff]/60',
             )}>
               {kind.replace(/_/g, ' ')}
             </span>

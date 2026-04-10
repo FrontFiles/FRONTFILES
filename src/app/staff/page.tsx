@@ -31,7 +31,7 @@ export default function StaffPage() {
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="text-sm font-bold text-black">{mod.label}</h2>
                   {mod.count !== null && mod.count > 0 && (
-                    <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 shrink-0">
+                    <span className="bg-[#0000ff] text-white text-[10px] font-bold px-1.5 py-0.5 shrink-0">
                       {mod.count}
                     </span>
                   )}

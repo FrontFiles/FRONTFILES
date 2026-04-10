@@ -216,7 +216,7 @@ export function DevHarness() {
                       className={cn(
                         'px-2 py-1 text-[10px] font-mono border transition-colors',
                         simState.speedMultiplier === s
-                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          ? 'border-[#0000ff] bg-[#0000ff]/5 text-[#0000cc]'
                           : 'border-slate-200 hover:border-black',
                       )}
                     >
@@ -234,7 +234,7 @@ export function DevHarness() {
                   'font-bold',
                   simState.status === 'running' && 'text-green-600',
                   simState.status === 'paused' && 'text-amber-600',
-                  simState.status === 'complete' && 'text-blue-600',
+                  simState.status === 'complete' && 'text-[#0000ff]',
                 )}>{simState.status}</span></div>
                 <div>Elapsed: {Math.round(simState.elapsedMs)}ms</div>
                 <div>Groups proposed: {simState.storyGroupsProposed ? 'Yes' : 'No'}</div>
@@ -482,7 +482,7 @@ function StateSummaryPanel({
                 <div key={g.id} className="px-4 py-2 flex items-center gap-3">
                   <span className={cn(
                     'text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5',
-                    g.kind === 'proposed' && 'bg-blue-100 text-blue-700',
+                    g.kind === 'proposed' && 'bg-[#0000ff]/10 text-[#0000cc]',
                     g.kind === 'matched-existing' && 'bg-amber-100 text-amber-700',
                     g.kind === 'creator' && 'bg-green-100 text-green-700',
                   )}>
@@ -543,7 +543,7 @@ function SimulationPanel({ simState }: { simState: SimEngineState | null }) {
                   className={cn(
                     'flex items-center justify-center text-[9px] font-bold uppercase tracking-wider',
                     stage === 'queued' && 'bg-slate-200 text-slate-600',
-                    stage === 'ingesting' && 'bg-blue-200 text-blue-700',
+                    stage === 'ingesting' && 'bg-[#0000ff]/15 text-[#0000cc]',
                     stage === 'analyzing' && 'bg-purple-200 text-purple-700',
                     stage === 'declaration_check' && 'bg-amber-200 text-amber-700',
                     stage === 'proposal_ready' && 'bg-green-200 text-green-700',
@@ -579,7 +579,7 @@ function SimulationPanel({ simState }: { simState: SimEngineState | null }) {
               <span className={cn(
                 'px-1.5 py-0.5 font-bold uppercase tracking-wider',
                 a.stage === 'queued' && 'bg-slate-100 text-slate-500',
-                a.stage === 'ingesting' && 'bg-blue-100 text-blue-600',
+                a.stage === 'ingesting' && 'bg-[#0000ff]/10 text-[#0000ff]',
                 a.stage === 'analyzing' && 'bg-purple-100 text-purple-600',
                 a.stage === 'declaration_check' && 'bg-amber-100 text-amber-600',
                 a.stage === 'proposal_ready' && 'bg-green-100 text-green-600',
@@ -591,7 +591,7 @@ function SimulationPanel({ simState }: { simState: SimEngineState | null }) {
                 <div
                   className={cn(
                     'h-full transition-all',
-                    a.stage === 'complete' ? 'bg-green-500' : 'bg-blue-500',
+                    a.stage === 'complete' ? 'bg-green-500' : 'bg-[#0000ff]',
                   )}
                   style={{ width: `${a.progress}%` }}
                 />
@@ -746,7 +746,7 @@ function MetricCard({ label, value, sub, color = 'slate' }: { label: string; val
         color === 'red' && 'text-red-600',
         color === 'green' && 'text-green-600',
         color === 'amber' && 'text-amber-600',
-        color === 'blue' && 'text-blue-600',
+        color === 'blue' && 'text-[#0000ff]',
       )}>
         {value}
       </div>

@@ -84,6 +84,14 @@ const CREATOR_COORDS: Record<string, [number, number]> = {
   'Thessaloniki, Greece': [40.63, 22.94],
   'Hong Kong': [22.32, 114.17],
   'Hong Kong, CN': [22.32, 114.17],
+  'Accra, Ghana': [5.60, -0.19],
+  'Mumbai, India': [19.08, 72.88],
+  'Amman, Jordan': [31.95, 35.93],
+  'Stockholm, Sweden': [59.33, 18.07],
+  'Tokyo, Japan': [35.68, 139.69],
+  'Mexico City, Mexico': [19.43, -99.13],
+  'Nairobi, Kenya': [-1.29, 36.82],
+  'Sydney, Australia': [-33.87, 151.21],
 }
 
 // ── Helper: convert AssetData to SampleAsset ──
@@ -124,20 +132,20 @@ export function getSearchCreators(): SearchCreator[] {
       assetCount: creatorAssets.length,
       storyCount: creatorStoryIds.size,
       specialties: c.specialties.slice(0, 3),
-      sampleAssets: creatorAssets.slice(0, 6).map(toSampleAsset),
+      sampleAssets: creatorAssets.slice(0, 15).map(toSampleAsset),
     }
   }).filter(c => c.lat !== 0)
 }
 
 // ── Enriched stories ──
 export function getSearchStories(): SearchStory[] {
-  return stories.map(s => {
+  return stories.flatMap(s => {
     const geo = geographyMap[s.primaryGeography]
-    if (!geo) return null
+    if (!geo) return []
     const creator = creatorMap[s.creatorId]
     const storyAssets = discoveryAssets.filter(a => a.storyId === s.id)
 
-    return {
+    return [{
       id: s.id,
       title: s.title,
       slug: s.slug,
@@ -150,8 +158,8 @@ export function getSearchStories(): SearchStory[] {
       assetCount: s.assetIds.length,
       topicTags: s.topicTags,
       sampleAssets: storyAssets.slice(0, 6).map(toSampleAsset),
-    }
-  }).filter((s): s is SearchStory => s !== null)
+    }]
+  })
 }
 
 // ── Asset clusters by geography ──
@@ -163,13 +171,13 @@ export function getSearchAssetClusters(): SearchAssetCluster[] {
     byGeo.set(a.geography, list)
   }
 
-  return Array.from(byGeo.entries()).map(([geoId, assets]) => {
+  return Array.from(byGeo.entries()).flatMap(([geoId, assets]) => {
     const geo = geographyMap[geoId]
-    if (!geo) return null
+    if (!geo || assets.length === 0) return []
     const formats = [...new Set(assets.map(a => a.format))]
     const creatorNames = [...new Set(assets.map(a => creatorMap[a.creatorId]?.name).filter(Boolean))] as string[]
 
-    return {
+    return [{
       id: geoId,
       geographyLabel: geo.locationLabel,
       country: geo.country,
@@ -179,6 +187,6 @@ export function getSearchAssetClusters(): SearchAssetCluster[] {
       formats,
       sampleAssets: assets.slice(0, 6).map(toSampleAsset),
       creatorNames,
-    }
-  }).filter((c): c is SearchAssetCluster => c !== null && c.assetCount > 0)
+    }]
+  })
 }

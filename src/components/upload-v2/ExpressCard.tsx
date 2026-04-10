@@ -44,7 +44,7 @@ export function ExpressCard() {
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Story</div>
             <div className="text-sm font-bold">{group.name}</div>
             {group.kind === 'matched-existing' && group.existingStoryTitle && (
-              <div className="text-xs text-amber-600 mt-0.5">
+              <div className="text-xs text-slate-600 mt-0.5">
                 Matches existing: {group.existingStoryTitle} ({group.existingStoryAssetCount} assets already published)
               </div>
             )}

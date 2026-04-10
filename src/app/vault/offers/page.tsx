@@ -39,7 +39,7 @@ const mockOffers: DirectOffer[] = [
 ]
 
 const OFFER_STATE_STYLES: Record<OfferState, string> = {
-  pending: 'border-blue-600 text-blue-600',
+  pending: 'border-[#0000ff] text-[#0000ff]',
   countered: 'border-slate-400 text-slate-500',
   accepted: 'bg-black text-white border-black',
   rejected: 'border-slate-300 text-slate-400',
@@ -125,7 +125,7 @@ function OfferCard({ offer }: { offer: DirectOffer }) {
           <div className="font-mono text-lg font-bold text-black">€{(offer.currentAmount / 100).toFixed(2)}</div>
           {offer.state === 'pending' && (
             <div className="flex gap-2 mt-2">
-              <button className="h-8 px-3 text-xs bg-blue-600 text-white font-bold uppercase tracking-wide hover:bg-blue-700 transition-colors">
+              <button className="h-8 px-3 text-xs bg-[#0000ff] text-white font-bold uppercase tracking-wide hover:bg-[#0000cc] transition-colors">
                 Accept
               </button>
               <button className="h-8 px-3 text-xs border border-black text-black font-bold uppercase tracking-wide hover:bg-black hover:text-white transition-colors">

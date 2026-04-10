@@ -36,7 +36,7 @@ export function RecommendationBadge({ recommendation, compact = false }: Recomme
               key={i}
               className={cn(
                 'text-[9px] font-mono px-1 py-0.5 border',
-                f.effect === 'increase' && 'border-blue-600 text-blue-600',
+                f.effect === 'increase' && 'border-[#0000ff] text-[#0000ff]',
                 f.effect === 'decrease' && 'border-slate-400 text-slate-400',
                 f.effect === 'neutral' && 'border-slate-300 text-slate-400',
               )}

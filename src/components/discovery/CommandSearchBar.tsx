@@ -41,7 +41,7 @@ export function CommandSearchBar({ size = 'default', placeholder, initialQuery =
       />
       <button
         type="submit"
-        className={`bg-black text-white font-bold uppercase tracking-wider hover:bg-black/80 transition-colors shrink-0 flex items-center justify-center ${isLarge ? 'px-6 text-sm gap-2' : 'px-4 text-xs gap-1.5'}`}
+        className={`bg-[#0000ff] text-white font-bold uppercase tracking-wider hover:bg-[#0000cc] transition-colors shrink-0 flex items-center justify-center ${isLarge ? 'px-6 text-sm gap-2' : 'px-4 text-xs gap-1.5'}`}
         aria-label="Send search"
       >
         Send

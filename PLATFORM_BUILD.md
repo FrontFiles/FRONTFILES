@@ -21,9 +21,9 @@
 | Route | Surface | Phase |
 |---|---|---|
 | `/` | Landing | Pre-existing |
-| `/onboarding` | 6-step creator onboarding | Pre-existing (repaired) |
-| `/creator/[handle]` | Creator profile (public) | Pre-existing (repaired) |
-| `/creator/[handle]/frontfolio` | Frontfolio (public portfolio) | Pre-existing (repaired) |
+| `/onboarding` | 3-phase creator onboarding (Verify → Build → Launch) | Pre-existing (repaired) |
+| `/[username]` | Creator profile (public) | Pre-existing (repaired) |
+| `/[username]/frontfolio` | Frontfolio (public portfolio) | Pre-existing (repaired) |
 | `/vault` | Vault (private asset management) | Pre-existing (repaired) |
 | `/vault/upload` | Upload workflow | Pre-existing |
 | `/vault/pricing` | Creator pricing & licence config | Phase 3 |
@@ -42,6 +42,22 @@
 | `/plugin` | Plugin Premium subscription | Phase 6 |
 | `/staff` | Staff operational dashboard | Phase 6 |
 | `/_not-found` | 404 | Auto |
+
+---
+
+## Username (Spec §5.1)
+
+Every user has exactly one **username** — the human-readable public identifier.
+
+| Property | Rule |
+|---|---|
+| Format | 3–30 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen |
+| Uniqueness | Globally unique, enforced at database level (UNIQUE constraint) |
+| URL | Root-level: `frontfiles.com/{username}` |
+| Immutability | Changeable during 30-day grace period after creation; permanent after |
+| Relation to Vault ID | Independent. Vault ID (`vault-XXXXXXXX`) is the system identifier. Username is the human-readable identity. Both are permanent. Neither replaces the other. |
+| Reserved words | All platform routes + reserved terms (see `RESERVED_USERNAMES` in `types.ts`) |
+| Validation | `USERNAME_PATTERN` regex + reserved word check via `isValidUsername()` in `types.ts` |
 
 ---
 

@@ -87,7 +87,7 @@ export function VaultDetailDrawer({ asset, onClose }: VaultDetailDrawerProps) {
 
         {/* Actions */}
         <div className="flex flex-col gap-2 border-t border-slate-200 pt-4">
-          <Button className="h-9 bg-blue-600 text-white hover:bg-blue-700 font-bold text-xs rounded-none uppercase tracking-wide w-full">
+          <Button className="h-9 bg-[#0000ff] text-white hover:bg-[#0000cc] font-bold text-xs rounded-none uppercase tracking-wide w-full">
             Publish to Frontfolio
           </Button>
           <Button variant="outline" className="h-9 border-2 border-black text-black hover:bg-black hover:text-white font-bold text-xs rounded-none uppercase tracking-wide w-full">
