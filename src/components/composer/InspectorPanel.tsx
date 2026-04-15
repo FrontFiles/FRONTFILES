@@ -5,6 +5,7 @@ import { getArticleReadiness, getSourceAssets, getInlineTextAssets, getCrossStor
 import { computeArticleSplit, formatEur, detectSelfSource } from '@/lib/composer/split-engine'
 import { assetMap, creatorMap, storyMap } from '@/data'
 import { ValidationBadge } from '@/components/discovery/ValidationBadge'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 
 export function InspectorPanel() {
   const { state, dispatch } = useComposer()
@@ -82,7 +83,7 @@ function ArticleInspector() {
                 onClick={() => dispatch({ type: 'FOCUS_ASSET', payload: asset.id })}
               >
                 <div className="w-6 h-5 bg-slate-100 shrink-0 overflow-hidden">
-                  <img src={asset.thumbnailRef} alt="" className="w-full h-full object-cover" />
+                  <img src={resolveProtectedUrl(asset.id, 'composer')} alt="" className="w-full h-full object-cover" />
                 </div>
                 <span className="text-[10px] text-black truncate flex-1">{asset.title}</span>
                 <span className="text-[9px] font-bold font-mono text-black shrink-0">
@@ -159,7 +160,7 @@ function AssetInspector({ assetId }: { assetId: string }) {
   if (!asset) return null
 
   const creator = creatorMap[asset.creatorId]
-  const story = storyMap[asset.storyId]
+  const story = asset.storyId ? storyMap[asset.storyId] : undefined
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -173,7 +174,7 @@ function AssetInspector({ assetId }: { assetId: string }) {
 
       {/* Preview */}
       <div className="aspect-video bg-slate-100 overflow-hidden">
-        <img src={asset.thumbnailRef} alt={asset.title} className="w-full h-full object-cover" />
+        <img src={resolveProtectedUrl(asset.id, 'composer')} alt={asset.title} className="w-full h-full object-cover" />
       </div>
 
       {/* Asset details */}
@@ -189,7 +190,7 @@ function AssetInspector({ assetId }: { assetId: string }) {
         {creator && <MetaRow label="Creator" value={creator.name} />}
         {story && <MetaRow label="Story" value={story.title} />}
         <MetaRow label="Privacy" value={asset.privacyLevel} />
-        {asset.price && <MetaRow label="Price" value={`\u20AC${asset.price}`} />}
+        {asset.price && <MetaRow label="Price" value={`\u20AC${asset.price.toFixed(2)}`} />}
       </div>
 
       <div className="px-4 py-3 border-b border-slate-200">

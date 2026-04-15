@@ -1,7 +1,22 @@
 // ═══════════════════════════════════════════════════════════════
-// FRONTFILES — Creator Dataset
-// 10 distinct editorial identities with coverage logic
+// FRONTFILES — Creator Discovery Cards (derived)
+//
+// Phase A: the identity-carrying fields (id, name, slug,
+// locationBase, regionsCovered, specialties, bio, trustBadge,
+// avatarRef) are now derived from the canonical `userSeed`
+// (see `data/users.ts`). Only the non-DB display decorations
+// (`languages`, `frontfolioSummary`, `featuredStoryIds`,
+// `featuredAssetIds`) live here, keyed by user id.
+//
+// The `Creator` interface and the `creators` / `creatorMap` /
+// `creatorBySlug` exports are preserved so every consumer
+// (messages, share metadata, search index, creator-content
+// adapter, profiles) keeps working unchanged.
 // ═══════════════════════════════════════════════════════════════
+
+import { userSeed } from './users'
+import type { UserSeed } from '@/lib/identity/types'
+import type { TrustBadge } from '@/lib/types'
 
 export interface Creator {
   id: string
@@ -11,7 +26,7 @@ export interface Creator {
   regionsCovered: string[]
   specialties: string[]
   bio: string
-  trustBadge: 'verified' | 'trusted'
+  trustBadge: TrustBadge
   languages: string[]
   avatarRef: string
   frontfolioSummary: string
@@ -19,278 +34,257 @@ export interface Creator {
   featuredAssetIds: string[]
 }
 
-export const creators: Creator[] = [
-  {
-    id: 'creator-001',
-    name: 'Marco Oliveira',
-    slug: 'marcooliveira',
-    locationBase: 'Porto Alegre, Brazil',
-    regionsCovered: ['Rio Grande do Sul', 'Southern Brazil', 'São Paulo'],
-    specialties: ['Flood documentation', 'Displacement coverage', 'Aerial survey', 'Settlement reporting'],
-    bio: 'Video and photo journalist covering displacement, flood events, and urban settlement disputes across southern Brazil since 2016. Formerly embedded with Defesa Civil RS during the 2024 Guaíba floods.',
-    trustBadge: 'verified',
+// ── Display-only decorations ───────────────────────────────────
+//
+// These four fields are intentionally NOT in the canonical
+// `creator_profiles` row — they are discovery-card display
+// metadata. The identity store does not own them; this file
+// does.
+
+interface CreatorDecoration {
+  languages: string[]
+  frontfolioSummary: string
+  featuredStoryIds: string[]
+  featuredAssetIds: string[]
+}
+
+const _decorations: Record<string, CreatorDecoration> = {
+  'creator-001': {
     languages: ['Portuguese', 'Spanish', 'English'],
-    avatarRef: '/assets/avatars/pexels-edwin-malca-cerna-1875492332-32772332.jpg',
-    frontfolioSummary: '47 certified assets across 6 Stories. Primary coverage: flood displacement and informal settlement disputes in Rio Grande do Sul.',
+    frontfolioSummary:
+      '47 certified assets across 6 Stories. Primary coverage: flood displacement and informal settlement disputes in Rio Grande do Sul.',
     featuredStoryIds: ['story-001', 'story-011'],
     featuredAssetIds: ['asset-001', 'asset-004', 'asset-043'],
   },
-  {
-    id: 'creator-002',
-    name: 'Ana Sousa',
-    slug: 'anasousa',
-    locationBase: 'Lisbon, Portugal',
-    regionsCovered: ['Lisbon', 'Setúbal', 'Alentejo'],
-    specialties: ['Parliamentary photography', 'Institutional documentation', 'Coastal reporting', 'Storm coverage'],
-    bio: 'Institutional and parliamentary photographer based in Lisbon. Covers the Assembleia da República, municipal governance in the greater Lisbon area, and coastal impact stories along the Setúbal coast.',
-    trustBadge: 'verified',
+  'creator-002': {
     languages: ['Portuguese', 'English', 'French'],
-    avatarRef: '/assets/avatars/pexels-caroline-veronez-112078470-10153201.jpg',
-    frontfolioSummary: '38 certified assets across 4 Stories. Primary coverage: parliamentary sessions, coastal erosion, and storm damage in central Portugal.',
+    frontfolioSummary:
+      '38 certified assets across 4 Stories. Primary coverage: parliamentary sessions, coastal erosion, and storm damage in central Portugal.',
     featuredStoryIds: ['story-002', 'story-003', 'story-014'],
     featuredAssetIds: ['asset-006', 'asset-010', 'asset-046'],
   },
-  {
-    id: 'creator-003',
-    name: 'Dimitris Katsaros',
-    slug: 'dimitriskatsaros',
-    locationBase: 'Alexandroupoli, Greece',
-    regionsCovered: ['Evros', 'Northern Greece', 'Eastern Aegean'],
-    specialties: ['Border documentation', 'Migration route reporting', 'Logistics photography', 'Checkpoint coverage'],
-    bio: 'Documentarian covering the Evros border region since 2019. Focuses on crossing infrastructure, asylum processing, and the logistics of border enforcement at the EU external frontier.',
-    trustBadge: 'verified',
+  'creator-003': {
     languages: ['Greek', 'English', 'Turkish'],
-    avatarRef: '/assets/avatars/pexels-imadclicks-9712871.jpg',
-    frontfolioSummary: '29 certified assets across 3 Stories. Primary coverage: border crossing logistics and asylum infrastructure at Evros.',
+    frontfolioSummary:
+      '29 certified assets across 3 Stories. Primary coverage: border crossing logistics and asylum infrastructure at Evros.',
     featuredStoryIds: ['story-004'],
     featuredAssetIds: ['asset-013', 'asset-015'],
   },
-  {
-    id: 'creator-004',
-    name: 'Lucia Ferrante',
-    slug: 'luciaferrante',
-    locationBase: 'Palermo, Italy',
-    regionsCovered: ['Sicily', 'Southern Italy', 'Calabria'],
-    specialties: ['Court reporting', 'Police accountability', 'Environmental documentation', 'Coastal fishing communities'],
-    bio: 'Reporter and photographer covering courts, police accountability cases, and environmental degradation across Sicily. Long-running documentation of coastal fishing communities and institutional access disputes.',
-    trustBadge: 'verified',
+  'creator-004': {
     languages: ['Italian', 'English'],
-    avatarRef: '/assets/avatars/pexels-efrem-efre-2786187-13824575.jpg',
-    frontfolioSummary: '34 certified assets across 3 Stories. Primary coverage: court proceedings, police misconduct cases, and coastal livelihoods in Sicily.',
-    featuredStoryIds: ['story-010', 'story-003b'],
+    frontfolioSummary:
+      '34 certified assets across 3 Stories. Primary coverage: court proceedings, police misconduct cases, and coastal livelihoods in Sicily.',
+    featuredStoryIds: ['story-010'],
     featuredAssetIds: ['asset-034', 'asset-036'],
   },
-  {
-    id: 'creator-005',
-    name: 'Yara Boukhari',
-    slug: 'yaraboukhari',
-    locationBase: 'Marseille, France',
-    regionsCovered: ['Marseille', 'Bouches-du-Rhône', 'Provence'],
-    specialties: ['Public health reporting', 'Hospital systems documentation', 'Port logistics', 'Heatwave impact'],
-    bio: 'Public health and logistics reporter based in Marseille. Covers hospital corridor pressure during heatwave events, port congestion at Fos-sur-Mer, and frontline healthcare infrastructure across southern France.',
-    trustBadge: 'verified',
+  'creator-005': {
     languages: ['French', 'Arabic', 'English'],
-    avatarRef: '/assets/avatars/pexels-thefullonmonet-17608522.jpg',
-    frontfolioSummary: '31 certified assets across 3 Stories. Primary coverage: hospital overload during heat events and port congestion in Marseille.',
+    frontfolioSummary:
+      '31 certified assets across 3 Stories. Primary coverage: hospital overload during heat events and port congestion in Marseille.',
     featuredStoryIds: ['story-006', 'story-012'],
-    featuredAssetIds: ['asset-020', 'asset-024'],
+    featuredAssetIds: ['asset-020', 'asset-022'],
   },
-  {
-    id: 'creator-006',
-    name: 'Tomasz Nowak',
-    slug: 'tomasznowak',
-    locationBase: 'Warsaw, Poland',
-    regionsCovered: ['Warsaw', 'Łódź', 'Central Poland'],
-    specialties: ['Labor strike coverage', 'Transit disruption', 'Election rally documentation', 'Public transport infrastructure'],
-    bio: 'Visual reporter covering labor disputes, transit strikes, and election security perimeters across central Poland. Multi-format documentation of commuter infrastructure breakdowns and rally staging areas.',
-    trustBadge: 'verified',
+  'creator-006': {
     languages: ['Polish', 'English', 'German'],
-    avatarRef: '/assets/avatars/pexels-apunto-group-agencia-de-publicidad-53086916-7752812.jpg',
-    frontfolioSummary: '26 certified assets across 3 Stories. Primary coverage: transit strikes, election rally logistics, and labor disputes in Warsaw and Łódź.',
+    frontfolioSummary:
+      '26 certified assets across 3 Stories. Primary coverage: transit strikes, election rally logistics, and labor disputes in Warsaw and Łódź.',
     featuredStoryIds: ['story-007', 'story-013'],
     featuredAssetIds: ['asset-025', 'asset-029'],
   },
-  {
-    id: 'creator-007',
-    name: 'Elena Vasile',
-    slug: 'elenavasile',
-    locationBase: 'Bucharest, Romania',
-    regionsCovered: ['Bucharest', 'Dolj', 'Wallachia'],
-    specialties: ['Student demonstration coverage', 'Education policy reporting', 'Municipal politics', 'Youth mobilization'],
-    bio: 'Reporter covering student demonstrations, education funding disputes, and municipal governance in Bucharest. Sustained coverage of the 2025–2026 Romanian university funding protests and campus security responses.',
-    trustBadge: 'trusted',
+  'creator-007': {
     languages: ['Romanian', 'English', 'French'],
-    avatarRef: '/assets/avatars/pexels-kirill-ozerov-109766512-9835449.jpg',
-    frontfolioSummary: '22 certified assets across 2 Stories. Primary coverage: student protests and education policy disputes in Bucharest.',
+    frontfolioSummary:
+      '22 certified assets across 2 Stories. Primary coverage: student protests and education policy disputes in Bucharest.',
     featuredStoryIds: ['story-008'],
     featuredAssetIds: ['asset-030', 'asset-031'],
   },
-  {
-    id: 'creator-008',
-    name: 'Carmen Ruiz',
-    slug: 'carmenruiz',
-    locationBase: 'Seville, Spain',
-    regionsCovered: ['Andalusia', 'Huelva', 'Almería'],
-    specialties: ['Data-led infographics', 'Drought mapping', 'Wildfire recovery documentation', 'Agricultural impact visualization'],
-    bio: 'Infographic journalist and data visualizer covering drought response, wildfire recovery, and agricultural impact across Andalusia. Produces certified infographics, maps, and illustrated data packages.',
-    trustBadge: 'verified',
+  'creator-008': {
     languages: ['Spanish', 'English', 'Portuguese'],
-    avatarRef: '/assets/avatars/pexels-pexels-latam-478514802-16135619.jpg',
-    frontfolioSummary: '19 certified assets across 2 Stories. Primary coverage: wildfire aftermath and drought response in Andalusia using data visualization and infographic formats.',
+    frontfolioSummary:
+      '19 certified assets across 2 Stories. Primary coverage: wildfire aftermath and drought response in Andalusia using data visualization and infographic formats.',
     featuredStoryIds: ['story-005', 'story-009'],
     featuredAssetIds: ['asset-017', 'asset-033'],
   },
-  {
-    id: 'creator-009',
-    name: 'Nikos Papadopoulos',
-    slug: 'nikospapadopoulos',
-    locationBase: 'Thessaloniki, Greece',
-    regionsCovered: ['Northern Greece', 'Evros', 'Thessaloniki'],
-    specialties: ['Asylum infrastructure', 'Humanitarian logistics', 'Processing center documentation'],
-    bio: 'Humanitarian logistics photographer covering asylum processing centers, reception facilities, and aid distribution across northern Greece. Independent documentation since 2020.',
-    trustBadge: 'trusted',
+  'creator-009': {
     languages: ['Greek', 'English'],
-    avatarRef: '/assets/avatars/pexels-gaurav-vishwakarma-3386298-14591977.jpg',
-    frontfolioSummary: '15 certified assets across 2 Stories. Primary coverage: asylum processing facilities and humanitarian aid distribution in Evros and Thessaloniki.',
+    frontfolioSummary:
+      '15 certified assets across 2 Stories. Primary coverage: asylum processing facilities and humanitarian aid distribution in Evros and Thessaloniki.',
     featuredStoryIds: ['story-004'],
     featuredAssetIds: ['asset-016'],
   },
-  {
-    id: 'creator-010',
-    name: 'Sarah Chen',
-    slug: 'sarahchen',
-    locationBase: 'Hong Kong',
-    regionsCovered: ['China', 'Hong Kong', 'Taiwan', 'Southeast Asia'],
-    specialties: ['Conflict reporting', 'Climate documentation', 'Technology', 'Regional politics'],
-    bio: 'Award-winning journalist covering conflict, climate, and technology across Asia Pacific for over 12 years. Previously with Reuters and the South China Morning Post.',
-    trustBadge: 'verified',
+  'creator-010': {
     languages: ['English', 'Mandarin', 'Cantonese'],
-    avatarRef: '/assets/avatars/pexels-anete-lusina-4793183.jpg',
-    frontfolioSummary: '33 certified assets across 3 Stories. Primary coverage: climate collapse, semiconductor industry, and press freedom in Asia Pacific.',
-    featuredStoryIds: ['story-sc-001', 'story-sc-002'],
-    featuredAssetIds: ['asset-sc-001', 'asset-sc-005'],
+    frontfolioSummary:
+      '33 certified assets across 3 Stories. Primary coverage: climate collapse, semiconductor industry, and press freedom in Asia Pacific.',
+    featuredStoryIds: [],
+    featuredAssetIds: ['asset-115', 'asset-116'],
   },
-  {
-    id: 'creator-011',
-    name: 'Kofi Mensah',
-    slug: 'kofimensah',
-    locationBase: 'Accra, Ghana',
-    regionsCovered: ['Accra', 'Volta Region', 'Ashanti'],
-    specialties: ['Election monitoring', 'Market economy reporting', 'Gold mining documentation'],
-    bio: 'Independent photojournalist covering elections, market economics, and artisanal gold mining across Ghana since 2018.',
-    trustBadge: 'verified',
+  'creator-011': {
     languages: ['English', 'Twi', 'Ga'],
-    avatarRef: '/assets/avatars/pexels-imadclicks-9712871.jpg',
-    frontfolioSummary: '24 certified assets across 3 Stories. Primary coverage: elections and mining in Ghana.',
+    frontfolioSummary:
+      '24 certified assets across 3 Stories. Primary coverage: elections and mining in Ghana.',
     featuredStoryIds: [],
-    featuredAssetIds: [],
+    featuredAssetIds: ['asset-059', 'asset-061'],
   },
-  {
-    id: 'creator-012',
-    name: 'Priya Sharma',
-    slug: 'priyasharma',
-    locationBase: 'Mumbai, India',
-    regionsCovered: ['Maharashtra', 'Gujarat', 'Rajasthan'],
-    specialties: ['Monsoon flooding', 'Urban displacement', 'Public health infrastructure'],
-    bio: 'Visual journalist covering monsoon impacts, urban displacement camps, and hospital infrastructure across western India.',
-    trustBadge: 'verified',
+  'creator-012': {
     languages: ['Hindi', 'English', 'Marathi'],
-    avatarRef: '/assets/avatars/pexels-caroline-veronez-112078470-10153201.jpg',
-    frontfolioSummary: '28 certified assets across 3 Stories. Primary coverage: monsoon displacement in Mumbai.',
+    frontfolioSummary:
+      '28 certified assets across 3 Stories. Primary coverage: monsoon displacement in Mumbai.',
     featuredStoryIds: [],
-    featuredAssetIds: [],
+    featuredAssetIds: ['asset-063', 'asset-065'],
   },
-  {
-    id: 'creator-013',
-    name: 'Fatima Al-Rashid',
-    slug: 'fatimaalrashid',
-    locationBase: 'Amman, Jordan',
-    regionsCovered: ['Jordan', 'Syria border', 'Lebanon'],
-    specialties: ['Refugee documentation', 'Water scarcity', 'Cross-border logistics'],
-    bio: 'Documentary photographer covering refugee camps, water infrastructure collapse, and cross-border humanitarian logistics in the Levant.',
-    trustBadge: 'verified',
+  'creator-013': {
     languages: ['Arabic', 'English', 'French'],
-    avatarRef: '/assets/avatars/pexels-thefullonmonet-17608522.jpg',
-    frontfolioSummary: '32 certified assets across 4 Stories. Primary coverage: refugee infrastructure and water scarcity.',
+    frontfolioSummary:
+      '32 certified assets across 4 Stories. Primary coverage: refugee infrastructure and water scarcity.',
     featuredStoryIds: [],
-    featuredAssetIds: [],
+    featuredAssetIds: ['asset-075', 'asset-079'],
   },
-  {
-    id: 'creator-014',
-    name: 'Lars Eriksson',
-    slug: 'larseriksson',
-    locationBase: 'Stockholm, Sweden',
-    regionsCovered: ['Stockholm', 'Gothenburg', 'Malmö'],
-    specialties: ['Energy transition', 'Arctic shipping', 'Climate protest'],
-    bio: 'Reporter covering energy policy, Arctic shipping routes, and climate activism across Scandinavia.',
-    trustBadge: 'trusted',
+  'creator-014': {
     languages: ['Swedish', 'English', 'Norwegian'],
-    avatarRef: '/assets/avatars/pexels-gaurav-vishwakarma-3386298-14591977.jpg',
-    frontfolioSummary: '18 certified assets across 2 Stories. Primary coverage: energy transition in Sweden.',
+    frontfolioSummary:
+      '18 certified assets across 2 Stories. Primary coverage: energy transition in Sweden.',
     featuredStoryIds: [],
-    featuredAssetIds: [],
+    featuredAssetIds: ['asset-122', 'asset-124'],
   },
-  {
-    id: 'creator-015',
-    name: 'Aiko Tanaka',
-    slug: 'aikotanaka',
-    locationBase: 'Tokyo, Japan',
-    regionsCovered: ['Tokyo', 'Osaka', 'Fukushima'],
-    specialties: ['Earthquake response', 'Nuclear decommissioning', 'Urban density reporting'],
-    bio: 'Photojournalist covering earthquake preparedness, Fukushima decommissioning, and urban density issues across Japan.',
-    trustBadge: 'verified',
+  'creator-015': {
     languages: ['Japanese', 'English'],
-    avatarRef: '/assets/avatars/pexels-anete-lusina-4793183.jpg',
-    frontfolioSummary: '21 certified assets across 2 Stories. Primary coverage: disaster preparedness in Japan.',
+    frontfolioSummary:
+      '21 certified assets across 2 Stories. Primary coverage: disaster preparedness in Japan.',
     featuredStoryIds: [],
-    featuredAssetIds: [],
+    featuredAssetIds: ['asset-129', 'asset-131'],
   },
-  {
-    id: 'creator-016',
-    name: 'Carlos Mendoza',
-    slug: 'carlosmendoza',
-    locationBase: 'Mexico City, Mexico',
-    regionsCovered: ['CDMX', 'Oaxaca', 'Chiapas'],
-    specialties: ['Indigenous rights', 'Water infrastructure', 'Electoral violence'],
-    bio: 'Documentary filmmaker and photographer covering indigenous land rights, water privatization disputes, and electoral violence in Mexico.',
-    trustBadge: 'verified',
+  'creator-016': {
     languages: ['Spanish', 'English', 'Nahuatl'],
-    avatarRef: '/assets/avatars/pexels-apunto-group-agencia-de-publicidad-53086916-7752812.jpg',
-    frontfolioSummary: '27 certified assets across 3 Stories. Primary coverage: indigenous rights in southern Mexico.',
+    frontfolioSummary:
+      '27 certified assets across 3 Stories. Primary coverage: indigenous rights in southern Mexico.',
     featuredStoryIds: [],
-    featuredAssetIds: [],
+    featuredAssetIds: ['asset-088', 'asset-114'],
   },
-  {
-    id: 'creator-017',
-    name: 'Amina Diallo',
-    slug: 'aminadiallo',
-    locationBase: 'Nairobi, Kenya',
-    regionsCovered: ['Nairobi', 'Mombasa', 'Northern Kenya'],
-    specialties: ['Drought documentation', 'Pastoralist displacement', 'Urban flooding'],
-    bio: 'Visual journalist covering climate-driven displacement, pastoralist migration, and Nairobi flooding events.',
-    trustBadge: 'trusted',
+  'creator-017': {
     languages: ['Swahili', 'English', 'French'],
-    avatarRef: '/assets/avatars/pexels-efrem-efre-2786187-13824575.jpg',
-    frontfolioSummary: '19 certified assets across 2 Stories. Primary coverage: climate displacement in East Africa.',
+    frontfolioSummary:
+      '19 certified assets across 2 Stories. Primary coverage: climate displacement in East Africa.',
     featuredStoryIds: [],
-    featuredAssetIds: [],
+    featuredAssetIds: ['asset-089', 'asset-090'],
   },
-  {
-    id: 'creator-018',
-    name: 'James O\'Brien',
-    slug: 'jamesobrien',
-    locationBase: 'Sydney, Australia',
-    regionsCovered: ['New South Wales', 'Queensland', 'Victoria'],
-    specialties: ['Bushfire recovery', 'Coral reef documentation', 'Flood response'],
-    bio: 'Environmental photojournalist covering bushfire aftermath, Great Barrier Reef bleaching, and flooding along the east coast of Australia.',
-    trustBadge: 'verified',
+  'creator-018': {
     languages: ['English'],
-    avatarRef: '/assets/avatars/pexels-kirill-ozerov-109766512-9835449.jpg',
-    frontfolioSummary: '23 certified assets across 3 Stories. Primary coverage: environmental crisis in eastern Australia.',
+    frontfolioSummary:
+      '23 certified assets across 3 Stories. Primary coverage: environmental crisis in eastern Australia.',
     featuredStoryIds: [],
-    featuredAssetIds: [],
+    featuredAssetIds: ['asset-092', 'asset-094'],
   },
-]
+  'creator-019': {
+    languages: ['English', 'Hausa', 'Yoruba'],
+    frontfolioSummary:
+      '31 certified assets across 3 Stories. Primary coverage: conflict displacement in Borno and Lake Chad basin.',
+    featuredStoryIds: ['story-af-001'],
+    featuredAssetIds: ['asset-af-001', 'asset-af-003'],
+  },
+  'creator-020': {
+    languages: ['French', 'Bambara', 'English'],
+    frontfolioSummary:
+      '24 certified assets across 2 Stories. Primary coverage: Sahel coup cycle and civilian impact.',
+    featuredStoryIds: ['story-af-002'],
+    featuredAssetIds: ['asset-af-006', 'asset-af-007'],
+  },
+  'creator-021': {
+    languages: ['Somali', 'Arabic', 'English'],
+    frontfolioSummary:
+      '28 certified assets across 3 Stories. Primary coverage: displacement and famine response in southern Somalia.',
+    featuredStoryIds: ['story-af-003'],
+    featuredAssetIds: ['asset-af-010', 'asset-af-011'],
+  },
+  'creator-022': {
+    languages: ['Arabic', 'English'],
+    frontfolioSummary:
+      '35 certified assets across 3 Stories. Primary coverage: Yemen humanitarian crisis and civilian infrastructure collapse.',
+    featuredStoryIds: ['story-me-001'],
+    featuredAssetIds: ['asset-me-001', 'asset-me-003'],
+  },
+  'creator-023': {
+    languages: ['Amharic', 'Tigrinya', 'English'],
+    frontfolioSummary:
+      '22 certified assets across 2 Stories. Primary coverage: Ethiopia post-Tigray recovery and Oromia displacement.',
+    featuredStoryIds: ['story-af-004'],
+    featuredAssetIds: ['asset-af-016', 'asset-af-017'],
+  },
+  'creator-024': {
+    languages: ['Arabic', 'English'],
+    frontfolioSummary:
+      '30 certified assets across 2 Stories. Primary coverage: Sudan civil war displacement and humanitarian access.',
+    featuredStoryIds: ['story-me-002'],
+    featuredAssetIds: ['asset-me-006', 'asset-me-007'],
+  },
+}
 
-export const creatorMap = Object.fromEntries(creators.map(c => [c.id, c]))
-export const creatorBySlug = Object.fromEntries(creators.map(c => [c.slug, c]))
+// ── Derivation from userSeed ───────────────────────────────────
+
+function toCreator(seed: UserSeed): Creator | null {
+  const profile = seed.creatorProfile
+  if (!profile) return null
+  const deco = _decorations[seed.user.id]
+  if (!deco) {
+    // A seed without a decoration would produce an incomplete
+    // discovery card. Surface this loudly in dev so a new
+    // creator cannot be seeded without its display metadata.
+    throw new Error(
+      `data/creators.ts: missing decoration for creator '${seed.user.id}'. ` +
+        `Add an entry to the _decorations map.`,
+    )
+  }
+  return {
+    id: seed.user.id,
+    name: seed.user.display_name,
+    slug: seed.user.username,
+    locationBase: profile.location_base ?? '',
+    regionsCovered: profile.coverage_areas,
+    specialties: profile.specialisations,
+    bio: profile.biography ?? '',
+    trustBadge: profile.trust_badge,
+    languages: deco.languages,
+    avatarRef: seed.user.avatar_url ?? '',
+    frontfolioSummary: deco.frontfolioSummary,
+    featuredStoryIds: deco.featuredStoryIds,
+    featuredAssetIds: deco.featuredAssetIds,
+  }
+}
+
+/**
+ * Ordered list of creators, derived from the canonical
+ * `userSeed`. Order matches the legacy hardcoded array
+ * (numerical: creator-001 → creator-024) so any downstream
+ * indexing or "first creator" heuristics continue to
+ * produce the same result.
+ */
+export const creators: Creator[] = (() => {
+  const out: Creator[] = []
+  const seen = new Set<string>()
+  // Numerical order (001–024) first
+  const order = Array.from({ length: 24 }, (_, i) =>
+    `creator-${String(i + 1).padStart(3, '0')}`,
+  )
+  const byId: Record<string, Creator> = {}
+  for (const seed of userSeed) {
+    const c = toCreator(seed)
+    if (c) byId[seed.user.id] = c
+  }
+  for (const id of order) {
+    const c = byId[id]
+    if (c) {
+      out.push(c)
+      seen.add(id)
+    }
+  }
+  // Any extras (defensive — should be empty given the seed)
+  for (const id of Object.keys(byId)) {
+    if (!seen.has(id)) out.push(byId[id])
+  }
+  return out
+})()
+
+export const creatorMap = Object.fromEntries(creators.map((c) => [c.id, c]))
+export const creatorBySlug = Object.fromEntries(
+  creators.map((c) => [c.slug, c]),
+)
