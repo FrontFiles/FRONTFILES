@@ -40,3 +40,21 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .gstack/
+
+# dev artifacts — watermark drafts, scratch outputs, dev-only rendering
+/public/dev/
+
+# macOS finder clutter (beyond the .DS_Store above)
+._*
+
+# editor / IDE scratch
+.vscode/
+.idea/
+
+# Large binary video assets — exceed GitHub's 100MB file limit.
+# Store externally (Vercel Blob, Cloudflare R2, S3) when referenced
+# from production code. Note: this rule does NOT affect the 11 video
+# files already tracked from before 2026-04-17 — gitignore only applies
+# to untracked paths. Those existing files remain where they are.
+/public/assets/videos/*.mp4
+/public/assets/videos/*.mov
