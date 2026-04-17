@@ -1,0 +1,171 @@
+/**
+ * FRONTFILES — Environment schema (Zod)
+ *
+ * Single source of truth for all `process.env` access. Every module that
+ * needs an env var imports `env` from this file instead of reading
+ * `process.env` directly.
+ *
+ * Two guarantees this file provides:
+ *   1. Fail-fast on import — if any REQUIRED var is missing or malformed,
+ *      the app crashes at startup with a clear error listing exactly which
+ *      keys are wrong. This catches misconfigured deploys immediately.
+ *   2. Typed access — TypeScript knows the shape of `env`, so `env.X`
+ *      completes correctly and has the right type.
+ *
+ * USAGE:
+ *   ```ts
+ *   import { env } from '@/lib/env'
+ *   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL
+ *   ```
+ *
+ * DO NOT bypass this by reading `process.env.X` elsewhere in the codebase.
+ * A lint rule enforcing this is a future addition.
+ *
+ * Public vs private:
+ *   - `NEXT_PUBLIC_*` vars are exposed to the browser bundle. Never put
+ *     secrets in them.
+ *   - All other vars are server-only. `SUPABASE_SERVICE_ROLE_KEY` and
+ *     `STRIPE_SECRET_KEY` MUST never appear in client code.
+ */
+
+import { z } from 'zod'
+
+// ─── Schema definition ──────────────────────────────────────────
+
+const envSchema = z.object({
+  // ─── Required: Supabase foundation ────────────────────────────
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url({
+    message: 'NEXT_PUBLIC_SUPABASE_URL must be a valid URL (e.g. https://xxxxx.supabase.co)',
+  }),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, {
+    message: 'NEXT_PUBLIC_SUPABASE_ANON_KEY is required (sb_publishable_... or legacy JWT)',
+  }),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, {
+    message: 'SUPABASE_SERVICE_ROLE_KEY is required (sb_secret_... or legacy JWT). Server-only.',
+  }),
+
+  // ─── Required: App URL ────────────────────────────────────────
+  NEXT_PUBLIC_APP_URL: z
+    .string()
+    .url()
+    .default('http://localhost:3000')
+    .describe('Public-facing URL for this deployment — used in email links, OAuth callbacks, etc.'),
+
+  // ─── Feature flags ────────────────────────────────────────────
+  NEXT_PUBLIC_FFF_SHARING_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .describe('FFF broadcast surface visibility (D-F1 lock: v1 broadcast-only)'),
+
+  FFF_REAL_UPLOAD: z
+    .enum(['true', 'false'])
+    .default('false')
+    .describe('Gates the real /api/upload commit path. `false` → 503 response.'),
+
+  FFF_STORAGE_DRIVER: z
+    .enum(['fs', 'supabase'])
+    .default('fs')
+    .describe('Storage adapter selection. `fs` = local filesystem. `supabase` = Supabase Storage.'),
+
+  FFF_STORAGE_FS_ROOT: z
+    .string()
+    .optional()
+    .describe('Local filesystem root when FFF_STORAGE_DRIVER=fs. Defaults to ./public/dev/uploads.'),
+
+  FFF_STORAGE_SUPABASE_BUCKET: z
+    .string()
+    .optional()
+    .describe('Supabase Storage bucket name when FFF_STORAGE_DRIVER=supabase.'),
+
+  // ─── Optional: Stripe (wired in Phase 5) ──────────────────────
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_CONNECT_CLIENT_ID: z.string().optional(),
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+
+  // ─── Optional: Google / Vertex AI (wired in Phase 4) ──────────
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CLOUD_PROJECT_ID: z.string().optional(),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+  VERTEX_AI_LOCATION: z
+    .string()
+    .optional()
+    .describe('Default Vertex AI region when creator ai_region is not set. Per D8 EU default.'),
+  NEXT_PUBLIC_GOOGLE_PLACES_API_KEY: z.string().optional(),
+
+  // ─── Optional: Apple Sign In (wired in Phase 4.A) ─────────────
+  APPLE_SIGN_IN_TEAM_ID: z.string().optional(),
+  APPLE_SIGN_IN_CLIENT_ID: z.string().optional(),
+  APPLE_SIGN_IN_KEY_ID: z.string().optional(),
+  APPLE_SIGN_IN_PRIVATE_KEY: z.string().optional(),
+
+  // ─── Optional: Resend (wired in Phase 3) ──────────────────────
+  RESEND_API_KEY_TRANSACTIONAL: z.string().optional(),
+  RESEND_API_KEY_MARKETING: z.string().optional(),
+  RESEND_FROM_TRANSACTIONAL: z
+    .string()
+    .optional()
+    .describe('e.g. "Frontfiles <hello@mail.frontfiles.news>"'),
+  RESEND_FROM_MARKETING: z
+    .string()
+    .optional()
+    .describe('e.g. "Frontfiles <news@news.frontfiles.news>"'),
+
+  // ─── Optional: Observability (wired in Phase 2) ───────────────
+  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
+  SENTRY_AUTH_TOKEN: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+
+  // ─── Node runtime ─────────────────────────────────────────────
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
+})
+
+// ─── Parse + fail-fast ──────────────────────────────────────────
+
+const parsed = envSchema.safeParse(process.env)
+
+if (!parsed.success) {
+  /* eslint-disable no-console */
+  console.error('\n❌ Invalid or missing environment variables:\n')
+  const fieldErrors = parsed.error.flatten().fieldErrors
+  for (const [key, errs] of Object.entries(fieldErrors)) {
+    if (errs && errs.length > 0) {
+      console.error(`   ${key}: ${errs.join(', ')}`)
+    }
+  }
+  console.error(
+    '\nSet the above in your .env.local (dev) or in Vercel environment settings (preview / prod).\n',
+  )
+  /* eslint-enable no-console */
+  throw new Error(
+    'Environment validation failed — see errors above. This is a fail-fast by design.',
+  )
+}
+
+// ─── Typed export ───────────────────────────────────────────────
+
+export const env = parsed.data
+
+export type Env = typeof env
+
+// ─── Derived helpers ────────────────────────────────────────────
+
+/** True when Supabase env vars are set — used by isSupabaseConfigured() shims. */
+export const isSupabaseEnvPresent =
+  Boolean(env.NEXT_PUBLIC_SUPABASE_URL) &&
+  Boolean(env.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
+  Boolean(env.SUPABASE_SERVICE_ROLE_KEY)
+
+/** Convenience booleans for env-gated features. */
+export const flags = {
+  fffSharing: env.NEXT_PUBLIC_FFF_SHARING_ENABLED === 'true',
+  realUpload: env.FFF_REAL_UPLOAD === 'true',
+  storageSupabase: env.FFF_STORAGE_DRIVER === 'supabase',
+}
+
+/** True when running in a production build. */
+export const isProd = env.NODE_ENV === 'production'
