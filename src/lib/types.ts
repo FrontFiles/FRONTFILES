@@ -81,25 +81,34 @@ export const NON_TRANSACTABLE_DECLARATION_STATES: ValidationDeclarationState[] =
 ]
 
 // ══════════════════════════════════════════════
-// OFFER STATE (Spec §10.4)
+// DIRECT OFFER STATE (Spec §10.4)
+// Turn-aware statuses for server-authoritative negotiation
 // ══════════════════════════════════════════════
 
-export type OfferState =
-  | 'pending'
-  | 'countered'
-  | 'accepted'
-  | 'rejected'
+export type DirectOfferStatus =
+  | 'buyer_offer_pending_creator'
+  | 'creator_counter_pending_buyer'
+  | 'buyer_counter_pending_creator'
+  | 'accepted_pending_checkout'
+  | 'declined'
   | 'expired'
-  | 'cancelled'
+  | 'auto_cancelled'
+  | 'completed'
 
-export const OFFER_STATE_LABELS: Record<OfferState, string> = {
-  pending: 'Offer Pending',
-  countered: 'Counter-offer',
-  accepted: 'Offer Accepted',
-  rejected: 'Offer Rejected',
-  expired: 'Offer Expired',
-  cancelled: 'Offer Cancelled',
+export const DIRECT_OFFER_STATUS_LABELS: Record<DirectOfferStatus, string> = {
+  buyer_offer_pending_creator: 'Awaiting Creator',
+  creator_counter_pending_buyer: 'Counter-offer',
+  buyer_counter_pending_creator: 'Awaiting Creator',
+  accepted_pending_checkout: 'Accepted',
+  declined: 'Declined',
+  expired: 'Expired',
+  auto_cancelled: 'Cancelled',
+  completed: 'Completed',
 }
+
+export const TERMINAL_OFFER_STATUSES: DirectOfferStatus[] = [
+  'declined', 'expired', 'auto_cancelled', 'completed',
+]
 
 // ══════════════════════════════════════════════
 // ASSIGNMENT STATE (Spec §10.7–10.9, Assignment Engine Architecture v1.1)
@@ -325,6 +334,22 @@ export type AccountType = 'creator' | 'buyer_individual' | 'buyer_company' | 're
 export type BuyerCompanyRole = 'admin' | 'content_commit_holder' | 'editor'
 
 export type AccountState = 'active' | 'suspended' | 'deleted'
+
+/** User-facing session type — collapses buyer variants, excludes staff. */
+export type UserType = 'creator' | 'buyer' | 'reader'
+
+/**
+ * Display labels for `UserType`. Phase C moved this map next to
+ * the `UserType` definition so downstream consumers
+ * (DiscoveryNav, CreatorGate, account pages, onboarding, etc.)
+ * don't have to import from `user-context` just to render a
+ * human-readable role name.
+ */
+export const USER_TYPE_LABELS: Record<UserType, string> = {
+  creator: 'Creator',
+  buyer: 'Buyer',
+  reader: 'Reader',
+}
 
 export type ViewerRole = 'anonymous' | 'reader' | 'buyer' | 'owner' | 'staff'
 
@@ -621,21 +646,62 @@ export interface CertificationEvent {
 }
 
 // ══════════════════════════════════════════════
-// DIRECT OFFER (Spec §10.4)
+// DIRECT OFFER THREAD (Spec §10.4)
+// Server-authoritative negotiation for PUBLIC assets
 // ══════════════════════════════════════════════
 
-export interface DirectOffer {
+export const DIRECT_OFFER_MAX_ROUNDS = 3
+export const DIRECT_OFFER_DEFAULT_RESPONSE_MINUTES = 240 // 4 hours
+export const DIRECT_OFFER_MIN_RESPONSE_MINUTES = 30
+export const DIRECT_OFFER_MAX_RESPONSE_MINUTES = 1440 // 24 hours
+
+export interface DirectOfferThread {
   id: string
   assetId: string
   buyerId: string
   creatorId: string
-  state: OfferState
-  currentAmount: number // EUR cents
-  listedPrice: number
-  counterRound: number // 0-3
-  maxRounds: 3
-  responseWindowHours: number
-  expiresAt: string
+  licenceType: LicenceType
+  listedPriceAtOpen: number // EUR cents — snapshot at thread creation
+  currentOfferAmount: number // EUR cents — latest live offer
+  currentOfferBy: 'buyer' | 'creator'
+  roundCount: number // 1-based, max DIRECT_OFFER_MAX_ROUNDS (starts at 1 on initial offer)
+  creatorResponseWindowMinutes: number
+  expiresAt: string // ISO — current offer expiry
+  status: DirectOfferStatus
+  acceptedAmount: number | null // EUR cents — locked on acceptance
+  checkoutIntentId: string | null // links to checkout flow
+  createdAt: string
+  updatedAt: string
+  resolvedAt: string | null
+  autoCancelReason: DirectOfferAutoCancelReason | null
+}
+
+export type DirectOfferAutoCancelReason =
+  | 'privacy_changed'
+  | 'declaration_non_transactable'
+  | 'exclusive_activated'
+  | 'asset_delisted'
+
+export type DirectOfferEventType =
+  | 'buyer_offer'
+  | 'creator_counter'
+  | 'buyer_counter'
+  | 'creator_accept'
+  | 'buyer_accept'
+  | 'creator_decline'
+  | 'expired'
+  | 'auto_cancelled'
+  | 'checkout_started'
+  | 'completed'
+
+export interface DirectOfferEvent {
+  id: string
+  threadId: string
+  type: DirectOfferEventType
+  actorId: string
+  amount: number | null // EUR cents — null for non-price events
+  message: string | null // negotiation note — licensing context, rationale, usage
+  metadata: Record<string, unknown> | null
   createdAt: string
 }
 
@@ -1050,8 +1116,134 @@ export interface DirectMessage {
   read: boolean
 }
 
-export interface FollowState {
-  followers: number
-  following: number
-  userFollows: boolean
+export interface ConnectionState {
+  connections: number
+  isConnected: boolean
+  isBlocked: boolean
+}
+
+// ══════════════════════════════════════════════
+// FFF SHARING — Posts (domain types)
+//
+// Distinct from the `/share/[token]` preview-link system under
+// `src/data/shares.ts` + `src/lib/share/metadata.ts`. Posts are
+// authenticated, in-product social feed objects that attach to
+// exactly one Frontfiles content entity.
+//
+// The DB row type lives in `src/lib/db/schema.ts` as `PostRow`.
+// The types below are the domain / service-layer shapes used by
+// the UI — keyed by camelCase, with resolved attachment + author
+// info (no snake_case or raw FKs).
+// ══════════════════════════════════════════════
+
+export type PostAttachmentKind =
+  | 'asset'
+  | 'story'
+  | 'article'
+  | 'collection'
+
+/** Minimal pointer to the Frontfiles entity a post attaches to. */
+export interface PostAttachmentRef {
+  kind: PostAttachmentKind
+  id: string
+  /** Denormalised at post-time — preserves attribution if the source is later removed. */
+  creatorUserId: string
+}
+
+/** Service-layer post (raw — no hydrated attachment yet). */
+export interface Post {
+  id: string
+  authorUserId: string
+  body: string
+  attachment: PostAttachmentRef
+  /** NULL for originals. Set for reposts. */
+  repostOfPostId: string | null
+  visibility: 'public' | 'connections'
+  status: 'published' | 'removed' | 'hidden_by_author'
+  publishedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Author summary as rendered on a post card. */
+export interface PostAuthor {
+  userId: string
+  username: string
+  displayName: string
+  professionalTitle: string
+  trustBadge: TrustBadge | null
+  avatarUrl: string | null
+}
+
+/**
+ * Hydrated attachment — the thing the PostAttachmentEmbed draws.
+ * Discriminated by `kind`; `preview` is already a delivery-safe URL
+ * resolved via `resolveProtectedUrl` / existing thumbnail refs.
+ *
+ * `originalCreator` is always populated (denormalised on the row)
+ * so the UI can show an attribution chip even when the author of
+ * the post is NOT the creator of the attached entity.
+ */
+export type HydratedPostAttachment =
+  | {
+      kind: 'asset'
+      id: string
+      title: string
+      format: AssetFormat
+      previewUrl: string | null
+      originalCreator: PostAuthor
+    }
+  | {
+      kind: 'story'
+      id: string
+      title: string
+      subtitle: string
+      assetCount: number
+      previewUrl: string | null
+      originalCreator: PostAuthor
+    }
+  | {
+      kind: 'article'
+      id: string
+      title: string
+      excerpt: string
+      wordCount: number
+      previewUrl: string | null
+      originalCreator: PostAuthor
+    }
+  | {
+      kind: 'collection'
+      id: string
+      title: string
+      itemCount: number
+      thumbnails: string[]
+      originalCreator: PostAuthor
+    }
+
+/**
+ * Fully hydrated post — what the feed UI consumes.
+ *
+ * For reposts, `repostOf` is populated with the hydrated parent
+ * (one level only; deeper chains render via permalinks on the
+ * detail page, not nested cards — keeps the feed editorial).
+ * `repostOf` may be `null` when the parent was removed; in that
+ * case the feed renders a "quoted post removed" placeholder but
+ * still shows the denormalised attachment on the outer card.
+ */
+export interface PostCard {
+  id: string
+  author: PostAuthor
+  body: string
+  attachment: HydratedPostAttachment
+  repostOf: PostCard | null
+  /** True when `repostOfPostId` is set but the parent could not be hydrated. */
+  repostOfRemoved: boolean
+  visibility: 'public' | 'connections'
+  publishedAt: string
+  /** Stubbed until Module 6 wires real social counters. */
+  likeCount: number
+  commentCount: number
+  repostCount: number
+  /** True if the viewing user has liked this post (stubbed to false for now). */
+  viewerLiked: boolean
 }

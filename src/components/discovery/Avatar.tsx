@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { getAvatarCrop } from '@/lib/avatar-crop'
 
 interface AvatarProps {
   src: string | null | undefined
   name: string
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   className?: string
+  slug?: string
 }
 
 const SIZE_MAP = {
@@ -23,7 +25,7 @@ const SIZE_MAP = {
 export const BLUR_PLACEHOLDER =
   'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%224%22 height=%224%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%25%22 stop-color=%22%23b0b0b0%22/%3E%3Cstop offset=%22100%25%22 stop-color=%22%23787878%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%224%22 height=%224%22 fill=%22url(%23g)%22/%3E%3C/svg%3E'
 
-export function Avatar({ src, name, size = 'sm', className }: AvatarProps) {
+export function Avatar({ src, name, size = 'sm', className, slug }: AvatarProps) {
   const [failed, setFailed] = useState(false)
   const sizeClass = SIZE_MAP[size]
   const showImage = src && !failed
@@ -39,6 +41,7 @@ export function Avatar({ src, name, size = 'sm', className }: AvatarProps) {
           src={showImage ? src : BLUR_PLACEHOLDER}
           alt=""
           className={cn('w-full h-full object-cover', !showImage && 'blur-sm scale-110')}
+          style={showImage && slug ? { objectPosition: getAvatarCrop(slug) } : undefined}
           aria-hidden="true"
           onError={() => setFailed(true)}
         />

@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 import { useUploadV2 } from './UploadV2Context'
 import { getStoryGroups, getUnassignedAssets, getAssetsForStoryGroup } from '@/lib/upload/v2-state'
 import { ChevronUp, ChevronDown, Check, X } from 'lucide-react'
@@ -105,8 +106,8 @@ export function StoryProposalsBanner() {
                           asset.storyGroupId === group.id ? 'border-[#0000ff]/60' : 'border-slate-200',
                         )}
                       >
-                        {asset.thumbnailRef ? (
-                          <img src={asset.thumbnailRef} alt="" className="w-full h-full object-cover" />
+                        {asset.id ? (
+                          <img src={resolveProtectedUrl(asset.id, 'upload-preview')} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-[7px] font-bold text-slate-300">
                             {asset.format?.charAt(0) ?? '?'}

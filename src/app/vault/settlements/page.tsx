@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { VaultLeftRail, type VaultSection } from '@/components/platform/VaultLeftRail'
 import { Panel, EmptyPanel } from '@/components/platform/Panel'
+import { CreatorGate } from '@/components/platform/CreatorGate'
+import { LegalIdentityPrompt } from '@/components/account/LegalIdentityPrompt'
 import { mockTransactions, mockSettlements, mockVaultAssets } from '@/lib/mock-data'
 import { PAYOUT_STATE_LABELS, PLATFORM_FEES } from '@/lib/types'
 import type { PrivacyState } from '@/lib/types'
@@ -16,6 +18,7 @@ export default function SettlementsPage() {
   const pendingAmount = mockSettlements.filter(s => s.state !== 'settled').reduce((sum, s) => sum + s.amount, 0)
 
   return (
+    <CreatorGate tool="Settlements">
     <div className="h-screen flex flex-col bg-white">
       <div className="flex flex-1 overflow-hidden">
         <VaultLeftRail
@@ -28,6 +31,16 @@ export default function SettlementsPage() {
         <div className="flex-1 overflow-y-auto px-8 py-8">
           <div className="max-w-3xl flex flex-col gap-8">
             <h1 className="text-2xl font-bold text-black tracking-tight">Settlements</h1>
+
+            {/* Phase D — JIT legal identity launch.
+                Settlements is the most payout-adjacent surface
+                in the creator vault. The `creator_payouts`
+                scenario reframes the drawer as "set up legal
+                identity for payouts" with a payout-specific
+                Step 1 ("Who will receive payouts?"). Hidden
+                once verified to avoid noise on a page
+                creators visit regularly. */}
+            <LegalIdentityPrompt scenario="creator_payouts" hideWhenVerified />
 
             {/* Earnings summary */}
             <div className="grid grid-cols-3 gap-4">
@@ -102,5 +115,6 @@ export default function SettlementsPage() {
         </div>
       </div>
     </div>
+    </CreatorGate>
   )
 }

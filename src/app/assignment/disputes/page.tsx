@@ -5,7 +5,7 @@ import { StaffDisputeQueue } from '@/components/assignment/StaffDisputeQueue'
 
 export default function DisputeQueuePage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="flex-1 overflow-y-auto bg-white">
       <div className="border-b border-black/10">
         <div className="max-w-[1200px] mx-auto px-6 py-3 flex items-center gap-3">
           <Link href="/assignment" className="text-[9px] text-black/30 hover:text-black transition-colors">

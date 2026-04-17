@@ -7,6 +7,7 @@ import type { NextRequest } from 'next/server'
 import { issueAssignmentBrief } from '@/lib/assignment/services'
 import { listAssignments, putAssignment } from '@/lib/assignment/store'
 import { success, errorResponse, withDomainError } from '@/lib/assignment/api-helpers'
+import { requireGrant } from '@/lib/identity/guards'
 
 export async function POST(request: NextRequest) {
   return withDomainError(async () => {
@@ -15,6 +16,15 @@ export async function POST(request: NextRequest) {
     if (!body.buyerId || !body.creatorId || !body.assignmentClass || !body.plan || !body.milestones) {
       return errorResponse('VALIDATION_ERROR', 'Missing required fields: buyerId, creatorId, assignmentClass, plan, milestones')
     }
+
+    // Phase B — server-side role gate.
+    // Issuing an assignment brief is a buyer-scoped action, so
+    // the acting `buyerId` must hold the 'buyer' grant. This is
+    // the second of two proof-of-concept wirings for the new
+    // `requireGrant` helper; the rest of the API surface will
+    // be retrofitted in a later phase.
+    const grantDenial = await requireGrant(body.buyerId, 'buyer')
+    if (grantDenial) return grantDenial
 
     const assignment = issueAssignmentBrief({
       buyerId: body.buyerId,

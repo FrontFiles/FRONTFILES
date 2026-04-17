@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
+import { isListablePrivacy } from '@/lib/asset/visibility'
 import { useUploadV2 } from './UploadV2Context'
 import {
   getStoryGroups,
@@ -114,7 +116,7 @@ export function StoryGroupsPanel() {
           // Compute group-level metrics
           const blockingCount = groupAssets.filter(a => getAssetExceptions(a).some(e => e.severity === 'blocking')).length
           const groupValue = groupAssets
-            .filter(a => a.editable.privacy === 'PUBLIC' || a.editable.privacy === 'RESTRICTED')
+            .filter(a => isListablePrivacy(a.editable.privacy))
             .reduce((sum, a) => sum + (a.editable.price ?? 0), 0)
 
           return (
@@ -240,8 +242,8 @@ export function StoryGroupsPanel() {
                         onClick={e => { e.stopPropagation(); dispatch({ type: 'SELECT_ASSET', assetId: a.id }) }}
                         title={a.filename}
                       >
-                        {a.thumbnailRef ? (
-                          <img src={a.thumbnailRef} alt="" className="w-full h-full object-cover" />
+                        {a.id ? (
+                          <img src={resolveProtectedUrl(a.id, 'upload-preview')} alt="" className="w-full h-full object-cover" />
                         ) : (
                           a.format?.charAt(0).toUpperCase() ?? '?'
                         )}

@@ -1,77 +1,96 @@
 import type {
   OnboardingFlowState,
-  OnboardingStepId,
-  IdentityVerificationResult,
-  IdentityAnchor,
-  CrossCheckSignal,
-  ValidationOutcome,
-  CreatorProfileDraft,
+  OnboardingStepKey,
+  OnboardingRole,
+  OnboardingBuyerType,
+  CreatorMinimalDraft,
 } from './types'
 
 export const initialState: OnboardingFlowState = {
-  currentStep: 1,
+  // Navigation
+  //
+  // Fresh flows start at the role picker — the single top-level
+  // entry into onboarding. Returning users who already created
+  // an account are restored to their persisted step by the
+  // hydration replay in `useOnboardingFlow`, which dispatches
+  // SET_STEP after replaying role + createdUserId, so they never
+  // see the picker on re-entry.
+  currentStep: 'role-picker',
   completedSteps: [],
-  identityVerification: null,
-  identityAnchor: null,
-  crossCheckSignals: [],
-  crossCheckComplete: false,
-  validationOutcome: null,
-  profileDraft: null,
-  username: null,
+  role: null,
+
+  // Phase 0 account form
+  email: '',
+  username: '',
   usernameAvailable: null,
-  finalValidationOutcome: null,
-  vaultCreated: false,
+  password: '',
+  createdUserId: null,
+  awaitingEmailVerification: false,
+
+  // Creator minimal
+  creatorMinimal: {
+    professionalTitle: '',
+    biography: '',
+  },
+
+  // Buyer minimal
+  buyerMinimal: {
+    buyerType: null,
+    companyName: '',
+  },
+
+  // Launch result
   vaultId: null,
 }
 
-// Discriminated union of all action types
+// Discriminated union of every action the live onboarding UI
+// actually dispatches. Anything not in this list is dead code.
 export type OnboardingAction =
-  | { type: 'SET_STEP'; payload: OnboardingStepId }
-  | { type: 'SET_IDENTITY_VERIFICATION'; payload: IdentityVerificationResult }
-  | { type: 'SET_IDENTITY_ANCHOR'; payload: IdentityAnchor }
-  | { type: 'SET_CROSS_CHECK_SIGNALS'; payload: CrossCheckSignal[] }
-  | { type: 'SET_CROSS_CHECK_COMPLETE'; payload: boolean }
-  | { type: 'SET_VALIDATION_OUTCOME'; payload: ValidationOutcome }
-  | { type: 'SET_PROFILE_DRAFT'; payload: CreatorProfileDraft }
-  | { type: 'UPDATE_PROFILE_DRAFT'; payload: Partial<CreatorProfileDraft> }
-  | { type: 'SET_USERNAME'; payload: { username: string; available: boolean } }
-  | { type: 'SET_FINAL_VALIDATION_OUTCOME'; payload: ValidationOutcome }
+  // Navigation
+  | { type: 'SET_STEP'; payload: OnboardingStepKey }
+  | { type: 'MARK_STEP_COMPLETE'; payload: OnboardingStepKey }
+
+  // Account creation
+  | { type: 'SET_EMAIL'; payload: string }
+  | { type: 'SET_USERNAME'; payload: { username: string; available: boolean | null } }
+  | { type: 'SET_PASSWORD'; payload: string }
+  | { type: 'SET_ROLE'; payload: OnboardingRole }
+  | { type: 'SET_CREATED_USER_ID'; payload: string }
+  | {
+      type: 'SET_AWAITING_EMAIL_VERIFICATION'
+      payload: boolean
+    }
+
+  // Creator minimal
+  | { type: 'UPDATE_CREATOR_MINIMAL'; payload: Partial<CreatorMinimalDraft> }
+
+  // Buyer minimal
+  | { type: 'SET_BUYER_TYPE'; payload: OnboardingBuyerType }
+  | { type: 'SET_COMPANY_NAME'; payload: string }
+
+  // Launch
   | { type: 'SET_VAULT_CREATED'; payload: { vaultId: string } }
-  | { type: 'MARK_STEP_COMPLETE'; payload: OnboardingStepId }
+
   | { type: 'RESET' }
 
 export function onboardingReducer(
   state: OnboardingFlowState,
-  action: OnboardingAction
+  action: OnboardingAction,
 ): OnboardingFlowState {
   switch (action.type) {
     case 'SET_STEP':
       return { ...state, currentStep: action.payload }
 
-    case 'SET_IDENTITY_VERIFICATION':
-      return { ...state, identityVerification: action.payload }
-
-    case 'SET_IDENTITY_ANCHOR':
-      return { ...state, identityAnchor: action.payload }
-
-    case 'SET_CROSS_CHECK_SIGNALS':
-      return { ...state, crossCheckSignals: action.payload }
-
-    case 'SET_CROSS_CHECK_COMPLETE':
-      return { ...state, crossCheckComplete: action.payload }
-
-    case 'SET_VALIDATION_OUTCOME':
-      return { ...state, validationOutcome: action.payload }
-
-    case 'SET_PROFILE_DRAFT':
-      return { ...state, profileDraft: action.payload }
-
-    case 'UPDATE_PROFILE_DRAFT':
-      if (!state.profileDraft) return state
+    case 'MARK_STEP_COMPLETE': {
+      if (state.completedSteps.includes(action.payload)) return state
       return {
         ...state,
-        profileDraft: { ...state.profileDraft, ...action.payload },
+        completedSteps: [...state.completedSteps, action.payload],
       }
+    }
+
+    case 'SET_EMAIL':
+      return { ...state, email: action.payload }
 
     case 'SET_USERNAME':
       return {
@@ -80,24 +99,41 @@ export function onboardingReducer(
         usernameAvailable: action.payload.available,
       }
 
-    case 'SET_FINAL_VALIDATION_OUTCOME':
-      return { ...state, finalValidationOutcome: action.payload }
+    case 'SET_PASSWORD':
+      return { ...state, password: action.payload }
+
+    case 'SET_ROLE':
+      return { ...state, role: action.payload }
+
+    case 'SET_CREATED_USER_ID':
+      return { ...state, createdUserId: action.payload }
+
+    case 'SET_AWAITING_EMAIL_VERIFICATION':
+      return { ...state, awaitingEmailVerification: action.payload }
+
+    case 'UPDATE_CREATOR_MINIMAL':
+      return {
+        ...state,
+        creatorMinimal: { ...state.creatorMinimal, ...action.payload },
+      }
+
+    case 'SET_BUYER_TYPE':
+      return {
+        ...state,
+        buyerMinimal: { ...state.buyerMinimal, buyerType: action.payload },
+      }
+
+    case 'SET_COMPANY_NAME':
+      return {
+        ...state,
+        buyerMinimal: { ...state.buyerMinimal, companyName: action.payload },
+      }
 
     case 'SET_VAULT_CREATED':
       return {
         ...state,
-        vaultCreated: true,
         vaultId: action.payload.vaultId,
       }
-
-    case 'MARK_STEP_COMPLETE': {
-      const alreadyComplete = state.completedSteps.includes(action.payload)
-      if (alreadyComplete) return state
-      return {
-        ...state,
-        completedSteps: [...state.completedSteps, action.payload],
-      }
-    }
 
     case 'RESET':
       return { ...initialState }

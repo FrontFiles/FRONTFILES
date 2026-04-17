@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useComposer } from '@/lib/composer/context'
 import { checkEditorEligibility } from '@/lib/composer/types'
 import { ComposerHeader } from './ComposerHeader'
@@ -8,10 +9,17 @@ import { SearchRail } from './SearchRail'
 import { EditorCanvas } from './EditorCanvas'
 import { InspectorPanel } from './InspectorPanel'
 import { PublishConfirmation } from './PublishConfirmation'
+import type { ContextualPanel } from '@/components/discovery/GeoBoltControlGroup'
 
 export function ComposerShell() {
   const { state } = useComposer()
   const eligibility = checkEditorEligibility(state.eligibility)
+  // Mirror of SearchRail's `activePanel`. SearchRail fires
+  // `onActivePanelChange` via useEffect, ComposerShell stores the latest
+  // value, and collapses its SearchRail column width down to just the rail
+  // footprint when neither Geo nor BOLT is open. Default 'geo' matches
+  // SearchRail's default `sidebarOpen=true`.
+  const [activePanel, setActivePanel] = useState<ContextualPanel>('geo')
 
   // Gate: editor must be eligible to use the Composer
   if (!eligibility.eligible) {
@@ -46,10 +54,19 @@ export function ComposerShell() {
       <ComposerHeader />
 
       <div className="flex-1 overflow-hidden flex">
-        {/* Zone A: Search Rail — fixed 240px */}
+        {/* Zone A: Search Rail — width tracks activePanel.
+            When Geo or BOLT is active: 580px (room for map / BOLT briefing
+            + gallery below). When both closed: 88px — just the 48px Geo/BOLT
+            rail + its outer padding, nothing else visible. */}
         {!state.ui.searchRailCollapsed && (
-          <div className="w-[240px] min-w-[200px] flex-shrink-0 h-full overflow-hidden flex flex-col border-r-2 border-black">
-            <SearchRail />
+          <div
+            className={`${
+              activePanel === null
+                ? 'w-[88px] min-w-[88px]'
+                : 'w-[580px] min-w-[480px]'
+            } flex-shrink-0 h-full overflow-hidden flex flex-col border-r-2 border-black`}
+          >
+            <SearchRail onActivePanelChange={setActivePanel} />
           </div>
         )}
 

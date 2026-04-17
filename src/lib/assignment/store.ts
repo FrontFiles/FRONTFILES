@@ -10,6 +10,11 @@
  */
 
 import type { Assignment } from '@/lib/types'
+import type {
+  AssignmentDocumentReadiness,
+  AssignmentSignatureReadiness,
+  WorkAuthorization,
+} from './closing-types'
 import { mockAssignments } from './mock-data'
 
 // ══════════════════════════════════════════════
@@ -61,4 +66,35 @@ export function _resetStore(): void {
 /** Current store size (test/debug). */
 export function getStoreSize(): number {
   return assignmentStore.size
+}
+
+// ══════════════════════════════════════════════
+// CLOSING RESULT STORE
+// Persists pipeline readiness data so the activate page
+// and detail page can display actual closing results,
+// not hard-coded status derived from assignment state.
+// ══════════════════════════════════════════════
+
+export interface ClosingResult {
+  assignmentId: string
+  documentReadiness: AssignmentDocumentReadiness
+  signatureReadiness: AssignmentSignatureReadiness
+  workAuthorization: WorkAuthorization
+}
+
+const closingResultStore: Map<string, ClosingResult> = new Map()
+
+/** Persist closing pipeline results for an assignment. */
+export function putClosingResult(result: ClosingResult): void {
+  closingResultStore.set(result.assignmentId, result)
+}
+
+/** Get closing pipeline results by assignment ID. Returns null if not found. */
+export function getClosingResult(assignmentId: string): ClosingResult | null {
+  return closingResultStore.get(assignmentId) ?? null
+}
+
+/** Reset closing result store (test only). */
+export function _resetClosingResultStore(): void {
+  closingResultStore.clear()
 }

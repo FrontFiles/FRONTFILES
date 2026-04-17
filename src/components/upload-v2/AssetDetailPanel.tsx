@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 import { useUploadV2 } from './UploadV2Context'
 import { getAssetExceptions, getStoryGroups, getFieldSource, getFieldConflict, centsToEur } from '@/lib/upload/v2-state'
 import {
@@ -55,8 +56,8 @@ export function AssetDetailPanel() {
         {/* ═══════ 1. ASSET HEADER / PREVIEW ═══════ */}
         <div className="border-2 border-black">
           <div className="bg-slate-100 h-28 flex items-center justify-center text-slate-300 overflow-hidden relative">
-            {asset.thumbnailRef ? (
-              <img src={asset.thumbnailRef} alt={asset.editable.title || asset.filename} className="w-full h-full object-cover" />
+            {asset.id ? (
+              <img src={resolveProtectedUrl(asset.id, 'upload-preview')} alt={asset.editable.title || asset.filename} className="w-full h-full object-cover" />
             ) : (
               <div className="text-center">
                 <div className="text-3xl font-bold uppercase">{asset.format?.charAt(0) ?? '?'}</div>

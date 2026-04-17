@@ -42,6 +42,41 @@ export type { SpotlightItem } from './spotlight'
 export { lightboxes, lightboxMap } from './lightbox'
 export type { LightboxData } from './lightbox'
 
+// Per-creator content adapters
+export {
+  getCreatorAssets,
+  getCreatorStories,
+  getCreatorArticles,
+  getCreatorCollections,
+  getCreatorEvents,
+  resolveCreatorId,
+} from './creator-content'
+
+// Profiles
+export {
+  creatorProfiles,
+  buyers,
+  profileMap,
+  profileById,
+  getCreatorProfile,
+  getCreatorProfileById,
+} from './profiles'
+
+// Social
+export {
+  socialAuthors,
+  followGraph,
+  getFollowerCount,
+  isFollowing,
+  getSocialCounts,
+  socialCounts,
+  comments,
+  conversations,
+  messages,
+  mockConnectionState,
+  getConnectionState,
+} from './social'
+
 // ═══════════════════════════════════════════════════════════════
 // Utility: resolve any object ID to its entity
 // ═══════════════════════════════════════════════════════════════
@@ -59,6 +94,27 @@ export function resolveObject(objectType: 'asset' | 'story' | 'article', objectI
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Share tokens
+export { shareRecords, shareMap } from './shares'
+export type { ShareRecord, ShareStatus, ShareTemplate } from './shares'
+
+// ═══════════════════════════════════════════════════════════════
+// FFF Sharing — Posts (distinct from Share tokens above)
+// ═══════════════════════════════════════════════════════════════
+export {
+  postRows,
+  postMap,
+  getPostsByAuthor,
+  getPostsAttachedTo,
+  getPostRepostsOf,
+} from './posts'
+export type {
+  PostRow,
+  PostAttachmentType,
+  PostStatus,
+  PostVisibility,
+} from './posts'
+
 // Summary stats (for landing page and dashboard use)
 // ═══════════════════════════════════════════════════════════════
 import { publicAssets } from './assets'

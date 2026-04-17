@@ -5,6 +5,7 @@ import { useComposer } from '@/lib/composer/context'
 import { getOrderedBlocks } from '@/lib/composer/selectors'
 import { assetMap, creatorMap } from '@/data'
 import { ValidationBadge } from '@/components/discovery/ValidationBadge'
+import { resolveProtectedUrl, resolveProtectedMediaUrl } from '@/lib/media/delivery-policy'
 import { formatEur } from '@/lib/composer/split-engine'
 
 export function EditorCanvas() {
@@ -238,13 +239,8 @@ function AssetBlockEditor({
   const asset = assetMap[assetId]
   const creator = asset ? creatorMap[asset.creatorId] : null
 
-  // Fetch full text content for Text-format assets
-  const [fullText, setFullText] = useState<string | null>(null)
-  useEffect(() => {
-    if (asset?.format === 'Text' && asset.textUrl && !fullText) {
-      fetch(asset.textUrl).then(r => r.text()).then(t => setFullText(t)).catch(() => {})
-    }
-  }, [asset?.format, asset?.textUrl, fullText])
+  // Text preview uses asset.textExcerpt — full text is original-only.
+  const fullText = asset?.format === 'Text' ? (asset.textExcerpt ?? null) : null
 
   if (!asset) {
     return (
@@ -268,8 +264,8 @@ function AssetBlockEditor({
       <div className="relative bg-slate-100 aspect-video overflow-hidden">
         {asset.videoUrl ? (
           <video
-            src={asset.videoUrl}
-            poster={asset.thumbnailRef}
+            src={resolveProtectedMediaUrl(asset.id, 'video', 'composer')}
+            poster={resolveProtectedUrl(asset.id, 'composer')}
             muted
             playsInline
             autoPlay
@@ -296,7 +292,7 @@ function AssetBlockEditor({
             <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent" />
           </div>
         ) : (
-          <img src={asset.thumbnailRef} alt={asset.title} className="w-full h-full object-cover" />
+          <img src={resolveProtectedUrl(asset.id, 'composer')} alt={asset.title} className="w-full h-full object-cover" />
         )}
         <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-widest bg-black text-white px-2 py-0.5">
           {asset.format}
@@ -315,15 +311,15 @@ function AssetBlockEditor({
         <span className="text-[10px] font-bold text-black truncate flex-1">{asset.title}</span>
         <ValidationBadge state={asset.validationDeclaration} />
         {asset.price && (
-          <span className="text-[9px] font-bold font-mono text-black shrink-0">&euro;{asset.price}</span>
+          <span className="text-[9px] font-bold font-mono text-black shrink-0">&euro;{asset.price.toFixed(2)}</span>
         )}
       </div>
 
-      {/* Caption / Full text — for Text assets, show full content */}
+      {/* Text excerpt — for Text assets, show preview excerpt */}
       {asset.format === 'Text' && fullText ? (
         <div className="border-t border-slate-200 bg-white">
           <div className="px-3 pt-1.5">
-            <span className="text-[8px] font-bold uppercase tracking-widest text-slate-300">Full text</span>
+            <span className="text-[8px] font-bold uppercase tracking-widest text-slate-300">Text excerpt</span>
           </div>
           <div className="px-6 py-4 max-h-[400px] overflow-y-auto">
             <p className="text-[13px] leading-[1.9] text-black/70 font-serif whitespace-pre-line">{fullText}</p>

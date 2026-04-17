@@ -12,6 +12,7 @@
  */
 
 import type { AssetFormat, LicenceType, PrivacyState, ValidationDeclarationState } from './types'
+import type { WatermarkMode } from '@/lib/watermark/types'
 
 // ── Metadata Source Tracking ──
 
@@ -271,6 +272,8 @@ export interface V2Defaults {
   privacy: PrivacyState | null
   licences: LicenceType[]
   tags: string[]
+  /** Default watermark mode for assets in this batch. null = use context default. */
+  watermarkMode: WatermarkMode | null
 }
 
 // ── UI State ──

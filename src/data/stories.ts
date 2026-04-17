@@ -345,6 +345,143 @@ export const stories: StoryData[] = [
     curatedEligible: false,
     discoveryReasonHints: ['Same geography: Setúbal', 'Same creator as coastal erosion', 'Storm damage cluster'],
   },
+  // ═══════════════════════════════════════════════
+  // 15. SAHEL COUP CASCADE — Mali / Burkina / Niger
+  // ═══════════════════════════════════════════════
+  {
+    id: 'story-af-001',
+    slug: 'sahel-coup-civilian-collapse',
+    title: 'Sahel Coup Cascade',
+    dek: 'Displacement, humanitarian access failures, and media blackouts across Mali, Burkina Faso, and Niger after successive military takeovers.',
+    summary: 'Documentation of civilian life across the three Sahel states under junta control. Covers IDP camp conditions, aid convoy obstruction, press restriction enforcement, and the collapse of community journalism.',
+    creatorId: 'creator-019',
+    primaryGeography: 'geo-ml-bamako',
+    secondaryGeographies: ['geo-bf-ouaga', 'geo-ne-niamey', 'geo-sahel'],
+    topicTags: ['coup', 'displacement', 'press-freedom', 'sahel'],
+    coverageWindow: { start: '2026-01-10', end: '2026-03-30' },
+    heroAssetId: 'asset-af-001',
+    assetIds: ['asset-af-001', 'asset-af-002', 'asset-af-003', 'asset-af-004', 'asset-af-005'],
+    articleIds: [],
+    recommendedStoryIds: ['story-af-002', 'story-af-003', 'story-me-002'],
+    spotlightWeight: 83,
+    curatedEligible: true,
+    discoveryReasonHints: ['Active Sahel coverage', 'Press freedom cluster', 'High-demand geography'],
+  },
+
+  // ═══════════════════════════════════════════════
+  // 16. MALI MEDIA BLACKOUT — Bamako
+  // ═══════════════════════════════════════════════
+  {
+    id: 'story-af-002',
+    slug: 'mali-junta-media-blackout',
+    title: 'Mali: Junta Media Blackout',
+    dek: 'Foreign media expelled, local journalists arrested, and internet cut: documenting the information desert inside military-controlled Mali.',
+    summary: 'Photo and text documentation of the media environment in Bamako and the interior under military governance. Covers newsroom shutdowns, journalist detention cases, public information gaps, and the channels Malians use to navigate restricted information.',
+    creatorId: 'creator-020',
+    primaryGeography: 'geo-ml-bamako',
+    secondaryGeographies: ['geo-ml', 'geo-sahel'],
+    topicTags: ['press-freedom', 'censorship', 'coup', 'media'],
+    coverageWindow: { start: '2026-02-01', end: '2026-03-25' },
+    heroAssetId: 'asset-af-006',
+    assetIds: ['asset-af-006', 'asset-af-007', 'asset-af-008', 'asset-af-009'],
+    articleIds: [],
+    recommendedStoryIds: ['story-af-001', 'story-af-003'],
+    spotlightWeight: 77,
+    curatedEligible: true,
+    discoveryReasonHints: ['Press freedom cluster', 'News desert geography', 'Active coverage'],
+  },
+
+  // ═══════════════════════════════════════════════
+  // 17. MOGADISHU IDP CRISIS — Somalia
+  // ═══════════════════════════════════════════════
+  {
+    id: 'story-af-003',
+    slug: 'mogadishu-idp-camp-crisis',
+    title: 'Mogadishu IDP Camp Crisis',
+    dek: "Overcrowding, disease, and evictions at Somalia's largest displacement settlements as drought and Al-Shabaab displacement converge.",
+    summary: 'Ground-level documentation of the IDP crisis in and around Mogadishu. Covers camp overcrowding, water access failures, eviction waves, child malnutrition, and the strain on humanitarian organisations operating under threat.',
+    creatorId: 'creator-021',
+    primaryGeography: 'geo-so-mogadishu',
+    secondaryGeographies: ['geo-so', 'geo-horn'],
+    topicTags: ['displacement', 'famine', 'conflict', 'humanitarian'],
+    coverageWindow: { start: '2025-12-01', end: '2026-03-15' },
+    heroAssetId: 'asset-af-010',
+    assetIds: ['asset-af-010', 'asset-af-011', 'asset-af-012', 'asset-af-013'],
+    articleIds: [],
+    recommendedStoryIds: ['story-af-001', 'story-af-004', 'story-001'],
+    spotlightWeight: 88,
+    curatedEligible: true,
+    discoveryReasonHints: ['Humanitarian crisis cluster', 'High-demand geography', 'Active coverage'],
+  },
+
+  // ═══════════════════════════════════════════════
+  // 18. TIGRAY RECOVERY — Ethiopia
+  // ═══════════════════════════════════════════════
+  {
+    id: 'story-af-004',
+    slug: 'tigray-recovery-documentary',
+    title: 'Tigray: After the Silence',
+    dek: "Three years after the peace deal, Tigray's towns rebuild slowly while displaced communities await return and journalists regain cautious access.",
+    summary: "Documentary photography of post-conflict Tigray, focusing on the return of displaced communities, the physical rebuilding of towns, the reopening of aid corridors, and the fragile restoration of local media. Produced in areas previously under total media blackout.",
+    creatorId: 'creator-023',
+    primaryGeography: 'geo-et-tigray',
+    secondaryGeographies: ['geo-et-addis', 'geo-et'],
+    topicTags: ['post-conflict', 'displacement', 'recovery', 'press-freedom'],
+    coverageWindow: { start: '2026-02-15', end: '2026-04-01' },
+    heroAssetId: 'asset-af-016',
+    assetIds: ['asset-af-016', 'asset-af-017', 'asset-af-018', 'asset-af-019'],
+    articleIds: [],
+    recommendedStoryIds: ['story-me-002', 'story-af-003'],
+    spotlightWeight: 80,
+    curatedEligible: true,
+    discoveryReasonHints: ['Post-conflict cluster', 'Media blackout recovery', 'Active coverage'],
+  },
+
+  // ═══════════════════════════════════════════════
+  // 19. YEMEN BLOCKADE — Sana'a / Aden
+  // ═══════════════════════════════════════════════
+  {
+    id: 'story-me-001',
+    slug: 'yemen-blockade-civilian-cost',
+    title: "Yemen: The Blockade's Cost",
+    dek: "Hospital supply failures, food import shutdowns, and civilian movement restrictions under Houthi and coalition blockades in northern and southern Yemen.",
+    summary: "Multi-location documentation of Yemen's humanitarian crisis driven by blockade and supply chain collapse. Covers hospital medicine shortages in Sana'a, food distribution points in Aden, civilian checkpoint conditions, and the impact on displaced families from Taiz and Hodeidah.",
+    creatorId: 'creator-022',
+    primaryGeography: 'geo-ye-sanaa',
+    secondaryGeographies: ['geo-ye-aden', 'geo-ye'],
+    topicTags: ['humanitarian', 'conflict', 'food-insecurity', 'hospital'],
+    coverageWindow: { start: '2026-01-20', end: '2026-03-28' },
+    heroAssetId: 'asset-me-001',
+    assetIds: ['asset-me-001', 'asset-me-002', 'asset-me-003', 'asset-me-004', 'asset-me-005'],
+    articleIds: [],
+    recommendedStoryIds: ['story-af-003', 'story-me-002'],
+    spotlightWeight: 91,
+    curatedEligible: true,
+    discoveryReasonHints: ["Humanitarian crisis cluster", 'High-demand geography', 'Blockade coverage'],
+  },
+
+  // ═══════════════════════════════════════════════
+  // 20. SUDAN CIVIL WAR — Khartoum / Port Sudan
+  // ═══════════════════════════════════════════════
+  {
+    id: 'story-me-002',
+    slug: 'sudan-civil-war-displacement',
+    title: 'Sudan: War and Displacement',
+    dek: 'Urban warfare, mass displacement, and humanitarian access collapse as fighting between SAF and RSF continues.',
+    summary: "Documentation of Sudan's ongoing civil conflict and its humanitarian consequences. Covers civilian displacement from Khartoum, the mass movement toward Port Sudan and Chad, Darfur documentation, and humanitarian blockades at distribution points.",
+    creatorId: 'creator-024',
+    primaryGeography: 'geo-sd-khartoum',
+    secondaryGeographies: ['geo-sd-portsudanr', 'geo-sd'],
+    topicTags: ['conflict', 'displacement', 'humanitarian', 'urban-warfare'],
+    coverageWindow: { start: '2025-11-01', end: '2026-04-01' },
+    heroAssetId: 'asset-me-006',
+    assetIds: ['asset-me-006', 'asset-me-007', 'asset-me-008', 'asset-me-009'],
+    articleIds: [],
+    recommendedStoryIds: ['story-af-003', 'story-af-004', 'story-001'],
+    spotlightWeight: 89,
+    curatedEligible: true,
+    discoveryReasonHints: ['Conflict cluster', 'High-demand geography', 'Mass displacement coverage'],
+  },
 ]
 
 export const storyMap = Object.fromEntries(stories.map(s => [s.id, s]))

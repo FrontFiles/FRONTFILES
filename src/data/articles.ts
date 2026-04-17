@@ -26,6 +26,8 @@ export interface ArticleData {
   recommendationReasons: string[]
   spotlightEligible: boolean
   curatedEligible: boolean
+  price?: number
+  licenseType?: 'editorial' | 'commercial' | 'exclusive'
 }
 
 export const articles: ArticleData[] = [
@@ -55,6 +57,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Same geography', 'Flood coverage cluster'],
     spotlightEligible: true,
     curatedEligible: true,
+    price: 350,
+    licenseType: 'editorial',
   },
 
   // ═══════════════════════════════════════════════
@@ -83,6 +87,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Institutional reporting cluster'],
     spotlightEligible: true,
     curatedEligible: true,
+    price: 350,
+    licenseType: 'editorial',
   },
 
   // ═══════════════════════════════════════════════
@@ -111,6 +117,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Displacement cluster', 'Multi-creator sourcing'],
     spotlightEligible: true,
     curatedEligible: true,
+    price: 350,
+    licenseType: 'editorial',
   },
 
   // ═══════════════════════════════════════════════
@@ -139,6 +147,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Public health cluster', 'Same geography: Marseille'],
     spotlightEligible: true,
     curatedEligible: true,
+    price: 350,
+    licenseType: 'editorial',
   },
 
   // ═══════════════════════════════════════════════
@@ -167,6 +177,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Multi-geography sourcing', 'Labor disruption cluster'],
     spotlightEligible: true,
     curatedEligible: true,
+    price: 350,
+    licenseType: 'editorial',
   },
 
   // ═══════════════════════════════════════════════
@@ -195,6 +207,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Civic unrest cluster'],
     spotlightEligible: true,
     curatedEligible: false,
+    price: 250,
+    licenseType: 'editorial',
   },
 
   // ═══════════════════════════════════════════════
@@ -223,6 +237,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Court proceedings cluster'],
     spotlightEligible: true,
     curatedEligible: false,
+    price: 250,
+    licenseType: 'editorial',
   },
 
   // ═══════════════════════════════════════════════
@@ -251,6 +267,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Water access cluster', 'Data visualization sourcing'],
     spotlightEligible: true,
     curatedEligible: true,
+    price: 350,
+    licenseType: 'editorial',
   },
 
   // ═══════════════════════════════════════════════
@@ -279,6 +297,8 @@ export const articles: ArticleData[] = [
     recommendationReasons: ['Source-connected content', 'Wildfire cluster', 'Same Andalusia geography'],
     spotlightEligible: true,
     curatedEligible: false,
+    price: 250,
+    licenseType: 'editorial',
   },
 ]
 

@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useAssignment } from '@/lib/assignment/context'
+import { useUser } from '@/lib/user-context'
 import type { Assignment, BuyerCompanyRole } from '@/lib/types'
 import type { AssignmentTab } from '@/lib/assignment/types'
 import {
@@ -31,6 +33,7 @@ import { ReviewConsole } from './ReviewConsole'
 import { DisputePanel } from './DisputePanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ProvisionalReleasePanel } from './ProvisionalReleasePanel'
+import { DocumentsPanel } from './DocumentsPanel'
 import { ActionBar } from './shared'
 import type { ActionBarItem } from './shared'
 
@@ -41,12 +44,19 @@ const TABS: { id: AssignmentTab; label: string; roles?: ViewerRole[] }[] = [
   { id: 'milestones', label: 'Milestones' },
   { id: 'fulfilment', label: 'Fulfilment' },
   { id: 'rights', label: 'Rights' },
+  { id: 'documents', label: 'Documents' },
   { id: 'history', label: 'History & CCR' },
 ]
 
+function deriveViewerRole(activeUserType: string): ViewerRole {
+  if (activeUserType === 'creator') return 'creator'
+  return 'buyer' // buyer and reader both view as buyer
+}
+
 export function AssignmentShell({ assignment, initialRole }: { assignment: Assignment; initialRole?: ViewerRole }) {
   const { state, dispatch } = useAssignment()
-  const [viewerRole, setViewerRole] = useState<ViewerRole>(initialRole ?? 'buyer')
+  const { activeUserType } = useUser()
+  const [viewerRole, setViewerRole] = useState<ViewerRole>(initialRole ?? deriveViewerRole(activeUserType))
   const [buyerCompanyRole, setBuyerCompanyRole] = useState<BuyerCompanyRole | null>('content_commit_holder')
 
   useEffect(() => {
@@ -104,6 +114,13 @@ export function AssignmentShell({ assignment, initialRole }: { assignment: Assig
     }
   }
   if (viewerRole === 'buyer') {
+    if (a.subState === 'accepted_pending_escrow' && a.state === 'brief_issued') {
+      actions.push({
+        label: 'Fund assignment',
+        variant: 'primary',
+        href: `/assignment/${a.id}/fund`,
+      })
+    }
     if (nextActions.includes('review_fulfilment')) {
       const reviewable = a.milestones.find(m => m.state === 'fulfilment_submitted' || m.state === 'review_open')
       actions.push({
@@ -259,6 +276,22 @@ export function AssignmentShell({ assignment, initialRole }: { assignment: Assig
             <ActionBar actions={actions} className="mt-4" />
           )}
 
+          {/* Pending escrow notice */}
+          {a.subState === 'accepted_pending_escrow' && a.state === 'brief_issued' && (
+            <div className="mt-3 border-2 border-dashed border-black/30 px-4 py-3 flex items-center gap-3">
+              <div className="w-2 h-2 bg-black/30 rounded-full shrink-0" />
+              <span className="text-[9px] text-black/50">
+                Creator accepted. Assignment requires escrow funding before work can begin.
+              </span>
+              <Link
+                href={`/assignment/${a.id}/fund`}
+                className="text-[8px] font-bold uppercase tracking-wider text-black border-2 border-black px-2 py-1 hover:bg-black hover:text-white transition-colors shrink-0 ml-auto"
+              >
+                Fund now
+              </Link>
+            </div>
+          )}
+
           {/* Progress bar */}
           <div className="mt-4 flex items-center gap-3">
             <div className="flex-1 h-1.5 bg-black/5 relative">
@@ -307,6 +340,7 @@ export function AssignmentShell({ assignment, initialRole }: { assignment: Assig
             </div>
           )}
           {tab === 'rights' && <RightsPanel />}
+          {tab === 'documents' && <DocumentsPanel />}
           {tab === 'history' && (
             <div className="flex flex-col gap-8">
               <CCRComposer />

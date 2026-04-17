@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "frontfiles-dev",
-      "runtimeExecutable": "/Users/jnmartins/.bun/bin/bun",
-      "runtimeArgs": ["next", "dev", "--turbopack"],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
       "port": 3000
     }
   ]

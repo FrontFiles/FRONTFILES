@@ -1,16 +1,35 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { SiteHeader } from '@/components/SiteHeader'
 
+/**
+ * Phase B note — signin is still a visual-only mockup. Real auth
+ * (Supabase Auth or equivalent) is explicitly out of scope for
+ * this phase. The form now at least fails in a coherent way:
+ *   - The "Log in" submit routes to /onboarding with a clear
+ *     demo-mode hint rather than silently preventing default.
+ *   - The dead /signin/forgot link has been removed.
+ *   - "Create new account" leads into the new Phase 0 entry
+ *     (`/onboarding`) which creates a real users row.
+ */
 export default function SignInPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    // No real auth backend yet. The submit sends the user into
+    // the onboarding entry point so there is no dead end.
+    router.push('/onboarding')
+  }
+
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="flex-1 overflow-y-auto bg-white flex flex-col">
       <SiteHeader />
 
       {/* Main */}
@@ -38,7 +57,7 @@ export default function SignInPage() {
 
           {/* Form */}
           <form
-            onSubmit={e => { e.preventDefault() }}
+            onSubmit={handleSubmit}
             className="flex flex-col gap-6"
           >
             {/* Email */}
@@ -94,18 +113,16 @@ export default function SignInPage() {
               </div>
             </div>
 
-            {/* Forgot password */}
-            <Link
-              href="/signin/forgot"
-              className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#0b1220] hover:text-[#0000ff] transition-colors"
-            >
-              Did you forget your password?
-            </Link>
+            {/* Demo-mode note — real auth lands later */}
+            <p className="text-[11px] font-medium text-[#6e7a8f]">
+              Demo mode — authentication is not yet wired. Logging in
+              routes you to the new account flow.
+            </p>
 
             {/* Submit */}
             <button
               type="submit"
-              className="w-full h-14 bg-[#0000ff] text-white text-[13px] font-bold uppercase tracking-[0.16em] rounded-md hover:bg-[#0000cc] transition-colors mt-2"
+              className="w-full h-14 bg-[#0000ff] text-white text-[13px] font-bold uppercase tracking-[0.16em]  hover:bg-[#0000cc] transition-colors mt-2"
             >
               Log in
             </button>
@@ -118,7 +135,7 @@ export default function SignInPage() {
             </p>
             <Link
               href="/onboarding"
-              className="block w-full h-14 bg-[#0000ff] text-white text-[13px] font-bold uppercase tracking-[0.16em] rounded-md hover:bg-[#0000cc] transition-colors flex items-center justify-center"
+              className="block w-full h-14 bg-[#0000ff] text-white text-[13px] font-bold uppercase tracking-[0.16em]  hover:bg-[#0000cc] transition-colors flex items-center justify-center"
             >
               Create new account
             </Link>
@@ -135,7 +152,7 @@ function SocialButton({ icon, label }: { icon: React.ReactNode; label: string })
   return (
     <button
       type="button"
-      className="flex items-center justify-center gap-3 h-14 border-2 border-[#0b1220] rounded-md text-[12px] font-bold uppercase tracking-[0.08em] text-[#0b1220] hover:bg-[#0b1220] hover:text-white transition-all duration-200 group"
+      className="flex items-center justify-center gap-3 h-14 border-2 border-[#0b1220]  text-[12px] font-bold uppercase tracking-[0.08em] text-[#0b1220] hover:bg-[#0b1220] hover:text-white transition-all duration-200 group"
     >
       <span className="w-5 h-5 shrink-0">{icon}</span>
       {label}

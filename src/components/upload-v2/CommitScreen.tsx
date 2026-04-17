@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { isListablePrivacy } from '@/lib/asset/visibility'
 import { useUploadV2 } from './UploadV2Context'
 import {
   getIncludedAssets,
@@ -77,7 +78,7 @@ function PreCommitView() {
           if (storyAssets.length === 0) return null
 
           const storyValue = storyAssets
-            .filter(a => a.editable.privacy === 'PUBLIC' || a.editable.privacy === 'RESTRICTED')
+            .filter(a => isListablePrivacy(a.editable.privacy))
             .reduce((sum, a) => sum + (a.editable.price ?? 0), 0)
 
           const formats = new Map<string, number>()

@@ -7,6 +7,7 @@
  * Design canon: black + #0000ff + white. No radius. Hard borders. Dense typography.
  */
 
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type {
   AssignmentClass,
@@ -258,7 +259,8 @@ export function EscrowPanel({ escrow, className }: { escrow: EscrowRecord; class
 
 export interface ActionBarItem {
   label: string
-  onClick: () => void
+  onClick?: () => void
+  href?: string
   variant?: 'primary' | 'secondary' | 'danger'
   disabled?: boolean
   disabledReason?: string
@@ -266,22 +268,31 @@ export interface ActionBarItem {
 
 export function ActionBar({ actions, className }: { actions: ActionBarItem[]; className?: string }) {
   if (actions.length === 0) return null
+
+  const btnClass = (action: ActionBarItem) => cn(
+    'text-[10px] font-bold uppercase tracking-wider px-4 py-2 border-2 transition-colors',
+    action.variant === 'primary' ? 'bg-black text-white border-black hover:bg-black/90 disabled:bg-black/20 disabled:border-black/20 disabled:text-black/40' :
+    action.variant === 'danger' ? 'bg-white text-black border-black hover:bg-black/5 disabled:border-black/20 disabled:text-black/30' :
+    'bg-white text-black border-black/30 hover:border-black disabled:border-black/10 disabled:text-black/20',
+  )
+
   return (
     <div className={cn('flex items-center gap-2', className)}>
       {actions.map((action, i) => (
         <div key={i} className="relative group">
-          <button
-            onClick={action.onClick}
-            disabled={action.disabled}
-            className={cn(
-              'text-[10px] font-bold uppercase tracking-wider px-4 py-2 border-2 transition-colors',
-              action.variant === 'primary' ? 'bg-black text-white border-black hover:bg-black/90 disabled:bg-black/20 disabled:border-black/20 disabled:text-black/40' :
-              action.variant === 'danger' ? 'bg-white text-black border-black hover:bg-black/5 disabled:border-black/20 disabled:text-black/30' :
-              'bg-white text-black border-black/30 hover:border-black disabled:border-black/10 disabled:text-black/20',
-            )}
-          >
-            {action.label}
-          </button>
+          {action.href ? (
+            <Link href={action.href} className={btnClass(action)}>
+              {action.label}
+            </Link>
+          ) : (
+            <button
+              onClick={action.onClick}
+              disabled={action.disabled}
+              className={btnClass(action)}
+            >
+              {action.label}
+            </button>
+          )}
           {action.disabled && action.disabledReason && (
             <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-10">
               <div className="bg-black text-white text-[8px] px-2 py-1 whitespace-nowrap max-w-[200px]">

@@ -8,6 +8,8 @@ import { getAssets } from '@/lib/upload/v2-state'
 import { SCENARIOS, SCENARIO_LIST, type ScenarioId } from '@/lib/upload/v2-mock-scenarios'
 import type { PrivacyState, LicenceType } from '@/lib/upload/types'
 import { ASSET_FORMAT_LABELS } from '@/lib/upload/types'
+import { PRESET_LIST } from '@/lib/watermark/presets'
+import type { WatermarkMode } from '@/lib/watermark/types'
 
 const PRIVACY_OPTIONS: PrivacyState[] = ['PUBLIC', 'PRIVATE', 'RESTRICTED']
 const LICENCE_OPTIONS: LicenceType[] = ['editorial', 'commercial', 'broadcast', 'print', 'digital', 'web', 'merchandise']
@@ -218,6 +220,27 @@ export function AddFilesScreen() {
                       </button>
                     )
                   })}
+                </div>
+              </div>
+              {/* Watermark */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-2">Preview watermark</label>
+                <div className="flex gap-2">
+                  {([{ mode: 'none' as WatermarkMode, label: 'None', desc: 'No watermark' }, ...PRESET_LIST.map(p => ({ mode: p.mode, label: p.label, desc: p.description }))]).map(opt => (
+                    <button
+                      key={opt.mode}
+                      onClick={() => dispatch({ type: 'SET_DEFAULTS', defaults: { watermarkMode: opt.mode } })}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-bold uppercase tracking-wide border-2 transition-colors',
+                        state.defaults.watermarkMode === opt.mode
+                          ? 'border-[#0000ff] bg-[#0000ff] text-white'
+                          : 'border-slate-300 text-slate-500 hover:border-black hover:text-black',
+                      )}
+                      title={opt.desc}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

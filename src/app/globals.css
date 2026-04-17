@@ -99,3 +99,206 @@
     @apply font-sans;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   FFF Sharing — Post token layer
+   --------------------------------------------------------------
+   Scoped under `--post-*`. Editorial tokens for the PostCard
+   system. Deliberately distinct from the shadcn theme layer so
+   form chrome (bg-primary / text-muted-foreground / border-border)
+   stays untouched.
+   Matches the interim pixel-spec sheet; values here are the
+   single source of truth for the post/ namespace.
+   ══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Colors ─────────────────────────────────────────────── */
+  --post-surface: #ffffff;
+  --post-surface-nested: #fafaf9;           /* warm off-white */
+  --post-border: rgb(0 0 0 / 0.09);         /* 9% black */
+  --post-border-hover: rgb(0 0 0 / 0.14);   /* 14% black */
+  --post-divider: rgb(0 0 0 / 0.08);        /* 8% black */
+  --post-text-primary: #0b0b0f;             /* near-black */
+  --post-text-secondary: rgb(11 11 15 / 0.64);
+  --post-text-meta: rgb(11 11 15 / 0.52);
+  --post-text-disabled: rgb(11 11 15 / 0.42);
+  --post-accent: #0000ff;                   /* Frontfiles signature blue */
+  --post-accent-hover: #0000cc;
+  --post-accent-tint: rgb(0 0 255 / 0.09);
+  --post-accent-tint-hover: rgb(0 0 255 / 0.14);
+  --post-focus-ring: #0000ff;
+
+  /* ── Radii — scoped, does NOT touch global --radius: 0rem ── */
+  --post-card-radius: 14px;
+  --post-nested-radius: 10px;
+  --post-embed-radius: 12px;
+  --post-thumb-radius: 10px;
+  --post-thumb-radius-compact: 8px;
+  --post-chip-radius: 9999px;               /* pill */
+  --post-avatar-radius: 0px;                /* square — matches Frontfiles profile chrome */
+
+  /* ── Border widths ──────────────────────────────────────── */
+  --post-border-width: 1px;
+
+  /* ── Dimensions ─────────────────────────────────────────── */
+  --post-card-max-w: 720px;
+  --post-card-min-w: 320px;
+  --post-body-max-w: 62ch;
+  --post-avatar: 40px;
+  --post-avatar-compact: 28px;
+  --post-trust-badge: 16px;
+  --post-trust-badge-compact: 14px;
+  --post-action-row-h: 40px;
+  --post-action-icon: 16px;
+  --post-chip-h: 24px;
+  --post-chip-h-compact: 22px;
+  --post-embed-thumb: 96px;
+  --post-embed-thumb-compact: 72px;
+  --post-embed-min-h: 108px;
+  --post-embed-min-h-compact: 84px;
+
+  /* ── Padding / gaps ─────────────────────────────────────── */
+  --post-card-padding: 20px;
+  --post-card-padding-compact: 14px;
+  --post-section-gap: 16px;
+  --post-section-gap-compact: 12px;
+  --post-minor-gap: 10px;
+  --post-meta-gap: 6px;
+  --post-avatar-gap: 12px;
+  --post-avatar-gap-compact: 10px;
+  --post-name-title-gap: 2px;
+  --post-name-badge-gap: 6px;
+  --post-body-paragraph-gap: 10px;
+  --post-body-to-embed-emptybody: 14px;
+  --post-body-to-nested: 14px;
+  --post-divider-top-margin: 14px;
+  --post-actions-top-padding: 12px;
+  --post-icon-label-gap: 8px;
+  --post-icon-label-gap-compact: 6px;
+  --post-chip-px: 10px;
+  --post-chip-px-compact: 9px;
+  --post-embed-pad: 10px;
+  --post-embed-pad-compact: 8px;
+  --post-thumb-text-gap: 12px;
+  --post-embed-title-meta-gap: 4px;
+  --post-embed-meta-gap: 6px;
+  --post-attribution-chip-margin: 10px;
+  --post-viewpost-chip-margin: 10px;
+  --post-repost-label-gap: 10px;
+}
+
+/* Responsive overrides — spec section 'Responsive behavior'.
+   :root-level so every post token resolves to the breakpoint
+   value without any component needing responsive classes. */
+
+@media (max-width: 767px) {
+  :root {
+    --post-card-padding: 16px;
+    --post-embed-thumb: 88px;
+  }
+}
+
+@media (max-width: 479px) {
+  :root {
+    --post-card-padding: 14px;
+    --post-icon-label-gap: 6px;
+  }
+}
+
+@media (max-width: 359px) {
+  :root {
+    --post-embed-thumb: 72px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Post type utilities
+   --------------------------------------------------------------
+   Ten type classes per the spec's Typography scale. Bundled
+   (size + weight + line-height + letter-spacing) so callers
+   only need one class per element. Deliberately NOT a Tailwind
+   arbitrary-value string — this is the one place the type
+   scale is defined.
+   ══════════════════════════════════════════════════════════════ */
+
+.post-type-author-name {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.post-type-author-name-compact {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.post-type-title {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.post-type-title-compact {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.post-type-meta {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+.post-type-meta-compact {
+  font-size: 10px;
+  line-height: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+.post-type-body {
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.post-type-body-compact {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.post-type-embed-title {
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.post-type-embed-meta {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.post-type-chip {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.post-type-action-label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.post-type-empty {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+}

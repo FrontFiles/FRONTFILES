@@ -1,37 +1,72 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { StateBadge } from './StateBadge'
 import { EmptyPanel } from './Panel'
 import { LikeButton } from '@/components/social/LikeButton'
 import { CommentCount } from '@/components/social/CommentSection'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 import { mockSocialCounts } from '@/lib/mock-data'
 import type { VaultAsset, Story, Article, Collection } from '@/lib/types'
+import { hydratePosts } from '@/lib/post/hydrate'
+import { useDraftStore } from '@/lib/post/draft-store'
+import { isFffSharingEnabled } from '@/lib/flags'
+import {
+  isPublishedPublicAsset,
+  isPublishedPublicStory,
+  isPublicCollection,
+} from '@/lib/asset/visibility'
+import { PostsContent } from './PostsContent'
 
-type FrontfolioTab = 'assets' | 'stories' | 'articles' | 'collections'
+type FrontfolioTab = 'assets' | 'stories' | 'articles' | 'collections' | 'posts'
 
 interface FrontfolioContentProps {
   assets: VaultAsset[]
   stories: Story[]
   articles: Article[]
   collections: Collection[]
+  /** Canonical users.id for the creator whose frontfolio this is. */
+  creatorId?: string
+  /** Display name — used by the Posts empty state. */
+  creatorDisplayName?: string
 }
 
-export function FrontfolioContent({ assets, stories, articles, collections }: FrontfolioContentProps) {
+export function FrontfolioContent({ assets, stories, articles, collections, creatorId, creatorDisplayName }: FrontfolioContentProps) {
   const [activeTab, setActiveTab] = useState<FrontfolioTab>('assets')
+  const { unifiedRows } = useDraftStore()
 
-  const publicAssets = assets.filter(a => a.privacy === 'PUBLIC' && a.publication === 'PUBLISHED')
-  const publicStories = stories.filter(s => s.privacy === 'PUBLIC' && s.publication === 'PUBLISHED')
+  // Centralized visibility predicates — see `lib/asset/visibility`.
+  const publicAssets = assets.filter(isPublishedPublicAsset)
+  const publicStories = stories.filter(isPublishedPublicStory)
   const publishedArticles = articles.filter(a => a.publishState === 'published')
-  const publicCollections = collections.filter(c => c.privacy === 'PUBLIC')
+  const publicCollections = collections.filter(isPublicCollection)
 
+  // Hydrate the feed from the unified pool so newly composed
+  // drafts appear here too. Was previously seed-only via
+  // `getPostsByAuthor`.
+  const postResults = useMemo(() => {
+    if (!creatorId) return []
+    const rows = unifiedRows
+      .filter(
+        (r) => r.author_user_id === creatorId && r.status === 'published',
+      )
+      .sort((a, b) => b.published_at.localeCompare(a.published_at))
+    return hydratePosts(rows)
+  }, [unifiedRows, creatorId])
+
+  // Posts tab is suppressed when FFF Sharing is disabled.
+  // Built-time constant so the tab strip is identical on
+  // server and client.
   const tabs: { key: FrontfolioTab; label: string }[] = [
     { key: 'assets', label: 'Assets' },
     { key: 'stories', label: 'Stories' },
     { key: 'articles', label: 'Articles' },
     { key: 'collections', label: 'Collections' },
+    ...(isFffSharingEnabled()
+      ? ([{ key: 'posts', label: 'Posts' }] as const)
+      : []),
   ]
 
   return (
@@ -110,6 +145,14 @@ export function FrontfolioContent({ assets, stories, articles, collections }: Fr
           <EmptyPanel message="No public Collections" />
         )
       )}
+
+      {activeTab === 'posts' && (
+        <PostsContent
+          results={postResults}
+          creatorDisplayName={creatorDisplayName ?? 'This creator'}
+          embedded
+        />
+      )}
     </div>
   )
 }
@@ -132,8 +175,8 @@ function AssetCard({ asset }: { asset: VaultAsset }) {
       className="block border border-slate-200 hover:border-slate-400 transition-colors"
     >
       <div className="aspect-video bg-slate-100 flex items-center justify-center relative overflow-hidden">
-        {asset.thumbnailUrl ? (
-          <img src={asset.thumbnailUrl} alt={asset.title} className="w-full h-full object-cover" />
+        {asset.id ? (
+          <img src={resolveProtectedUrl(asset.id, 'thumbnail')} alt={asset.title} className="w-full h-full object-cover" />
         ) : (
           <span className="text-lg font-bold font-mono text-slate-300">{FORMAT_ICON[asset.format]}</span>
         )}
@@ -267,7 +310,7 @@ function ArticleCard({ article }: { article: Article }) {
           <span className="font-mono text-[10px] text-slate-400">
             {article.publishedAt ? new Date(article.publishedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unpublished'}
           </span>
-          <span className="font-mono text-[10px] text-slate-400">{article.wordCount.toLocaleString()} words</span>
+          <span className="font-mono text-[10px] text-slate-400">{article.wordCount.toLocaleString('en-US')} words</span>
           {social && (
             <div className="flex items-center gap-2 ml-auto">
               <LikeButton initialCount={social.likes} initialLiked={social.userLiked} size="sm" />

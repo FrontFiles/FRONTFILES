@@ -61,6 +61,9 @@ export function getCrossStoryMap(state: ComposerState): CrossStoryEntry[] {
     const asset = assetMap[id]
     if (!asset) continue
     const sid = asset.storyId
+    // Assets without a parent story do not belong on a by-story grouping.
+    // storyId is nullable in the canonical AssetData type; skip those here.
+    if (!sid) continue
     if (!storyGroups[sid]) storyGroups[sid] = []
     storyGroups[sid].push(id)
   }

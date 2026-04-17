@@ -45,6 +45,7 @@ export type AssignmentTab =
   | 'milestones'
   | 'fulfilment'
   | 'rights'
+  | 'documents'
   | 'history'
 
 // ══════════════════════════════════════════════

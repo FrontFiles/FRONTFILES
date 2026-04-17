@@ -406,4 +406,119 @@ INSERT INTO assignment_events (id, assignment_id, event_type, description, actor
   ('b0000001-0000-4000-a000-000000000017', '10000001-0000-4000-a000-000000000003', 'escrow_captured', 'Escrow captured: €2,860.00', '30000001-0000-4000-a000-000000000003', 'system', '{"amountCents": 286000}', 'evt-hyb001-escrow', '2026-04-06T10:00:00Z'),
   ('b0000001-0000-4000-a000-000000000018', '10000001-0000-4000-a000-000000000003', 'ccr_submitted', 'CCR submitted: deadline extension and scope expansion', '40000001-0000-4000-a000-000000000003', 'creator', '{"ccrId": "80000001-0000-4000-a000-000000000001", "amendedFields": ["deadline", "scope"]}', 'evt-hyb001-ccr1', '2026-04-11T10:00:00Z');
 
+-- ════════════════════════════════════════════════════════════════
+-- IDENTITY LAYER SEED (Phase A)
+--
+-- Seeds the users / user_granted_types / creator_profiles /
+-- buyer_accounts rows that the assignment and direct-offer seed
+-- above references via fk_*_buyer / fk_*_creator (NOT VALID,
+-- added in migration 11). Inserting these rows means a subsequent
+--
+--   ALTER TABLE assignments VALIDATE CONSTRAINT fk_assignments_buyer;
+--   ALTER TABLE assignments VALIDATE CONSTRAINT fk_assignments_creator;
+--
+-- will now succeed for the first three creators and buyers. The
+-- full 24-creator mock set lives in src/data/users.ts and is
+-- loaded into the in-memory identity store at runtime; that
+-- mapping uses string ids ('creator-001'..) and is deliberately
+-- parallel to this UUID-based SQL seed. Full reconciliation is
+-- planned for a later phase.
+--
+-- UUID pattern:
+--   Buyers    30000001..30000003 (matching existing assignment seed)
+--   Creators  40000001..40000024 (creators 001-024)
+-- ════════════════════════════════════════════════════════════════
+
+-- USERS -- creators 001-024
+
+INSERT INTO users (id, username, display_name, email, avatar_url, account_state, founding_member, created_at, updated_at) VALUES
+  ('40000001-0000-4000-a000-000000000001', 'marcooliveira', 'Marco Oliveira', 'marcooliveira@frontfiles.test', '/assets/avatars/pexels-edwin-malca-cerna-1875492332-32772332.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000002', 'anasousa', 'Ana Sousa', 'anasousa@frontfiles.test', '/assets/avatars/pexels-caroline-veronez-112078470-10153201.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000003', 'dimitriskatsaros', 'Dimitris Katsaros', 'dimitriskatsaros@frontfiles.test', '/assets/avatars/pexels-imadclicks-9712871.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000004', 'luciaferrante', 'Lucia Ferrante', 'luciaferrante@frontfiles.test', '/assets/avatars/pexels-efrem-efre-2786187-13824575.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000005', 'yaraboukhari', 'Yara Boukhari', 'yaraboukhari@frontfiles.test', '/assets/avatars/pexels-thefullonmonet-17608522.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000006', 'tomasznowak', 'Tomasz Nowak', 'tomasznowak@frontfiles.test', '/assets/avatars/pexels-apunto-group-agencia-de-publicidad-53086916-7752812.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000007', 'elenavasile', 'Elena Vasile', 'elenavasile@frontfiles.test', '/assets/avatars/pexels-kirill-ozerov-109766512-9835449.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000008', 'carmenruiz', 'Carmen Ruiz', 'carmenruiz@frontfiles.test', '/assets/avatars/pexels-pexels-latam-478514802-16135619.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000009', 'nikospapadopoulos', 'Nikos Papadopoulos', 'nikospapadopoulos@frontfiles.test', '/assets/avatars/pexels-gaurav-vishwakarma-3386298-14591977.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000010', 'sarahchen', 'Sarah Chen', 'sarahchen@frontfiles.test', '/assets/avatars/pexels-anete-lusina-4793183.jpg', 'active', true, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000011', 'kofimensah', 'Kofi Mensah', 'kofimensah@frontfiles.test', '/assets/avatars/pexels-cottonbro-7611746.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000012', 'priyasharma', 'Priya Sharma', 'priyasharma@frontfiles.test', '/assets/avatars/pexels-bethany-ferr-5176816.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000013', 'fatimaalrashid', 'Fatima Al-Rashid', 'fatimaalrashid@frontfiles.test', '/assets/avatars/pexels-talie-photo-69424917-8346242.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000014', 'larseriksson', 'Lars Eriksson', 'larseriksson@frontfiles.test', '/assets/avatars/portrait-man-grey-hair-glasses.jpeg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000015', 'aikotanaka', 'Aiko Tanaka', 'aikotanaka@frontfiles.test', '/assets/avatars/portrait-woman-asian-dark-hair.jpeg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000016', 'carlosmendoza', 'Carlos Mendoza', 'carlosmendoza@frontfiles.test', '/assets/avatars/pexels-imadclicks-19055975.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000017', 'aminadiallo', 'Amina Diallo', 'aminadiallo@frontfiles.test', '/assets/avatars/pexels-rk-photography-32275125.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000018', 'jamesobrien', 'James O''Brien', 'jamesobrien@frontfiles.test', '/assets/avatars/portrait-man-stubble-grey-bg.jpeg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000019', 'oluwaseunadeyemi', 'Oluwaseun Adeyemi', 'oluwaseunadeyemi@frontfiles.test', '/assets/avatars/pexels-aidemstudios-35933269.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000020', 'mariamtoure', 'Mariam Touré', 'mariamtoure@frontfiles.test', '/assets/avatars/pexels-adietska-kaka-plur-346078987-14232669.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000021', 'abdirahimhassan', 'Abdirahim Hassan', 'abdirahimhassan@frontfiles.test', '/assets/avatars/pexels-aslam-shah-938590627-20777265.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000022', 'yasminalharazi', 'Yasmin Al-Harazi', 'yasminalharazi@frontfiles.test', '/assets/avatars/pexels-hesam-khodaei-1595988017-28086182.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000023', 'tigisthaile', 'Tigist Haile', 'tigisthaile@frontfiles.test', '/assets/avatars/pexels-thais-simplicio-483156064-15935639.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('40000001-0000-4000-a000-000000000024', 'khalidibrahim', 'Khalid Ibrahim', 'khalidibrahim@frontfiles.test', '/assets/avatars/pexels-cottonbro-7618402.jpg', 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+
+-- USERS -- buyers (matches assignment seed buyer refs)
+
+INSERT INTO users (id, username, display_name, email, avatar_url, account_state, founding_member, created_at, updated_at) VALUES
+  ('30000001-0000-4000-a000-000000000001', 'buyerreuters', 'Reuters Desk', 'desk.reuters@frontfiles.test', NULL, 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('30000001-0000-4000-a000-000000000002', 'buyerborderwire', 'Borderwire Editorial', 'editorial.borderwire@frontfiles.test', NULL, 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('30000001-0000-4000-a000-000000000003', 'buyerechocoverage', 'Echo Coverage', 'desk.echocoverage@frontfiles.test', NULL, 'active', false, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+
+-- USER_GRANTED_TYPES
+
+INSERT INTO user_granted_types (user_id, user_type) VALUES
+  ('40000001-0000-4000-a000-000000000001', 'creator'),
+  ('40000001-0000-4000-a000-000000000002', 'creator'),
+  ('40000001-0000-4000-a000-000000000003', 'creator'),
+  ('40000001-0000-4000-a000-000000000004', 'creator'),
+  ('40000001-0000-4000-a000-000000000005', 'creator'),
+  ('40000001-0000-4000-a000-000000000006', 'creator'),
+  ('40000001-0000-4000-a000-000000000007', 'creator'),
+  ('40000001-0000-4000-a000-000000000008', 'creator'),
+  ('40000001-0000-4000-a000-000000000009', 'creator'),
+  ('40000001-0000-4000-a000-000000000010', 'creator'),
+  -- Sarah Chen is the demo session user with all three grants
+  ('40000001-0000-4000-a000-000000000010', 'buyer'),
+  ('40000001-0000-4000-a000-000000000010', 'reader'),
+  ('40000001-0000-4000-a000-000000000011', 'creator'),
+  ('40000001-0000-4000-a000-000000000012', 'creator'),
+  ('40000001-0000-4000-a000-000000000013', 'creator'),
+  ('40000001-0000-4000-a000-000000000014', 'creator'),
+  ('40000001-0000-4000-a000-000000000015', 'creator'),
+  ('40000001-0000-4000-a000-000000000016', 'creator'),
+  ('40000001-0000-4000-a000-000000000017', 'creator'),
+  ('40000001-0000-4000-a000-000000000018', 'creator'),
+  ('40000001-0000-4000-a000-000000000019', 'creator'),
+  ('40000001-0000-4000-a000-000000000020', 'creator'),
+  ('40000001-0000-4000-a000-000000000021', 'creator'),
+  ('40000001-0000-4000-a000-000000000022', 'creator'),
+  ('40000001-0000-4000-a000-000000000023', 'creator'),
+  ('40000001-0000-4000-a000-000000000024', 'creator'),
+  ('30000001-0000-4000-a000-000000000001', 'buyer'),
+  ('30000001-0000-4000-a000-000000000002', 'buyer'),
+  ('30000001-0000-4000-a000-000000000003', 'buyer');
+
+-- CREATOR_PROFILES
+-- Each row is 1:1 with the matching users row via UNIQUE(user_id).
+-- Example rows seeded below; the full canonical set lives in
+-- src/data/users.ts and is loaded into the mock identity store
+-- automatically. Extend this block as Supabase-mode scenarios
+-- require more creators.
+
+INSERT INTO creator_profiles (user_id, professional_title, location_base, website_url, biography, trust_tier, trust_badge, verification_status, last_verified_at, coverage_areas, specialisations, media_affiliations, press_accreditations, published_in, skills, also_me_links) VALUES
+  ('40000001-0000-4000-a000-000000000001', 'Photojournalist, Southern Brazil', 'Porto Alegre, Brazil', 'https://marcooliveira.press', 'Video and photo journalist covering displacement, flood events, and urban settlement disputes across southern Brazil since 2016.', 'standard', 'verified', 'verified', '2026-03-02T00:00:00Z', ARRAY['Rio Grande do Sul','Southern Brazil','São Paulo'], ARRAY['Flood documentation','Displacement coverage','Aerial survey','Settlement reporting'], ARRAY['Agência Brasil','Folha de S.Paulo','Reuters'], ARRAY['Federação Nacional dos Jornalistas','Rio Grande do Sul Press Association'], ARRAY['Agência Brasil','Folha de S.Paulo','Reuters','Le Monde'], ARRAY['Flood documentation','Drone operation','Field reporting','Video journalism'], ARRAY['https://linkedin.com/in/marcooliveira-journalist','https://twitter.com/marcooliveira']),
+  ('40000001-0000-4000-a000-000000000002', 'Parliamentary Photographer, Lisbon', 'Lisbon, Portugal', 'https://anasousa.photo', 'Institutional and parliamentary photographer based in Lisbon.', 'standard', 'verified', 'verified', '2026-03-03T00:00:00Z', ARRAY['Lisbon','Setúbal','Alentejo'], ARRAY['Parliamentary photography','Institutional documentation','Coastal reporting','Storm coverage'], ARRAY['Agência Lusa','Público','Jornal de Negócios'], ARRAY['Assembleia da República Press Gallery','Sindicato dos Jornalistas'], ARRAY['Agência Lusa','Público','The Guardian','El País'], ARRAY['Parliamentary photography','Institutional documentation','Portrait photography','Storm coverage'], ARRAY['https://linkedin.com/in/anasousa-photo','https://twitter.com/anasousaphoto']),
+  ('40000001-0000-4000-a000-000000000003', 'Border Correspondent, Evros Region', 'Alexandroupoli, Greece', 'https://dimitriskatsaros.com', 'Documentarian covering the Evros border region since 2019.', 'standard', 'verified', 'verified', '2026-03-04T00:00:00Z', ARRAY['Evros','Northern Greece','Eastern Aegean'], ARRAY['Border documentation','Migration route reporting','Logistics photography','Checkpoint coverage'], ARRAY['Kathimerini','SKAI TV','InfoMigrants'], ARRAY['Hellenic Federation of Journalists','EU External Borders Press Accreditation'], ARRAY['Kathimerini','InfoMigrants','Balkan Insight','Der Spiegel'], ARRAY['Border documentation','Migration reporting','Long-form documentary','Logistics photography'], ARRAY['https://linkedin.com/in/dimitriskatsaros','https://twitter.com/dkatsaros']),
+  ('40000001-0000-4000-a000-000000000010', 'Senior Correspondent, Asia Pacific', 'Hong Kong', 'https://sarahchen.press', 'Award-winning journalist covering conflict, climate, and technology across Asia Pacific for over 12 years.', 'standard', 'verified', 'verified', '2026-03-11T00:00:00Z', ARRAY['China','Hong Kong','Taiwan','Southeast Asia'], ARRAY['Conflict reporting','Climate documentation','Technology','Regional politics'], ARRAY['Reuters','South China Morning Post','Foreign Policy'], ARRAY['Foreign Correspondents'' Club of China','Hong Kong Journalists Association'], ARRAY['Reuters','South China Morning Post','Foreign Policy','The Guardian'], ARRAY['Long-form Reporting','Photojournalism','Video Production','Data Journalism'], ARRAY['https://linkedin.com/in/sarahchen-journalist','https://twitter.com/sarahchenreports']);
+
+-- BUYER_ACCOUNTS
+-- Sarah Chen also carries an individual buyer facet so her
+-- multi-role demo session keeps working end-to-end.
+
+INSERT INTO buyer_accounts (user_id, buyer_type, company_name, vat_number, tax_id) VALUES
+  ('30000001-0000-4000-a000-000000000001', 'company', 'Reuters News Desk', NULL, NULL),
+  ('30000001-0000-4000-a000-000000000002', 'company', 'Borderwire Editorial', NULL, NULL),
+  ('30000001-0000-4000-a000-000000000003', 'company', 'Echo Coverage', NULL, NULL),
+  ('40000001-0000-4000-a000-000000000010', 'individual', NULL, NULL, NULL);
+
 COMMIT;

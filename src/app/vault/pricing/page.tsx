@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { VaultLeftRail, type VaultSection } from '@/components/platform/VaultLeftRail'
 import { Panel, EmptyPanel } from '@/components/platform/Panel'
 import { StateBadge } from '@/components/platform/StateBadge'
+import { CreatorGate } from '@/components/platform/CreatorGate'
 import { mockVaultAssets } from '@/lib/mock-data'
 import { LICENCE_TYPE_LABELS, EXCLUSIVE_TIER_LABELS, EXCLUSIVE_MULTIPLIERS } from '@/lib/types'
 import type { PrivacyState } from '@/lib/types'
@@ -16,6 +17,7 @@ export default function PricingPage() {
   const unpricedAssets = mockVaultAssets.filter(a => a.creatorPrice === null)
 
   return (
+    <CreatorGate tool="Pricing & Licences">
     <div className="h-screen flex flex-col bg-white">
       <div className="flex flex-1 overflow-hidden">
         <VaultLeftRail
@@ -105,5 +107,6 @@ export default function PricingPage() {
         </div>
       </div>
     </div>
+    </CreatorGate>
   )
 }

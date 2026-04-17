@@ -36,6 +36,7 @@ import type {
 import { DEFAULT_COLUMNS } from './v2-types'
 import type { AssetFormat, LicenceType, ValidationDeclarationState } from './types'
 import { TRANSACTABLE_STATES } from './types'
+import { isListablePrivacy } from '@/lib/asset/visibility'
 
 // ── ID Generator ──
 
@@ -827,6 +828,7 @@ export function createV2InitialState(): V2State {
       privacy: null,
       licences: [],
       tags: [],
+      watermarkMode: null,
     },
   }
 }
@@ -889,13 +891,14 @@ export function getAssetExceptions(asset: V2Asset): V2Exception[] {
     exceptions.push({ type: 'unresolved_conflict', severity: 'blocking', label: 'Unresolved metadata conflict' })
   }
 
-  // Blocking: price required for PUBLIC and RESTRICTED (both transactable)
-  if ((asset.editable.privacy === 'PUBLIC' || asset.editable.privacy === 'RESTRICTED') && asset.editable.price === null) {
+  // Blocking: price required for listable (PUBLIC or RESTRICTED)
+  // privacy. Both states are transactable; PRIVATE is not.
+  if (isListablePrivacy(asset.editable.privacy) && asset.editable.price === null) {
     exceptions.push({ type: 'needs_price', severity: 'blocking', label: 'Needs price' })
   }
 
-  // Blocking: licences required for PUBLIC and RESTRICTED
-  if ((asset.editable.privacy === 'PUBLIC' || asset.editable.privacy === 'RESTRICTED') && asset.editable.licences.length === 0) {
+  // Blocking: licences required for listable privacy.
+  if (isListablePrivacy(asset.editable.privacy) && asset.editable.licences.length === 0) {
     exceptions.push({ type: 'needs_licences', severity: 'blocking', label: 'Needs licence selection' })
   }
 
@@ -1060,7 +1063,7 @@ export function getStoryCoverageSummary(state: V2State): {
 
 export function getTotalListedValue(state: V2State): number {
   return getIncludedAssets(state)
-    .filter(a => a.editable.privacy === 'PUBLIC' || a.editable.privacy === 'RESTRICTED')
+    .filter(a => isListablePrivacy(a.editable.privacy))
     .reduce((sum, a) => sum + (a.editable.price ?? 0), 0)
 }
 

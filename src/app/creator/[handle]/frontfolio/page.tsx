@@ -1,21 +1,34 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useRef, useCallback } from 'react'
+import { use, useEffect, useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
+import { GridToolbar, type OverlayMode } from '@/components/discovery/GridToolbar'
+import { gridLayoutClass } from '@/lib/grid-layout'
+import { useUser } from '@/lib/user-context'
 import {
-  mockCreatorProfile,
-  mockVaultAssets,
-  mockStories,
-  mockCollections,
-  mockFollowState,
-  mockSocialCounts,
-} from '@/lib/mock-data'
+  getConnectionState,
+  getCreatorAssets,
+  getCreatorStories,
+  getCreatorCollections,
+  socialCounts,
+} from '@/data'
+import { buildCreatorProfileFromShell } from '@/data/profiles'
+import { getCreatorPortfolioShellByHandle } from '@/lib/identity/store'
+import type { UserWithFacets } from '@/lib/identity/types'
 import { LikeButton } from '@/components/social/LikeButton'
 import { CommentCount } from '@/components/social/CommentSection'
 import { Avatar } from '@/components/discovery/Avatar'
-import type { VaultAsset, Story, Collection } from '@/lib/types'
+import { useOnboardingCompletion } from '@/hooks/useOnboardingCompletion'
+import { OnboardingChecklistSlot } from '@/components/onboarding/OnboardingChecklistSlot'
+import type { VaultAsset, Story, Collection, CreatorProfile } from '@/lib/types'
+import { resolveProtectedUrl, resolveProtectedMediaUrl } from '@/lib/media/delivery-policy'
+import {
+  isPublishedPublicAsset,
+  isPublishedPublicStory,
+  isPublicCollection,
+} from '@/lib/asset/visibility'
 
 // ═══════════════════════════════════════════════
 // FRONTFOLIO PAGE
@@ -23,12 +36,41 @@ import type { VaultAsset, Story, Collection } from '@/lib/types'
 // ═══════════════════════════════════════════════
 
 const FRONTFOLIO_FORMATS = ['All', 'Article', 'Story', 'Collection', 'Photo', 'Video', 'Audio', 'Text', 'Infographic', 'Illustration', 'Vector'] as const
+const FRONTFOLIO_ENTITY_FILTERS = ['All', 'Article', 'Story', 'Collection'] as const
+const FRONTFOLIO_FORMAT_FILTERS = ['Photo', 'Video', 'Audio', 'Text', 'Infographic', 'Illustration', 'Vector'] as const
 
-export default function FrontfolioPage() {
-  const profile = mockCreatorProfile
+export default function FrontfolioPage({ params }: { params: Promise<{ handle: string }> }) {
+  const { handle } = use(params)
+  const { sessionUser } = useUser()
+  // Progressive-onboarding activation flags. Read at the top
+  // of the component (before any early return) so this hook
+  // always runs in the same order per render, per React's
+  // rules of hooks. The flags come from user-context state
+  // (grants + facets), never from the onboarding wizard.
+  const onboardingCompletion = useOnboardingCompletion()
+
+  // ── Live portfolio-shell fetch (Option C) ──
+  //
+  // The old sync reads through `getCreatorProfile(handle)` +
+  // `resolveCreatorId(handle)` were module-load snapshots that
+  // could not see newly-onboarded creators. The live reader
+  // `getCreatorPortfolioShellByHandle` goes through the
+  // canonical identity store and returns either the full shell
+  // (user + creator_profiles row + grants) or `null` when the
+  // handle is unknown / not a visible creator.
+  //
+  // All state hooks (shell, loaded, filters, toggles, …) are
+  // declared BEFORE any early return so the hooks array is
+  // stable across the loading → loaded transition. React's
+  // rules of hooks require this; an early return on `!loaded`
+  // that skips later `useState` calls would crash on mount.
+  const [shell, setShell] = useState<UserWithFacets | null>(null)
+  const [loaded, setLoaded] = useState(false)
   const [viewMode, setViewMode] = useState<'grid4' | 'grid2' | 'grid1' | 'list'>('grid4')
-  const [hoverEnabled, setHoverEnabled] = useState(true)
+  const [overlay, setOverlay] = useState<OverlayMode>('data')
   const [formatFilters, setFormatFilters] = useState<Set<string>>(new Set(['All']))
+  const [railOpen, setRailOpen] = useState(true)
+  const [frontfolioOpen, setFrontfolioOpen] = useState(true)
 
   const toggleFormat = useCallback((f: string) => {
     setFormatFilters(prev => {
@@ -40,9 +82,85 @@ export default function FrontfolioPage() {
     })
   }, [])
 
-  const publicAssets = mockVaultAssets.filter(a => a.privacy === 'PUBLIC' && a.publication === 'PUBLISHED')
-  const publicStories = mockStories.filter(s => s.privacy === 'PUBLIC' && s.publication === 'PUBLISHED')
-  const publicCollections = mockCollections.filter(c => c.privacy === 'PUBLIC')
+  useEffect(() => {
+    let cancelled = false
+    getCreatorPortfolioShellByHandle(handle).then((s) => {
+      if (cancelled) return
+      setShell(s)
+      setLoaded(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [handle])
+
+  // Render an empty shell while the live fetch resolves so the
+  // page never flashes a bogus 404 during the async round-trip
+  // to the identity store.
+  //
+  // When `handle` changes between renders (e.g. navigating from
+  // /creator/a/frontfolio to /creator/b/frontfolio without a
+  // remount), `shell` still holds the previous creator's data
+  // until the effect re-runs. We can't reset `shell`/`loaded`
+  // inside the effect body (`react-hooks/set-state-in-effect`
+  // flags that as a cascading render). Instead, derive staleness
+  // during render: if the loaded shell's username no longer
+  // matches the current handle, treat it as loading until the
+  // new fetch lands.
+  const isStale = shell !== null && shell.user.username !== handle
+  if (!loaded || isStale) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Loading frontfolio…</p>
+        </div>
+      </div>
+    )
+  }
+
+  const profile: CreatorProfile | null = shell
+    ? buildCreatorProfileFromShell(shell)
+    : null
+  // `creatorId` is the canonical `users.id` on the shell — no
+  // more module-load `creatorBySlug` lookup. Content adapters
+  // (`getCreatorAssets` etc.) still key off this id exactly as
+  // before.
+  const creatorId: string | null = shell?.user.id ?? null
+
+  if (!profile || !creatorId) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <h1 className="text-sm font-bold uppercase tracking-widest text-black">Creator not found</h1>
+          <p className="text-xs text-slate-400 mt-2">No frontfolio matches the handle &ldquo;{handle}&rdquo;</p>
+        </div>
+      </div>
+    )
+  }
+
+  const connectionState = getConnectionState(sessionUser.username, handle)
+  const allCreatorAssets = getCreatorAssets(creatorId)
+  const allCreatorStories = getCreatorStories(creatorId)
+  const allCreatorCollections = getCreatorCollections(creatorId)
+
+  // Phase C — self-view detection.
+  // Render the inline `EditPencil` affordances on the identity
+  // rail only when the visiting user is the owner of this
+  // frontfolio. Uses canonical handle/username comparison —
+  // safe even if `sessionUser.username` is case-mismatched.
+  //
+  // The creator's onboarding checklist slot (rendered inside
+  // `<main>` below) is gated on this flag so a creator's
+  // activation prompts never leak into someone else's public
+  // frontfolio view.
+  const isSelfView =
+    sessionUser.username.toLowerCase() === handle.toLowerCase()
+
+  // Centralized visibility predicates — see `lib/asset/visibility`.
+  const publicAssets = allCreatorAssets.filter(isPublishedPublicAsset)
+  const heroAsset = publicAssets.find(a => a.id) || null
+  const publicStories = allCreatorStories.filter(isPublishedPublicStory)
+  const publicCollections = allCreatorCollections.filter(isPublicCollection)
 
   const showAll = formatFilters.has('All')
 
@@ -82,12 +200,10 @@ export default function FrontfolioPage() {
     publicAssets.filter(a => a.uploadedAt && (now - new Date(a.uploadedAt).getTime()) < 7 * 86400000).map(a => a.id)
   )
 
-  const [railOpen, setRailOpen] = useState(true)
-
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="flex-1 min-h-0 flex flex-col bg-white">
       {/* Always-visible breadcrumb + collapse toggle */}
-      <div className="border-b border-black/10 bg-white shrink-0">
+      <div className="bg-white shrink-0">
         <div className="px-6 flex items-center gap-1.5 h-8">
           <Link href="/search" className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] hover:text-[#00008b]">Frontfiles</Link>
           <span className="text-[10px] text-black/20">/</span>
@@ -102,66 +218,84 @@ export default function FrontfolioPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex">
+      <div className="flex-1 flex overflow-hidden">
         {/* Left column: CreatorDetailRail with identity at top — collapsible */}
         {railOpen && (
-          <CreatorDetailRail profile={profile} />
+          <CreatorDetailRail profile={profile} connectionCount={connectionState.connections} isSelfView={isSelfView} />
         )}
 
-        {/* Main content — fills remaining space */}
+        {/* Main content — hero + frontfolio */}
         <main className="flex-1 min-w-0 overflow-y-auto">
-        <div className="px-8 pt-5 pb-7">
-          <div className="flex items-end justify-between mb-3">
-            <h2 className="text-[26px] font-serif italic text-black tracking-tight leading-none">Frontfolio</h2>
-            <div className="flex items-center gap-2">
+        {/* Onboarding checklist plug point — self-view only.
+            Renders null today; the future checklist will hang
+            off `onboardingCompletion` without any further shell
+            edits. Guarded by `isSelfView` so a creator's
+            activation prompts never appear on another creator's
+            public frontfolio. */}
+        {isSelfView && (
+          <OnboardingChecklistSlot
+            flags={onboardingCompletion}
+            surface="creator"
+          />
+        )}
+        {/* Hero cover strip */}
+        {heroAsset?.id && (
+          <div className="w-full h-64 md:h-80 overflow-hidden bg-slate-100 relative">
+              <img
+                src={resolveProtectedUrl(heroAsset.id, 'preview')}
+                alt={heroAsset.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+          </div>
+        )}
+        {/* Sticky header: name + format bar */}
+        <div className="sticky top-0 z-30 bg-white">
+        <div className="px-8 pt-5 pb-0">
+          <div className="flex items-center gap-2 mb-3">
               <button
-                onClick={() => setHoverEnabled(h => !h)}
-                className={`w-8 h-8 flex items-center justify-center border-2 transition-colors ${hoverEnabled ? 'bg-[#0000ff] text-white border-[#0000ff]' : 'bg-white text-black/30 border-black hover:text-black'}`}
-                title={hoverEnabled ? 'Hover preview on' : 'Hover preview off'}
+                onClick={() => setFrontfolioOpen(o => !o)}
+                className="w-5 h-5 flex items-center justify-center text-black/30 hover:text-black transition-colors shrink-0"
+                title={frontfolioOpen ? 'Collapse frontfolio' : 'Expand frontfolio'}
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M5 2v17l4.5-4.5 3.5 7 2.5-1.3-3.5-7H17.5L5 2z" />
-                  {!hoverEnabled && <rect x="1" y="1" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 3" rx="0" />}
-                </svg>
+                <svg className={cn('w-3 h-3 transition-transform', frontfolioOpen ? 'rotate-90' : '-rotate-90')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
               </button>
-              <ViewToggles viewMode={viewMode} setViewMode={setViewMode} />
-            </div>
+              <h2 className="text-[26px] font-serif italic text-black tracking-tight leading-none">{profile.displayName.split(' ')[0]}&apos;s Frontfolio</h2>
           </div>
 
-          {/* Format filter line with counts */}
-          <div className="flex items-center border-b-2 border-black mb-5 flex-wrap">
-            {FRONTFOLIO_FORMATS.map(f => {
-              const count = formatCountMap[f] || 0
-              const isActive = formatFilters.has(f)
-              return (
-                <button
-                  key={f}
-                  onClick={() => toggleFormat(f)}
-                  className={`px-4 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors relative -mb-[2px] ${
-                    isActive
-                      ? 'text-[#0000ff] border-b-[3px] border-[#0000ff]'
-                      : 'text-black/25 hover:text-black/50 border-b-[3px] border-transparent'
-                  }`}
-                >
-                  {f}
-                  <span className={`ml-1 text-[9px] font-mono ${isActive ? 'text-[#0000ff]/70' : 'text-black/15'}`}>{count}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {filteredAssets.length > 0 && <PhotosGrid assets={filteredAssets} recentIds={recentIds} viewMode={viewMode} hoverEnabled={hoverEnabled} />}
-          {showStories && publicStories.length > 0 && (
-            <div className={filteredAssets.length > 0 ? 'mt-8' : ''}>
-              <StoriesGrid stories={publicStories} viewMode={viewMode} />
-            </div>
-          )}
-          {showCollections && publicCollections.length > 0 && (
-            <div className={(filteredAssets.length > 0 || showStories) ? 'mt-8' : ''}>
-              <CollectionsGrid collections={publicCollections} viewMode={viewMode} />
-            </div>
+          {frontfolioOpen && (
+              <GridToolbar
+                filters={FRONTFOLIO_FORMATS.map(f => ({ label: f, value: f, count: formatCountMap[f] || 0 }))}
+                filterGroups={{
+                  primary: FRONTFOLIO_ENTITY_FILTERS.map(f => ({ label: f, value: f, count: formatCountMap[f] || 0 })),
+                  secondary: FRONTFOLIO_FORMAT_FILTERS.map(f => ({ label: f, value: f, count: formatCountMap[f] || 0 })),
+                }}
+                activeFilters={formatFilters}
+                onToggleFilter={toggleFormat}
+                overlay={overlay}
+                onOverlayChange={setOverlay}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+              />
           )}
         </div>
+        </div>
+        {/* End sticky header */}
+        {frontfolioOpen && (
+        <div className="px-8 pb-7 pt-5">
+              {filteredAssets.length > 0 && <PhotosGrid assets={filteredAssets} recentIds={recentIds} viewMode={viewMode} overlay={overlay} />}
+              {showStories && publicStories.length > 0 && (
+                <div className={filteredAssets.length > 0 ? 'mt-8' : ''}>
+                  <StoriesGrid stories={publicStories} viewMode={viewMode} profile={profile} />
+                </div>
+              )}
+              {showCollections && publicCollections.length > 0 && (
+                <div className={(filteredAssets.length > 0 || showStories) ? 'mt-8' : ''}>
+                  <CollectionsGrid collections={publicCollections} viewMode={viewMode} />
+                </div>
+              )}
+        </div>
+        )}
 
         <FrontfolioFooter />
         </main>
@@ -169,35 +303,6 @@ export default function FrontfolioPage() {
     </div>
   )
 }
-
-// ══════════════════════════════════════════════════════
-// TOP NAV
-// ══════════════════════════════════════════════════════
-
-function FrontfolioFormatBar({ formatFilters, toggleFormat }: { formatFilters: Set<string>; toggleFormat: (f: string) => void }) {
-  return (
-    <div className="border-b border-black/10 bg-white shrink-0">
-      <div className="px-6 flex items-center gap-1 h-10 flex-wrap">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-black mr-2">Frontfolio</span>
-        <span className="text-black/20 mr-1">|</span>
-        {FRONTFOLIO_FORMATS.map(f => (
-          <button
-            key={f}
-            onClick={() => toggleFormat(f)}
-            className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 transition-colors ${
-              formatFilters.has(f)
-                ? 'text-[#0000ff]'
-                : 'text-black/30 hover:text-black'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 
 const ALL_FORMATS = ['photo', 'video', 'audio', 'text', 'infographic', 'illustration', 'vector'] as const
 
@@ -241,8 +346,10 @@ function getSocialPlatform(url: string): { icon: React.ReactNode; bg: string } {
   }
 }
 
-function CreatorDetailRail({ profile }: {
-  profile: typeof mockCreatorProfile
+function CreatorDetailRail({ profile, connectionCount, isSelfView }: {
+  profile: CreatorProfile
+  connectionCount: number
+  isSelfView: boolean
 }) {
   return (
     <aside className="w-80 border-r-2 border-black bg-white shrink-0 overflow-y-auto">
@@ -272,18 +379,21 @@ function CreatorDetailRail({ profile }: {
               </div>
             )}
             <h1 className="text-lg font-black text-black tracking-tight leading-none">{profile.displayName}</h1>
+            {isSelfView && (
+              <span className="ml-auto">
+                <EditPencil section="overview" label="name, title, biography" />
+              </span>
+            )}
           </div>
           <p className="text-[10px] text-black/40 uppercase tracking-widest font-bold leading-none">{profile.professionalTitle}</p>
 
           <div className="flex items-center gap-2 mt-2">
             <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 text-black/30 shrink-0"><path d="M8 1C5 1 2.5 3.5 2.5 6.5 2.5 10.5 8 15 8 15s5.5-4.5 5.5-8.5C13.5 3.5 11 1 8 1z" stroke="currentColor" strokeWidth="1.5" /><circle cx="8" cy="6.5" r="2" stroke="currentColor" strokeWidth="1.5" /></svg>
-            <span className="text-[10px] text-black/40 leading-none">Hong Kong, CN</span>
-            {['🇨🇳', '🇭🇰', '🇹🇼'].map((f, i) => <span key={i} className="text-[11px] leading-none">{f}</span>)}
+            <span className="text-[10px] text-black/40 leading-none">{profile.locationBase}</span>
           </div>
 
           <div className="flex items-center gap-3 mt-2 text-[9px] text-black/30">
-            <span><strong className="text-black font-bold">{mockFollowState.followers}</strong> followers</span>
-            <span><strong className="text-black font-bold">{mockFollowState.following}</strong> following</span>
+            <span><strong className="text-black font-bold">{connectionCount}</strong> connections</span>
           </div>
 
           <ExpandableBio text={profile.biography} maxLines={2} />
@@ -293,7 +403,7 @@ function CreatorDetailRail({ profile }: {
         <div className="px-5 pb-4 flex flex-col gap-2">
           <HeaderAssignButton />
           <a href={`/messages?to=${profile.username}`} className="h-11 flex items-center justify-center text-[10px] font-bold uppercase tracking-[0.12em] border-2 border-black bg-white text-black hover:bg-black hover:text-white transition-colors w-full">Message</a>
-          <FollowButton />
+          <ConnectButton />
 
           {/* Social icons */}
           <div className="flex items-center gap-1.5 mt-1">
@@ -317,68 +427,90 @@ function CreatorDetailRail({ profile }: {
       {/* ── DETAIL SECTIONS ── */}
       <div className="px-5 py-4 flex flex-col gap-4">
         {/* Skill pool */}
-        <div className="border-t border-black/10 pt-3">
-          <span className="text-[8px] font-bold uppercase tracking-widest text-black/30 block mb-2">Skill pool</span>
-          <div className="flex flex-wrap gap-[3px]">
-            {[...profile.specialisations, ...profile.skills].map((s, i) => (
-              <span key={i} className="border-2 border-black text-[7px] font-bold uppercase tracking-[0.08em] text-black px-1.5 py-[2px] leading-tight truncate">{s}</span>
-            ))}
+        {(isSelfView || [...(profile.specialisations ?? []), ...(profile.skills ?? [])].length > 0) && (
+          <div className="border-t border-black/10 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[8px] font-bold uppercase tracking-widest text-black/30">Skill pool</span>
+              {isSelfView && <EditPencil section="practice" label="skills" />}
+            </div>
+            <div className="flex flex-wrap gap-[3px]">
+              {[...(profile.specialisations ?? []), ...(profile.skills ?? [])].map((s, i) => (
+                <span key={i} className="border-2 border-black text-[7px] font-bold uppercase tracking-[0.08em] text-black px-1.5 py-[2px] leading-tight truncate">{s}</span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Coverage & specializations */}
-        <div className="border-t border-black/10 pt-3">
-          <span className="text-[8px] font-bold uppercase tracking-widest text-black/30 block mb-2">Coverage & specializations</span>
-          <div className="flex flex-wrap gap-[3px]">
-            {[...new Set([...profile.coverageAreas, ...profile.specialisations])].map((item, i) => (
-              <span key={i} className="border-2 border-black text-[7px] font-bold uppercase tracking-[0.08em] text-black px-1.5 py-[2px] leading-tight truncate">{item}</span>
-            ))}
+        {(isSelfView || [...new Set([...(profile.coverageAreas ?? []), ...(profile.specialisations ?? [])])].length > 0) && (
+          <div className="border-t border-black/10 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[8px] font-bold uppercase tracking-widest text-black/30">Coverage & specializations</span>
+              {isSelfView && <EditPencil section="coverage" label="coverage areas" />}
+            </div>
+            <div className="flex flex-wrap gap-[3px]">
+              {[...new Set([...(profile.coverageAreas ?? []), ...(profile.specialisations ?? [])])].map((item, i) => (
+                <span key={i} className="border-2 border-black text-[7px] font-bold uppercase tracking-[0.08em] text-black px-1.5 py-[2px] leading-tight truncate">{item}</span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Affiliations & accreditations */}
-        <div className="border-t border-black/10 pt-3">
-          <span className="text-[8px] font-bold uppercase tracking-widest text-black/30 block mb-2">Affiliations & accreditations</span>
-          <div className="flex flex-col gap-1">
-            {profile.mediaAffiliations.map((a, i) => (
-              <span key={`a-${i}`} className="text-[9px] font-bold text-black leading-tight">{a}</span>
-            ))}
-            {profile.pressAccreditations.map((a, i) => (
-              <span key={`p-${i}`} className="text-[9px] text-black/50 leading-tight">{a}</span>
-            ))}
+        {(isSelfView || (profile.mediaAffiliations?.length ?? 0) + (profile.pressAccreditations?.length ?? 0) > 0) && (
+          <div className="border-t border-black/10 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[8px] font-bold uppercase tracking-widest text-black/30">Affiliations & accreditations</span>
+              {isSelfView && <EditPencil section="press" label="press record" />}
+            </div>
+            <div className="flex flex-col gap-1">
+              {(profile.mediaAffiliations ?? []).map((a, i) => (
+                <span key={`a-${i}`} className="text-[9px] font-bold text-black leading-tight">{a}</span>
+              ))}
+              {(profile.pressAccreditations ?? []).map((a, i) => (
+                <span key={`p-${i}`} className="text-[9px] text-black/50 leading-tight">{a}</span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Published works */}
-        <div className="border-t border-black/10 pt-3">
-          <span className="text-[8px] font-bold uppercase tracking-widest text-black/30 block mb-2">Published works</span>
-          <div className="flex flex-col gap-2.5">
-            {profile.publishedIn.map((pub, i) => {
-              const pubMeta = PUBLICATION_META[pub] || { type: 'Magazine', color: 'bg-black/5', desc: 'Editorial contributions' }
-              return (
-                <div key={i} className="flex items-start gap-2.5 group cursor-pointer">
-                  <div className={`w-8 h-10 ${pubMeta.color} border border-black/10 flex items-center justify-center shrink-0`}>
-                    <span className="text-[5px] font-black text-black/40 uppercase leading-none tracking-tight">{pub.slice(0, 3)}</span>
+        {(isSelfView || (profile.publishedIn?.length ?? 0) > 0) && (
+          <div className="border-t border-black/10 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[8px] font-bold uppercase tracking-widest text-black/30">Published works</span>
+              {isSelfView && <EditPencil section="press" label="published in" />}
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {(profile.publishedIn ?? []).map((pub, i) => {
+                const pubMeta = PUBLICATION_META[pub] || { type: 'Magazine', color: 'bg-black/5', desc: 'Editorial contributions' }
+                return (
+                  <div key={i} className="flex items-start gap-2.5 group cursor-pointer">
+                    <div className={`w-8 h-10 ${pubMeta.color} border border-black/10 flex items-center justify-center shrink-0`}>
+                      <span className="text-[5px] font-black text-black/40 uppercase leading-none tracking-tight">{pub.slice(0, 3)}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] font-bold text-black leading-none group-hover:text-[#0000ff] transition-colors">{pub}</p>
+                      <p className="text-[7px] text-black/25 uppercase tracking-wider mt-0.5">{pubMeta.type}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[9px] font-bold text-black leading-none group-hover:text-[#0000ff] transition-colors">{pub}</p>
-                    <p className="text-[7px] text-black/25 uppercase tracking-wider mt-0.5">{pubMeta.type}</p>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Last verified + disclaimer */}
-        <div className="border-t border-black/10 pt-3">
-          <span className="font-mono text-[9px] text-black/30">
-            Last verified: {new Date(profile.lastVerifiedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}
-          </span>
-          <p className="text-[8px] text-black/20 leading-relaxed mt-2">
-            Frontfiles certifies provenance and file history. It does not verify factual accuracy or act as an editorial truth authority.
-          </p>
-        </div>
+        {profile.lastVerifiedAt && (
+          <div className="border-t border-black/10 pt-3">
+            <span className="font-mono text-[9px] text-black/30">
+              Last verified: {new Date(profile.lastVerifiedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}
+            </span>
+            <p className="text-[8px] text-black/20 leading-relaxed mt-2">
+              Frontfiles certifies provenance and file history. It does not verify factual accuracy or act as an editorial truth authority.
+            </p>
+          </div>
+        )}
       </div>
     </aside>
   )
@@ -400,16 +532,32 @@ const PUBLICATION_META: Record<string, { type: string; color: string; desc: stri
 }
 
 // ══════════════════════════════════════════════════════
-// EDIT PENCIL — 1st person view section edit icon
+// EDIT PENCIL — self-view section edit affordance
+//
+// Phase C: the pencil is now a real deep link into the
+// `/account/profile` editor, driven by an `?section=` query
+// param so the editor can scroll the matching section into
+// view. It is only rendered when the page computes
+// `isSelfView` — see `FrontfolioPage` for the comparison.
 // ══════════════════════════════════════════════════════
 
-function EditPencil() {
+type ProfileEditorSection = 'overview' | 'coverage' | 'press' | 'practice'
+
+function EditPencil({ section, label }: {
+  section: ProfileEditorSection
+  label: string
+}) {
   return (
-    <button className="w-5 h-5 flex items-center justify-center text-black/15 hover:text-[#0000ff] transition-colors shrink-0" title="Edit">
+    <Link
+      href={`/account/profile?section=${section}`}
+      title={`Edit ${label}`}
+      aria-label={`Edit ${label}`}
+      className="w-5 h-5 flex items-center justify-center text-black/30 hover:text-[#0000ff] transition-colors shrink-0 border border-transparent hover:border-[#0000ff]"
+    >
       <svg viewBox="0 0 14 14" fill="none" className="w-3 h-3">
         <path d="M10.5 1.5l2 2-8 8H2.5v-2l8-8z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-    </button>
+    </Link>
   )
 }
 
@@ -432,23 +580,56 @@ function HeaderAssignButton() {
 }
 
 // ══════════════════════════════════════════════════════
-// FOLLOW BUTTON
+// CONNECT BUTTON (inline — frontfolio header variant)
 // ══════════════════════════════════════════════════════
 
-function FollowButton() {
-  const [following, setFollowing] = useState(false)
+function ConnectButton() {
+  const [state, setState] = useState<'disconnected' | 'connected' | 'blocked'>('disconnected')
+  const [showMenu, setShowMenu] = useState(false)
+
+  function handleClick() {
+    if (state === 'disconnected') setState('connected')
+    else if (state === 'connected') setShowMenu(m => !m)
+  }
+
   return (
-    <button
-      onClick={() => setFollowing(f => !f)}
-      className={cn(
-        'h-11 w-full text-[10px] font-bold uppercase tracking-[0.12em] transition-colors border-2',
-        following
-          ? 'bg-[#0000ff] text-white border-[#0000ff] hover:bg-[#0000cc]'
-          : 'bg-white text-black border-black hover:bg-black hover:text-white'
+    <div className="relative">
+      <button
+        onClick={handleClick}
+        className={cn(
+          'h-11 w-full text-[10px] font-bold uppercase tracking-[0.12em] transition-colors border-2 flex items-center justify-center gap-2',
+          state === 'connected'
+            ? 'bg-[#0000ff] text-white border-[#0000ff] hover:bg-[#0000cc]'
+            : state === 'blocked'
+            ? 'bg-white text-black/30 border-black/20'
+            : 'bg-white text-[#0000ff] border-[#0000ff] hover:bg-[#0000ff] hover:text-white'
+        )}
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M13 2L4.09 12.64a1 1 0 0 0 .78 1.63H11l-1 7.73L19.91 11.36a1 1 0 0 0-.78-1.63H13l1-7.73z" />
+        </svg>
+        {state === 'connected' ? 'Connected' : state === 'blocked' ? 'Blocked' : 'Connect'}
+      </button>
+      {showMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+          <div className="absolute top-full left-0 right-0 mt-1 z-50 border-2 border-black bg-white shadow-lg">
+            <button
+              onClick={() => { setState('disconnected'); setShowMenu(false) }}
+              className="w-full px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-black hover:bg-black/5 transition-colors text-left"
+            >
+              Disconnect
+            </button>
+            <button
+              onClick={() => { setState('blocked'); setShowMenu(false) }}
+              className="w-full px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-red-600 hover:bg-red-50 transition-colors text-left border-t border-black/10"
+            >
+              Block connections
+            </button>
+          </div>
+        </>
       )}
-    >
-      {following ? 'Following' : 'Follow'}
-    </button>
+    </div>
   )
 }
 
@@ -481,62 +662,10 @@ function ExpandableBio({ text, maxLines = 2 }: { text: string; maxLines?: number
 }
 
 // ══════════════════════════════════════════════════════
-// TAB BUTTON — decisive active state
-// ══════════════════════════════════════════════════════
-
-function TabBtn({ label, count, active, onClick }: { label: string; count?: number; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'px-4 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors relative -mb-[2px]',
-        active
-          ? 'text-[#0000ff] border-b-[3px] border-[#0000ff]'
-          : 'text-black/25 hover:text-black/50 border-b-[3px] border-transparent'
-      )}
-    >
-      {label}
-      {count !== undefined && <span className={cn('ml-1 text-[9px] font-mono', active ? 'text-[#0000ff]/70' : 'text-black/15')}>{count}</span>}
-    </button>
-  )
-}
-
-// ══════════════════════════════════════════════════════
-// VIEW TOGGLES
-// ══════════════════════════════════════════════════════
-
-function ViewToggles({ viewMode, setViewMode }: { viewMode: 'grid4' | 'grid2' | 'grid1' | 'list'; setViewMode: (m: 'grid4' | 'grid2' | 'grid1' | 'list') => void }) {
-  return (
-    <div className="flex items-center gap-0 border-2 border-black">
-      {([
-        ['grid4', <><span className="grid grid-cols-2 gap-[2px] w-3 h-3"><span className="bg-current" /><span className="bg-current" /><span className="bg-current" /><span className="bg-current" /></span></>],
-        ['grid2', <><span className="grid grid-cols-2 gap-[2px] w-3 h-3"><span className="bg-current col-span-1 row-span-2 h-3" /><span className="bg-current col-span-1 row-span-2 h-3" /></span></>],
-        ['grid1', <><span className="flex flex-col gap-[2px] w-3 h-3"><span className="bg-current flex-1" /></span></>],
-        ['list', <><span className="flex flex-col gap-[2px] w-3 h-3"><span className="bg-current h-[2px]" /><span className="bg-current h-[2px]" /><span className="bg-current h-[2px]" /></span></>],
-      ] as [string, React.ReactNode][]).map(([mode, icon], i) => (
-        <button
-          key={mode}
-          onClick={() => setViewMode(mode as typeof viewMode)}
-          className={`w-8 h-8 flex items-center justify-center transition-colors ${
-            i > 0 ? 'border-l border-black/10' : ''
-          } ${
-            viewMode === mode
-              ? 'bg-[#0000ff] text-white'
-              : 'bg-white text-black/30 hover:text-black'
-          }`}
-        >
-          {icon}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════
 // PHOTOS GRID — 4 columns, archive-wall density
 // ══════════════════════════════════════════════════════
 
-function PhotoAssetCard({ asset, isNew, hoverEnabled = true }: { asset: VaultAsset; isNew: boolean; hoverEnabled?: boolean }) {
+function PhotoAssetCard({ asset, isNew, overlay = 'data' }: { asset: VaultAsset; isNew: boolean; overlay?: OverlayMode }) {
   const [showPreview, setShowPreview] = useState(false)
   const [hovering, setHovering] = useState(false)
   const [audioPlaying, setAudioPlaying] = useState(false)
@@ -546,25 +675,22 @@ function PhotoAssetCard({ asset, isNew, hoverEnabled = true }: { asset: VaultAss
   const hasVideo = !!asset.videoUrl
   const hasAudio = !!asset.audioUrl
   const hasText = asset.format === 'text' && !!asset.textExcerpt
-  const [textContent, setTextContent] = useState<string | null>(null)
+  // Text preview uses asset.textExcerpt — full text is original-only.
 
   const handleMouseEnter = useCallback(() => {
-    if (!hoverEnabled) return
+    if (overlay === 'off') return
     setHovering(true)
     if (!hasVideo && !hasAudio && !hasText) {
       timerRef.current = setTimeout(() => setShowPreview(true), 400)
     }
     if (hasText) {
       timerRef.current = setTimeout(() => setShowPreview(true), 400)
-      if (!textContent && asset.textUrl) {
-        fetch(asset.textUrl).then(r => r.text()).then(t => setTextContent(t)).catch(() => {})
-      }
     }
     if (hasAudio && audioRef.current) {
       audioRef.current.play().catch(() => {})
       setAudioPlaying(true)
     }
-  }, [hoverEnabled, hasVideo, hasAudio, hasText, textContent, asset.textUrl])
+  }, [overlay, hasVideo, hasAudio, hasText, asset.id])
   const handleMouseLeave = useCallback(() => {
     setHovering(false)
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -601,7 +727,7 @@ function PhotoAssetCard({ asset, isNew, hoverEnabled = true }: { asset: VaultAss
             <>
               {/* Video frame as base thumbnail — always present */}
               <video
-                src={asset.videoUrl!}
+                src={resolveProtectedMediaUrl(asset.id, 'video', 'preview')}
                 muted
                 preload="metadata"
                 onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5 }}
@@ -611,7 +737,7 @@ function PhotoAssetCard({ asset, isNew, hoverEnabled = true }: { asset: VaultAss
               {hovering && (
                 <video
                   ref={handleVideoReady}
-                  src={asset.videoUrl!}
+                  src={resolveProtectedMediaUrl(asset.id, 'video', 'preview')}
                   muted
                   loop
                   playsInline
@@ -621,7 +747,7 @@ function PhotoAssetCard({ asset, isNew, hoverEnabled = true }: { asset: VaultAss
             </>
           ) : hasAudio ? (
             <div className="w-full h-full bg-black flex flex-col items-center justify-center gap-3 relative">
-              <audio ref={audioRef} src={asset.audioUrl!} preload="metadata" />
+              <audio ref={audioRef} src={resolveProtectedMediaUrl(asset.id, 'audio', 'preview')} preload="metadata" />
               {/* Play/pause indicator */}
               {!audioPlaying && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
@@ -646,18 +772,18 @@ function PhotoAssetCard({ asset, isNew, hoverEnabled = true }: { asset: VaultAss
               <style>{`@keyframes audioBar { 0% { transform: scaleY(0.4); } 100% { transform: scaleY(1); } }`}</style>
             </div>
           ) : hasText ? (
-            <div className="w-full h-full bg-white px-4 py-3 overflow-hidden relative flex flex-col">
-              <h4 className="text-[9px] font-bold text-black leading-tight line-clamp-2">{asset.title}</h4>
-              <p className="text-[7px] text-black/40 mt-0.5 line-clamp-1">{asset.description}</p>
-              <p className="text-[7px] leading-[1.5] text-black/50 font-serif mt-1.5 line-clamp-3 flex-1">{asset.textExcerpt}</p>
-              <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white to-transparent" />
+            <div className="w-full h-full bg-stone-50 overflow-hidden relative flex items-center justify-center px-6 py-6">
+              <div className="w-full max-w-[90%] text-center">
+                <p className="text-[12px] leading-[1.7] text-black/50 font-serif italic line-clamp-5">{asset.textExcerpt}</p>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-stone-50 to-transparent" />
             </div>
           ) : (asset.format === 'illustration' || asset.format === 'infographic' || asset.format === 'vector') && asset.illustrationUrl ? (
             <div className="w-full h-full bg-white flex items-center justify-center p-2">
-              <img src={asset.illustrationUrl} alt={asset.title} className="max-w-full max-h-full object-contain" />
+              <img src={resolveProtectedMediaUrl(asset.id, 'illustration', 'lightbox-preview')} alt={asset.title} className="max-w-full max-h-full object-contain" />
             </div>
-          ) : asset.thumbnailUrl ? (
-            <img src={asset.thumbnailUrl} alt={asset.title} className="w-full h-full object-cover object-center" />
+          ) : asset.id ? (
+            <img src={resolveProtectedUrl(asset.id, 'thumbnail')} alt={asset.title} className="w-full h-full object-cover object-center" />
           ) : (
             <div className="w-full h-full flex items-center justify-center"><span className="text-xs font-bold font-mono text-black/20">{asset.format.toUpperCase()}</span></div>
           )}
@@ -688,11 +814,11 @@ function PhotoAssetCard({ asset, isNew, hoverEnabled = true }: { asset: VaultAss
                 <span className="text-[80px] font-black uppercase tracking-[0.2em] text-black/[0.04] rotate-[-30deg] whitespace-nowrap select-none">LICENSABLE</span>
               </div>
               <p className="text-[13px] leading-[1.8] text-black/80 font-serif whitespace-pre-line relative z-10">
-                {textContent || asset.textExcerpt}
+                {asset.textExcerpt}
               </p>
             </div>
           ) : (
-            asset.thumbnailUrl && <img src={asset.thumbnailUrl} alt={asset.title} className="max-w-[85vw] max-h-[85vh] object-contain" />
+            asset.id && <img src={resolveProtectedUrl(asset.id, 'lightbox-preview')} alt={asset.title} className="max-w-[85vw] max-h-[85vh] object-contain" />
           )}
         </div>,
         document.body
@@ -701,14 +827,9 @@ function PhotoAssetCard({ asset, isNew, hoverEnabled = true }: { asset: VaultAss
   )
 }
 
-function PhotosGrid({ assets, recentIds, viewMode, hoverEnabled }: { assets: VaultAsset[]; recentIds: Set<string>; viewMode: 'grid4' | 'grid2' | 'grid1' | 'list'; hoverEnabled: boolean }) {
+function PhotosGrid({ assets, recentIds, viewMode, overlay }: { assets: VaultAsset[]; recentIds: Set<string>; viewMode: 'grid4' | 'grid2' | 'grid1' | 'list'; overlay: OverlayMode }) {
   return (
-    <div className={
-      viewMode === 'grid4' ? 'grid grid-cols-4 gap-[3px]' :
-      viewMode === 'grid2' ? 'grid grid-cols-2 gap-4' :
-      viewMode === 'grid1' ? 'grid grid-cols-1 gap-4' :
-      'flex flex-col gap-2'
-    }>
+    <div className={cn(gridLayoutClass(viewMode), viewMode === 'grid4' && 'gap-[3px]')}>
       {assets.map(asset => {
         const isNew = recentIds.has(asset.id)
 
@@ -720,8 +841,8 @@ function PhotosGrid({ assets, recentIds, viewMode, hoverEnabled }: { assets: Vau
               className="flex items-center gap-4 border-b border-black/10 py-2 group hover:bg-black/[0.02] transition-colors"
             >
               <div className="w-16 h-12 shrink-0 overflow-hidden bg-black/5">
-                {asset.thumbnailUrl ? (
-                  <img src={asset.thumbnailUrl} alt={asset.title} className="w-full h-full object-cover object-center" />
+                {asset.id ? (
+                  <img src={resolveProtectedUrl(asset.id, 'thumbnail')} alt={asset.title} className="w-full h-full object-cover object-center" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center"><span className="text-[8px] font-bold font-mono text-black/20">{asset.format.toUpperCase()}</span></div>
                 )}
@@ -739,7 +860,7 @@ function PhotosGrid({ assets, recentIds, viewMode, hoverEnabled }: { assets: Vau
           )
         }
 
-        return <PhotoAssetCard key={asset.id} asset={asset} isNew={isNew} hoverEnabled={hoverEnabled} />
+        return <PhotoAssetCard key={asset.id} asset={asset} isNew={isNew} overlay={overlay} />
       })}
     </div>
   )
@@ -749,17 +870,11 @@ function PhotosGrid({ assets, recentIds, viewMode, hoverEnabled }: { assets: Vau
 // STORIES GRID — 3 columns, coverage-unit cards
 // ══════════════════════════════════════════════════════
 
-function StoriesGrid({ stories: storyList, viewMode }: { stories: Story[]; viewMode: 'grid4' | 'grid2' | 'grid1' | 'list' }) {
-  const profile = mockCreatorProfile
+function StoriesGrid({ stories: storyList, viewMode, profile }: { stories: Story[]; viewMode: 'grid4' | 'grid2' | 'grid1' | 'list'; profile: CreatorProfile }) {
   return (
-    <div className={
-      viewMode === 'grid4' ? 'grid grid-cols-4 gap-4' :
-      viewMode === 'grid2' ? 'grid grid-cols-2 gap-4' :
-      viewMode === 'grid1' ? 'grid grid-cols-1 gap-4' :
-      'flex flex-col gap-2'
-    }>
+    <div className={gridLayoutClass(viewMode)}>
       {storyList.map(story => {
-        const social = mockSocialCounts[story.id]
+        const social = socialCounts[story.id]
 
         if (viewMode === 'list') {
           return (
@@ -798,12 +913,7 @@ function StoriesGrid({ stories: storyList, viewMode }: { stories: Story[]; viewM
 
 function CollectionsGrid({ collections, viewMode }: { collections: Collection[]; viewMode: 'grid4' | 'grid2' | 'grid1' | 'list' }) {
   return (
-    <div className={
-      viewMode === 'grid4' ? 'grid grid-cols-4 gap-4' :
-      viewMode === 'grid2' ? 'grid grid-cols-2 gap-4' :
-      viewMode === 'grid1' ? 'grid grid-cols-1 gap-4' :
-      'flex flex-col gap-2'
-    }>
+    <div className={gridLayoutClass(viewMode)}>
       {collections.map(coll => {
         if (viewMode === 'list') {
           return (
@@ -832,7 +942,7 @@ function CollectionsGrid({ collections, viewMode }: { collections: Collection[];
 // STORY CARD WITH PREVIEW — hover popup
 // ══════════════════════════════════════════════════════
 
-function StoryCardWithPreview({ story, social, profile }: { story: Story; social: any; profile: typeof mockCreatorProfile }) {
+function StoryCardWithPreview({ story, social, profile }: { story: Story; social: any; profile: CreatorProfile }) {
   const [showPreview, setShowPreview] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handleMouseEnter = useCallback(() => { timerRef.current = setTimeout(() => setShowPreview(true), 400) }, [])

@@ -10,7 +10,7 @@ export function ContinueSearchCard({ query, label }: ContinueSearchCardProps) {
   return (
     <Link
       href={href}
-      className="block border-2 border-black p-6 hover:bg-black hover:text-white transition-colors group"
+      className="block border border-black/15 p-6 hover:bg-black hover:text-white transition-colors group"
     >
       <span className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] group-hover:text-[#0000ff]/20">Continue discovery</span>
       <p className="mt-2 text-sm font-bold">{label || 'Open FrontSearch'}</p>

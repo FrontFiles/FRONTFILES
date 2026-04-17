@@ -8,6 +8,7 @@ import { creators, creatorMap } from '@/data/creators'
 import { searchableAssets, type AssetData } from '@/data/assets'
 import { stories, storyMap, type StoryData } from '@/data/stories'
 import { geographies, geographyMap, type Geography } from '@/data/geographies'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 
 // ── Enriched types for the search surface ──
 
@@ -71,7 +72,9 @@ function getInitials(name: string): string {
 }
 
 // ── Helper: get creator coordinates from location string ──
-const CREATOR_COORDS: Record<string, [number, number]> = {
+// Exported so the Discovery search page can resolve feedItem creator points
+// without duplicating the lookup table.
+export const CREATOR_COORDS: Record<string, [number, number]> = {
   'Porto Alegre, Brazil': [-30.03, -51.23],
   'Lisbon, Portugal': [38.72, -9.14],
   'Alexandroupoli, Greece': [40.85, 25.87],
@@ -92,6 +95,12 @@ const CREATOR_COORDS: Record<string, [number, number]> = {
   'Mexico City, Mexico': [19.43, -99.13],
   'Nairobi, Kenya': [-1.29, 36.82],
   'Sydney, Australia': [-33.87, 151.21],
+  'Lagos, Nigeria': [6.52, 3.38],
+  'Bamako, Mali': [12.65, -8.00],
+  'Mogadishu, Somalia': [2.05, 45.34],
+  "Sana'a, Yemen": [15.35, 44.21],
+  'Addis Ababa, Ethiopia': [9.03, 38.74],
+  'Port Sudan, Sudan': [19.62, 37.22],
 }
 
 // ── Helper: convert AssetData to SampleAsset ──
@@ -99,7 +108,7 @@ function toSampleAsset(a: AssetData): SampleAsset {
   return {
     id: a.id,
     title: a.title,
-    thumbnailUrl: a.thumbnailRef,
+    thumbnailUrl: resolveProtectedUrl(a.id, 'thumbnail'),
     format: a.format,
     locationLabel: a.locationLabel,
     validationDeclaration: a.validationDeclaration,
@@ -162,10 +171,77 @@ export function getSearchStories(): SearchStory[] {
   })
 }
 
+// ── Geo context parsing from free-text query ──
+// Fallback resolver: walks the canonical geographies + creator coords and
+// returns the first textual match, if any. Discovery should PREFER a
+// structured geo source (URL param, filter state, etc.) when one exists and
+// only fall back to this parser when nothing structured is available.
+
+export interface GeoContext {
+  label: string
+  lat: number
+  lng: number
+  geoId: string | null
+  /** 'structured' if sourced from filter state, 'parsed' if inferred from q. */
+  source: 'structured' | 'parsed'
+}
+
+export function parseGeoContextFromQuery(q: string | null | undefined): GeoContext | null {
+  if (!q) return null
+  const lower = q.toLowerCase()
+
+  // 1) Full location labels (most specific first — labels are longer than countries).
+  for (const g of geographies) {
+    if (!g.locationLabel) continue
+    if (lower.includes(g.locationLabel.toLowerCase())) {
+      return { label: g.locationLabel, lat: g.lat, lng: g.lng, geoId: g.id, source: 'parsed' }
+    }
+  }
+
+  // 2) City names (when labels embed them — catches 'lisbon' matching 'Lisbon, Portugal').
+  for (const g of geographies) {
+    if (!g.city) continue
+    if (lower.includes(g.city.toLowerCase())) {
+      return { label: g.locationLabel || g.city, lat: g.lat, lng: g.lng, geoId: g.id, source: 'parsed' }
+    }
+  }
+
+  // 3) Country names.
+  for (const g of geographies) {
+    if (!g.country) continue
+    if (lower.includes(g.country.toLowerCase())) {
+      return { label: g.country, lat: g.lat, lng: g.lng, geoId: g.id, source: 'parsed' }
+    }
+  }
+
+  // 4) Region names (when distinct from country).
+  for (const g of geographies) {
+    if (!g.region || g.region === g.country) continue
+    if (lower.includes(g.region.toLowerCase())) {
+      return { label: g.region, lat: g.lat, lng: g.lng, geoId: g.id, source: 'parsed' }
+    }
+  }
+
+  // 5) Creator base-city fallback (covers cities present in CREATOR_COORDS
+  //    but not in the geography reference).
+  for (const [key, [lat, lng]] of Object.entries(CREATOR_COORDS)) {
+    const city = key.split(',')[0].trim().toLowerCase()
+    if (city && lower.includes(city)) {
+      return { label: key, lat, lng, geoId: null, source: 'parsed' }
+    }
+  }
+
+  return null
+}
+
 // ── Asset clusters by geography ──
-export function getSearchAssetClusters(): SearchAssetCluster[] {
+export function getSearchAssetClusters(formatFilter?: string): SearchAssetCluster[] {
+  const filtered = formatFilter && formatFilter !== 'All'
+    ? discoveryAssets.filter(a => a.format.toLowerCase() === formatFilter.toLowerCase())
+    : discoveryAssets
+
   const byGeo = new Map<string, AssetData[]>()
-  for (const a of discoveryAssets) {
+  for (const a of filtered) {
     const list = byGeo.get(a.geography) ?? []
     list.push(a)
     byGeo.set(a.geography, list)

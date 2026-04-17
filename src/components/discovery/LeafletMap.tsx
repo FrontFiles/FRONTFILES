@@ -5,6 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { MapPoint, MapMode } from './DiscoveryMap'
 import { BLUR_PLACEHOLDER } from './Avatar'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 
 // ══════════════════════════════════════════════════════
 // LEAFLET MAP — real cartography with monochrome tiles
@@ -15,15 +16,19 @@ import { BLUR_PLACEHOLDER } from './Avatar'
 const TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
 const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
 
+export interface MapBounds { north: number; south: number; east: number; west: number }
+
 interface LeafletMapProps {
   points: MapPoint[]
   selectedId: string | null
   hoveredId: string | null
   onSelect: (id: string | null) => void
   onHover: (id: string | null) => void
+  onHoverPosition?: (data: { id: string; x: number; y: number } | null) => void
   mode: MapMode
   mapSize?: 'hidden' | 'small' | 'large'
   formatFilter?: string
+  onBoundsChange?: (bounds: MapBounds) => void
 }
 
 // Format-specific SVG icons (24x24 viewBox, white fill)
@@ -49,89 +54,100 @@ function getFormatIcon(formats?: string[]): string {
 }
 
 function createMarkerIcon(point: MapPoint, mode: MapMode, isSelected: boolean, isHovered: boolean, formatFilter?: string): L.DivIcon {
-  const size = mode === 'assets' ? Math.min(14 + (point.count ?? 0) * 1.5, 36) : 14
+  // ── Tiny asset-card marker for all point types ──
+  // Every marker is a square thumbnail tile — a miniature Frontfiles asset card.
+  // Creator markers use the avatar; asset/story markers use the first sample asset thumbnail.
 
-  if (mode === 'creators') {
-    const borderColor = isSelected ? '#2563eb' : isHovered ? '#000' : 'rgba(0,0,0,0.3)'
-    const borderWidth = isSelected ? '3px' : isHovered ? '2px' : '1.5px'
-    const s = point.avatarUrl ? (isSelected ? size + 10 : isHovered ? size + 6 : size + 2) : (isSelected ? size + 8 : isHovered ? size + 4 : size)
-    const imgSrc = point.avatarUrl || BLUR_PLACEHOLDER
-    const blurStyle = point.avatarUrl ? '' : 'filter:blur(1px);'
+  const isCreator = point.pointType === 'creator' || mode === 'creators'
+
+  // Size: compact square, slightly larger for selected/hovered
+  const s = isSelected ? 40 : isHovered ? 36 : 32
+
+  // Image source: creator avatar or first sample asset matching the active format filter
+  const thumbSrc = isCreator
+    ? (point.avatarUrl || null)
+    : (() => {
+        const assets = point.sampleAssets || []
+        if (formatFilter && formatFilter !== 'All') {
+          const match = assets.find(a => a.format.toLowerCase() === formatFilter.toLowerCase())
+          return match ? resolveProtectedUrl(match.id, 'thumbnail') : null
+        }
+        return assets[0] ? resolveProtectedUrl(assets[0].id, 'thumbnail') : null
+      })()
+
+  // Border treatment: hard-edged, visible, editorial
+  const borderColor = isSelected ? '#000' : isHovered ? '#000' : 'rgba(0,0,0,0.35)'
+  const borderWidth = isSelected ? '2px' : '1px'
+
+  // Selected accent: thin blue top edge
+  const accentBar = isSelected
+    ? '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:#0000ff;"></div>'
+    : ''
+
+  // Count badge: small monospace count in bottom-right corner for clusters
+  const count = point.count ?? 0
+  const countBadge = count > 1
+    ? `<span style="position:absolute;bottom:0;right:0;font-size:7px;font-weight:bold;font-family:monospace;color:white;background:rgba(0,0,0,0.7);padding:0 2px;line-height:1.4;">${count}</span>`
+    : ''
+
+  if (thumbSrc) {
+    // Primary path: image-driven asset card
     return L.divIcon({
       className: 'leaflet-marker-custom',
       html: `<div style="
         width:${s}px;height:${s}px;
         border:${borderWidth} solid ${borderColor};
-        overflow:hidden;
-        ${isSelected ? 'box-shadow:0 0 0 2px #2563eb, 0 2px 8px rgba(0,0,0,0.3);' : ''}
-      "><img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;${blurStyle}" onerror="this.src='${BLUR_PLACEHOLDER}';this.style.filter='blur(1px)';" /></div>`,
+        overflow:hidden;position:relative;background:#f1f5f9;
+        ${isHovered && !isSelected ? 'transform:scale(1.06);' : ''}
+        transition:transform 0.12s;
+      "><img src="${thumbSrc}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" onerror="this.style.display='none';" />${accentBar}${countBadge}</div>`,
       iconSize: [s, s],
       iconAnchor: [s / 2, s / 2],
     })
   }
 
-  if (mode === 'assets') {
-    const bg = isSelected ? '#1d4ed8' : '#2563eb'
-    const opacity = isHovered && !isSelected ? '0.9' : isSelected ? '1' : '0.85'
-    const count = point.count ?? 0
-    const showCount = count > 1
-    const filterKey = formatFilter?.toLowerCase()
-    const iconSvg = filterKey && filterKey !== 'all' && FORMAT_ICONS[filterKey]
-      ? FORMAT_ICONS[filterKey]
-      : getFormatIcon(point.formats)
-    const iconSize = Math.round(size * 0.55)
+  // Fallback: no image — cover-card style with title text on dark background
+  if (isCreator) {
+    const initials = point.initials || point.label?.slice(0, 2).toUpperCase() || ''
     return L.divIcon({
       className: 'leaflet-marker-custom',
-      html: `<div style="
-        width:${size}px;height:${size}px;
-        background:${bg};opacity:${opacity};
-        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0px;
-        ${isSelected ? 'box-shadow:0 0 0 2px #2563eb, 0 2px 8px rgba(0,0,0,0.3);' : ''}
-        ${isHovered ? 'transform:scale(1.15);' : ''}
-        transition:transform 0.15s;
-      "><div style="width:${iconSize}px;height:${iconSize}px;">${iconSvg}</div>${showCount ? `<span style="font-size:6px;font-weight:bold;font-family:monospace;color:white;line-height:1;margin-top:-1px;">${count}</span>` : ''}</div>`,
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
+      html: `<div style="width:${s}px;height:${s}px;border:${borderWidth} solid ${borderColor};overflow:hidden;position:relative;background:#e2e8f0;display:flex;align-items:center;justify-content:center;${isHovered && !isSelected ? 'transform:scale(1.06);' : ''}transition:transform 0.12s;"><span style="font-size:9px;font-weight:900;font-family:system-ui,sans-serif;color:rgba(0,0,0,0.35);">${initials}</span>${accentBar}${countBadge}</div>`,
+      iconSize: [s, s],
+      iconAnchor: [s / 2, s / 2],
     })
   }
 
-  // Stories mode — icon varies by filter (story/article/collection)
-  const bg = isSelected ? '#1d4ed8' : '#2563eb'
-  const s = isSelected ? 20 : isHovered ? 18 : 14
-  const storyFilterKey = formatFilter?.toLowerCase()
-  const storyIcon = storyFilterKey === 'article' ? FORMAT_ICONS.article
-    : storyFilterKey === 'collection' ? FORMAT_ICONS.collection
-    : FORMAT_ICONS.story
-  const storyIconSize = Math.round(s * 0.6)
+  // Text/Audio/other assets without thumbnails — editorial cover card
+  const titleText = point.sampleAssets?.[0]?.title || point.label || ''
+  const truncTitle = titleText.length > 18 ? titleText.slice(0, 18) : titleText
+  const fmtTag = (formatFilter && formatFilter !== 'All' ? formatFilter : point.formats?.[0] || '').toUpperCase()
   return L.divIcon({
     className: 'leaflet-marker-custom',
-    html: `<div style="
-      width:${s}px;height:${s}px;
-      background:${bg};
-      display:flex;align-items:center;justify-content:center;
-      ${isSelected ? 'box-shadow:0 0 0 2px #2563eb, 0 2px 8px rgba(0,0,0,0.3);' : ''}
-      ${isHovered ? 'transform:scale(1.15);' : ''}
-      transition:transform 0.15s;
-    "><div style="width:${storyIconSize}px;height:${storyIconSize}px;">${storyIcon}</div></div>`,
+    html: `<div style="width:${s}px;height:${s}px;border:${borderWidth} solid ${borderColor};overflow:hidden;position:relative;background:#1a1a1a;display:flex;flex-direction:column;justify-content:flex-end;padding:2px;box-sizing:border-box;${isHovered && !isSelected ? 'transform:scale(1.06);' : ''}transition:transform 0.12s;"><span style="font-size:5px;font-weight:800;font-family:system-ui,sans-serif;color:#fff;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">${truncTitle}</span><span style="position:absolute;top:1px;left:2px;font-size:4px;font-weight:bold;font-family:monospace;color:rgba(255,255,255,0.4);letter-spacing:0.5px;">${fmtTag}</span>${accentBar}${countBadge}</div>`,
     iconSize: [s, s],
     iconAnchor: [s / 2, s / 2],
   })
 }
 
 function buildPopupHTML(point: MapPoint, mode: MapMode, isSelected: boolean): string {
+  const effectiveMode = point.pointType === 'creator' ? 'creators'
+    : point.pointType === 'story' ? 'stories'
+    : point.pointType === 'asset' ? 'assets'
+    : mode
+
   const trustBadgeHTML = point.trustBadge
     ? `<span style="font-size:5px;font-weight:bold;text-transform:uppercase;letter-spacing:0.3px;padding:0 2px;border:1px solid ${point.trustBadge === 'verified' ? '#2563eb' : 'rgba(0,0,0,0.2)'};color:${point.trustBadge === 'verified' ? '#2563eb' : 'rgba(0,0,0,0.4)'};margin-left:3px;">${point.trustBadge}</span>`
     : ''
 
-  const avatarImgSrc = mode === 'creators' ? (point.avatarUrl || BLUR_PLACEHOLDER) : ''
-  const avatarBlur = mode === 'creators' && !point.avatarUrl ? 'filter:blur(2px);transform:scale(1.1);' : ''
-  const avatarHTML = mode === 'creators'
+  const avatarImgSrc = effectiveMode === 'creators' ? (point.avatarUrl || BLUR_PLACEHOLDER) : ''
+  const avatarBlur = effectiveMode === 'creators' && !point.avatarUrl ? 'filter:blur(2px);transform:scale(1.1);' : ''
+  const avatarHTML = effectiveMode === 'creators'
     ? `<div style="width:16px;height:16px;flex-shrink:0;overflow:hidden;background:#e2e8f0;border:1px solid rgba(0,0,0,0.1);"><img src="${avatarImgSrc}" style="width:100%;height:100%;object-fit:cover;${avatarBlur}" onerror="this.src='${BLUR_PLACEHOLDER}';this.style.filter='blur(2px)';this.style.transform='scale(1.1)';" /></div>`
     : ''
 
-  const storyImgSrc = mode === 'stories' ? (point.creatorAvatarUrl || BLUR_PLACEHOLDER) : ''
-  const storyBlur = mode === 'stories' && !point.creatorAvatarUrl ? 'filter:blur(2px);transform:scale(1.1);' : ''
-  const storyAvatarHTML = mode === 'stories'
+  const storyImgSrc = effectiveMode === 'stories' ? (point.creatorAvatarUrl || BLUR_PLACEHOLDER) : ''
+  const storyBlur = effectiveMode === 'stories' && !point.creatorAvatarUrl ? 'filter:blur(2px);transform:scale(1.1);' : ''
+  const storyAvatarHTML = effectiveMode === 'stories'
     ? `<div style="width:12px;height:12px;flex-shrink:0;overflow:hidden;background:#e2e8f0;border:1px solid rgba(0,0,0,0.1);"><img src="${storyImgSrc}" style="width:100%;height:100%;object-fit:cover;${storyBlur}" onerror="this.src='${BLUR_PLACEHOLDER}';this.style.filter='blur(2px)';this.style.transform='scale(1.1)';" /></div>`
     : ''
 
@@ -144,22 +160,24 @@ function buildPopupHTML(point: MapPoint, mode: MapMode, isSelected: boolean): st
   const thumbsHTML = point.sampleAssets.length > 0
     ? `<div style="display:flex;gap:1px;margin-top:3px;">${point.sampleAssets.slice(0, 4).map(a =>
       `<div style="flex:1;aspect-ratio:1;overflow:hidden;background:rgba(0,0,0,0.03);border:1px solid rgba(0,0,0,0.08);position:relative;">
-        <img src="${a.thumbnailUrl}" style="width:100%;height:100%;object-fit:cover;" />
+        <img src="${resolveProtectedUrl(a.id, 'thumbnail')}" style="width:100%;height:100%;object-fit:cover;" />
         <span style="position:absolute;bottom:0;left:0;right:0;font-size:4px;font-weight:bold;text-transform:uppercase;letter-spacing:0.2px;background:rgba(0,0,0,0.7);color:white;padding:0 1px;text-align:center;line-height:1.4;">${a.format}</span>
       </div>`
     ).join('')}${point.sampleAssets.length > 4 ? `<div style="flex:1;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.02);border:1px solid rgba(0,0,0,0.08);font-size:6px;font-family:monospace;color:rgba(0,0,0,0.25);">+${point.sampleAssets.length - 4}</div>` : ''}</div>`
     : ''
 
   const contextHTML =
-    mode === 'creators' && point.specialties && point.specialties.length > 0
+    effectiveMode === 'creators' && point.specialties && point.specialties.length > 0
       ? `<div style="display:flex;flex-wrap:wrap;gap:1px;margin-top:2px;">${point.specialties.slice(0, 3).map(s => `<span style="font-size:5px;color:rgba(0,0,0,0.3);border:1px solid rgba(0,0,0,0.06);padding:0 2px;">${s}</span>`).join('')}</div>`
-      : mode === 'stories' && point.dek
+      : effectiveMode === 'stories' && point.dek
         ? `<p style="font-size:6px;color:rgba(0,0,0,0.35);line-height:1.3;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${point.dek}</p>`
-        : mode === 'assets' && point.creatorNames && point.creatorNames.length > 0
+        : effectiveMode === 'assets' && point.creatorNames && point.creatorNames.length > 0
           ? `<p style="font-size:6px;color:rgba(0,0,0,0.3);margin-top:2px;">${point.creatorNames.slice(0, 3).join(' · ')}</p>`
           : ''
 
-  const ctaText = isSelected ? 'Click "View" below' : 'Click to select'
+  const ctaText = effectiveMode === 'creators' ? 'Click to view creator'
+    : isSelected ? 'Click "View" below'
+    : 'Click to select'
 
   return `
     <div style="font-family:system-ui,-apple-system,sans-serif;min-width:120px;max-width:140px;">
@@ -186,7 +204,7 @@ function buildPopupHTML(point: MapPoint, mode: MapMode, isSelected: boolean): st
   `
 }
 
-export default function LeafletMap({ points, selectedId, hoveredId, onSelect, onHover, mode, mapSize, formatFilter }: LeafletMapProps) {
+export default function LeafletMap({ points, selectedId, hoveredId, onSelect, onHover, onHoverPosition, mode, mapSize, formatFilter, onBoundsChange }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
@@ -195,8 +213,23 @@ export default function LeafletMap({ points, selectedId, hoveredId, onSelect, on
   // Stable callback refs to avoid stale closures
   const onSelectRef = useRef(onSelect)
   const onHoverRef = useRef(onHover)
+  const onHoverPositionRef = useRef(onHoverPosition)
+  const onBoundsChangeRef = useRef(onBoundsChange)
+  const selectedIdRef = useRef(selectedId)
   useEffect(() => { onSelectRef.current = onSelect }, [onSelect])
   useEffect(() => { onHoverRef.current = onHover }, [onHover])
+  useEffect(() => { onHoverPositionRef.current = onHoverPosition }, [onHoverPosition])
+  useEffect(() => { onBoundsChangeRef.current = onBoundsChange }, [onBoundsChange])
+  useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
+
+  // Track previous state for targeted marker icon updates
+  const prevPointsRef = useRef<MapPoint[] | null>(null)
+  const prevModeRef = useRef<MapMode | null>(null)
+  const prevFilterRef = useRef<string | undefined>(undefined)
+  const prevHoveredRef = useRef<string | null>(null)
+  const prevSelectedRef = useRef<string | null>(null)
+  const pointsRef = useRef(points)
+  useEffect(() => { pointsRef.current = points }, [points])
 
   // Initialize map once
   useEffect(() => {
@@ -226,9 +259,36 @@ export default function LeafletMap({ points, selectedId, hoveredId, onSelect, on
 
     mapRef.current = map
 
+    // Fire viewport bounds on every move/zoom and on init.
+    // Defensive: the map pane's internal `_leaflet_pos` may be unset during
+    // StrictMode double-mount or on very early timer fires. Guard with a
+    // destroyed flag + try/catch and clear the init timer on cleanup so we
+    // never call getBounds() on a torn-down map.
+    let destroyed = false
+    const fireBounds = () => {
+      if (destroyed || mapRef.current !== map) return
+      try {
+        const b = map.getBounds()
+        onBoundsChangeRef.current?.({
+          north: b.getNorth(),
+          south: b.getSouth(),
+          east: b.getEast(),
+          west: b.getWest(),
+        })
+      } catch {
+        // Map not fully initialized yet (pane position unset) — skip.
+      }
+    }
+    map.on('moveend', fireBounds)
+    map.on('zoomend', fireBounds)
+    const initBoundsTimer = setTimeout(fireBounds, 200)
+
     return () => {
+      destroyed = true
+      clearTimeout(initBoundsTimer)
       map.remove()
       mapRef.current = null
+      markersRef.current.clear()
     }
   }, [])
 
@@ -238,44 +298,66 @@ export default function LeafletMap({ points, selectedId, hoveredId, onSelect, on
     setTimeout(() => mapRef.current?.invalidateSize(), 50)
   }, [mapSize])
 
-  // Update markers when points/mode/selection/hover change
+  // Update markers — recreates only when data changes; hover/selection just updates icons
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    // Clear old markers
-    markersRef.current.forEach(m => m.remove())
-    markersRef.current.clear()
+    const dataChanged = points !== prevPointsRef.current || mode !== prevModeRef.current || formatFilter !== prevFilterRef.current || markersRef.current.size === 0
 
-    // Close any open popup
-    if (popupRef.current) {
-      popupRef.current.remove()
-      popupRef.current = null
+    if (dataChanged) {
+      // Full marker recreation — data actually changed
+      markersRef.current.forEach(m => m.remove())
+      markersRef.current.clear()
+      if (popupRef.current) { popupRef.current.remove(); popupRef.current = null }
+
+      points.forEach(point => {
+        const icon = createMarkerIcon(point, mode, point.id === selectedId, point.id === hoveredId, formatFilter)
+        const marker = L.marker([point.lat, point.lng], { icon })
+
+        marker.on('click', () => {
+          onSelectRef.current(point.id === selectedIdRef.current ? null : point.id)
+        })
+        marker.on('mouseover', () => {
+          onHoverRef.current(point.id)
+          if (mapRef.current) {
+            const pt = mapRef.current.latLngToContainerPoint(marker.getLatLng())
+            onHoverPositionRef.current?.({ id: point.id, x: pt.x, y: pt.y })
+          }
+        })
+        marker.on('mouseout', () => {
+          onHoverRef.current(null)
+          onHoverPositionRef.current?.(null)
+        })
+
+        marker.addTo(map)
+        markersRef.current.set(point.id, marker)
+      })
+    } else {
+      // Hover/selection change only — update just the affected markers' icons (no recreation)
+      const changed = new Set<string>()
+      if (prevHoveredRef.current) changed.add(prevHoveredRef.current)
+      if (hoveredId) changed.add(hoveredId)
+      if (prevSelectedRef.current) changed.add(prevSelectedRef.current)
+      if (selectedId) changed.add(selectedId)
+
+      changed.forEach(id => {
+        const marker = markersRef.current.get(id)
+        const point = points.find(p => p.id === id)
+        if (marker && point) {
+          marker.setIcon(createMarkerIcon(point, mode, id === selectedId, id === hoveredId, formatFilter))
+        }
+      })
     }
 
-    // Add new markers
-    points.forEach(point => {
-      const isSelected = point.id === selectedId
-      const isHovered = point.id === hoveredId
+    prevPointsRef.current = points
+    prevModeRef.current = mode
+    prevFilterRef.current = formatFilter
+    prevHoveredRef.current = hoveredId
+    prevSelectedRef.current = selectedId
 
-      const icon = createMarkerIcon(point, mode, isSelected, isHovered, formatFilter)
-      const marker = L.marker([point.lat, point.lng], { icon })
-
-      marker.on('click', () => {
-        onSelectRef.current(point.id === selectedId ? null : point.id)
-      })
-      marker.on('mouseover', () => {
-        onHoverRef.current(point.id)
-      })
-      marker.on('mouseout', () => {
-        onHoverRef.current(null)
-      })
-
-      marker.addTo(map)
-      markersRef.current.set(point.id, marker)
-    })
-
-    // Show popup for hovered or selected point
+    // Update popup for hovered or selected point
+    if (popupRef.current) { popupRef.current.remove(); popupRef.current = null }
     const activeId = hoveredId ?? selectedId
     const activePoint = activeId ? points.find(p => p.id === activeId) : null
     if (activePoint) {

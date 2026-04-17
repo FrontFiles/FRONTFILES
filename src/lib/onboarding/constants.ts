@@ -1,31 +1,98 @@
-import type { OnboardingPhase, ValidationOutcomeStatus } from './types'
+import type {
+  OnboardingRole,
+  OnboardingStepKey,
+  OnboardingStepMeta,
+} from './types'
 
-export const ONBOARDING_PHASES: OnboardingPhase[] = [
-  { id: 1, label: 'Verify', description: 'Verify your identity' },
-  { id: 2, label: 'Build', description: 'Review your profile' },
-  { id: 3, label: 'Launch', description: 'Your Vault is ready' },
-]
+// ══════════════════════════════════════════════
+// ROLE + STEP METADATA
+// ══════════════════════════════════════════════
 
-/** @deprecated Use ONBOARDING_PHASES */
-export const ONBOARDING_STEPS = ONBOARDING_PHASES
-
-export const VALIDATION_STATUS_LABELS: Record<ValidationOutcomeStatus, string> = {
-  VALIDATED: 'Validated',
-  FLAGGED: 'Flagged for Review',
-  STANDARD_BLOCK: 'Application Paused',
-  HARD_BLOCK: 'Application Closed',
+export const ROLE_LABELS: Record<OnboardingRole, string> = {
+  creator: 'Creator',
+  buyer: 'Buyer',
+  reader: 'Reader',
 }
 
-export const CROSS_CHECK_TASKS = [
-  { id: 'professional_presence', label: 'Professional presence', description: 'LinkedIn and professional networks' },
-  { id: 'bylines', label: 'Published bylines', description: 'Attributed articles and reports' },
-  { id: 'accreditations', label: 'Press accreditations', description: 'Press pass and credential records' },
-  { id: 'web_references', label: 'Web references', description: 'Open web mentions and citations' },
-  { id: 'publication_footprint', label: 'Publication footprint', description: 'Editorial history and outlets' },
+export const ROLE_DESCRIPTIONS: Record<OnboardingRole, string> = {
+  creator: 'Publish certified work. Licence your assets to editorial buyers.',
+  buyer: 'Licence certified assets. Commission assignments from verified creators.',
+  reader: 'Follow creators, read articles, and save searches.',
+}
+
+/**
+ * Canonical metadata for each onboarding step.
+ * The PhaseStrip renders a filtered view of this map,
+ * selecting the steps relevant to the current role.
+ */
+export const ONBOARDING_STEP_META: Record<OnboardingStepKey, OnboardingStepMeta> = {
+  'role-picker': {
+    key: 'role-picker',
+    label: 'Role',
+    description: 'Choose creator, buyer, or reader',
+  },
+  account: {
+    key: 'account',
+    label: 'Account',
+    description: 'Email, username, and role',
+  },
+  'creator-profile': {
+    key: 'creator-profile',
+    label: 'Profile',
+    description: 'Optional creator profile details',
+  },
+  'buyer-details': {
+    key: 'buyer-details',
+    label: 'Buyer',
+    description: 'Individual or company buyer',
+  },
+  'reader-welcome': {
+    key: 'reader-welcome',
+    label: 'Welcome',
+    description: 'You are ready to explore',
+  },
+  launch: {
+    key: 'launch',
+    label: 'Launch',
+    description: 'All set — enter Frontfiles',
+  },
+}
+
+/**
+ * Ordered step sequence per role.
+ *
+ * `role-picker` is the single top-level entry point and is
+ * always the first step. `account` (Phase 0) follows it and is
+ * common to every role. Everything after `account` diverges
+ * based on the role picked in the `role-picker` step.
+ */
+export const ROLE_STEP_SEQUENCES: Record<OnboardingRole, OnboardingStepKey[]> = {
+  creator: ['role-picker', 'account', 'creator-profile', 'launch'],
+  buyer: ['role-picker', 'account', 'buyer-details', 'launch'],
+  reader: ['role-picker', 'account', 'reader-welcome', 'launch'],
+}
+
+/**
+ * The step sequence shown before a role is selected.
+ *
+ * Every role-specific sequence also begins with
+ * `['role-picker', 'account', ...]`, so advancing past the
+ * picker is a well-defined transition even in the instant
+ * between the picker's `SET_ROLE` dispatch and the follow-up
+ * `goNext` — both sequences agree that the step after
+ * `role-picker` is `account`.
+ */
+export const DEFAULT_STEP_SEQUENCE: OnboardingStepKey[] = [
+  'role-picker',
+  'account',
+  'launch',
 ]
 
-export const BUILDING_TASKS = [
-  { id: 'scan', label: 'Scanning professional record', description: 'Querying networks, bylines, and registries' },
-  { id: 'validate', label: 'Validating credentials', description: 'Cross-referencing against your verified identity' },
-  { id: 'assemble', label: 'Assembling your profile', description: 'Building your creator profile from discovered signals' },
-]
+/**
+ * Compute the active step sequence for the current role,
+ * falling back to the default sequence when no role is
+ * selected yet.
+ */
+export function getStepSequence(role: OnboardingRole | null): OnboardingStepKey[] {
+  return role ? ROLE_STEP_SEQUENCES[role] : DEFAULT_STEP_SEQUENCE
+}

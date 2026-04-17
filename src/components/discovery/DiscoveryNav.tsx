@@ -2,20 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Avatar } from './Avatar'
+import { useUser } from '@/lib/user-context'
+import { useTransaction } from '@/lib/transaction/context'
+import { useDraftStore } from '@/lib/post/draft-store'
+import { isFffSharingEnabled } from '@/lib/flags'
+import { AvatarMenu } from '@/components/platform/AvatarMenu'
+import { type UserType } from '@/lib/types'
 
 // ══════════════════════════════════════════════
 // ICONS (inline SVG — no external dependency)
 // ══════════════════════════════════════════════
-
-function IconSearch({ className = 'w-4 h-4' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  )
-}
 
 function IconCart({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -69,7 +65,7 @@ function NavIconButton({ href, children, label }: { href: string; children: Reac
   return (
     <Link
       href={href}
-      className="w-10 h-10 border-l border-black/10 flex items-center justify-center text-black/40 hover:text-black transition-colors"
+      className="w-10 h-10 border-l border-black flex items-center justify-center text-black hover:text-[#0000ff] transition-colors"
       aria-label={label}
     >
       {children}
@@ -90,81 +86,149 @@ function IconClipboard({ className = 'w-4 h-4' }: { className?: string }) {
   )
 }
 
+// ══════════════════════════════════════════════
+// USER TYPE SWITCHER — moved into AvatarMenu as a
+// submenu in Phase C. The standalone chip is gone;
+// role switching now lives behind the account avatar.
+// ══════════════════════════════════════════════
+
+// ══════════════════════════════════════════════
+// TOOLBAR VISIBILITY
+// ══════════════════════════════════════════════
+
+const SHOW_ASSIGNMENTS: Set<UserType> = new Set(['buyer'])
+const SHOW_COMPOSER: Set<UserType>    = new Set(['creator'])
+const SHOW_UPLOAD: Set<UserType>      = new Set(['creator'])
+const SHOW_LIGHTBOX: Set<UserType>    = new Set(['creator', 'buyer'])
+
 export function DiscoveryNav() {
   const pathname = usePathname()
+  const { activeUserType } = useUser()
+  const { openComposer } = useDraftStore()
+  // Build-time constant. Hides every FFF Sharing affordance
+  // (the FFF nav button + the Share trigger) when the flag is
+  // off. The DraftStoreProvider stays mounted so `useDraftStore`
+  // never throws — the pool is just empty.
+  const fffEnabled = isFffSharingEnabled()
   const onExplore = pathname === '/search' || pathname.startsWith('/search/')
-  const onAssignments = pathname === '/assignments' || pathname.startsWith('/assignments/')
+  const onAssignments = pathname === '/assignment' || pathname.startsWith('/assignment/')
+  const onFeed = pathname === '/feed' || pathname.startsWith('/feed/')
 
   return (
-    <header className="h-14 bg-white border-b-2 border-black flex items-center shrink-0">
+    <header className="h-14 bg-white border-b border-black/15 flex items-center shrink-0">
       {/* ── Logo ── */}
       <Link href="/" className="text-lg font-black tracking-tight leading-none px-6 shrink-0">
         <span className="text-black">FRONT</span><span className="text-[#0000ff]">FILES</span>
       </Link>
 
-      {/* ── Explore ── */}
+      {/* ── Explore (all types) ──
+          Single flex-1 button that spans the entire gap between the
+          FRONTFILES logo and the avatar cluster. No side spacers, no
+          left border — the whole cell is one continuous clickable
+          surface with the "Explore" label centered inside. */}
       <Link
         href="/search"
-        className={`h-full flex items-center px-5 text-[12px] font-bold uppercase tracking-wider border-l border-black/10 transition-colors shrink-0 ${
-          onExplore ? 'text-black' : 'text-black/40 hover:text-black'
+        className={`h-full flex-1 min-w-[112px] flex items-center justify-center text-[12px] font-bold uppercase tracking-wider transition-colors ${
+          onExplore ? 'text-black' : 'text-black hover:text-[#0000ff]'
         }`}
       >
         Explore
       </Link>
 
-      {/* ── Assignments ── */}
-      <Link
-        href="/assignments"
-        className="h-full flex items-center px-4 text-[12px] font-bold uppercase tracking-wider border-l border-black/10 transition-colors shrink-0 text-[#0000ff] hover:text-[#0000cc]"
-      >
-        Assignments
-      </Link>
+      {/* ── FFF (feed, all types) ──
+          Compact fixed-width nav action routing to /feed. Visible
+          across user types when FFF Sharing is enabled. Hidden
+          entirely when the feature flag is off so the nav stays
+          clean for users who don't see the feature yet. */}
+      {fffEnabled && (
+        <Link
+          href="/feed"
+          aria-label="Visit feed"
+          title="Visit feed"
+          className={`h-full w-20 flex items-center justify-center text-[12px] font-bold uppercase tracking-wider border-l border-black transition-colors shrink-0 ${
+            onFeed ? 'text-[#0000ff]' : 'text-black hover:text-[#0000ff]'
+          }`}
+        >
+          FFF
+        </Link>
+      )}
 
-      {/* ── Composer ── */}
-      <Link
-        href="/vault/composer"
-        className={`h-full flex items-center px-4 border-l border-black/10 text-[12px] font-bold uppercase tracking-wider transition-colors shrink-0 ${
-          pathname === '/vault/composer' ? 'text-black' : 'text-black/40 hover:text-black'
-        }`}
-      >
-        Composer
-      </Link>
-
-      {/* ── Search bar ── */}
-      <div className="flex-1 h-full flex items-center border-l border-black/10 px-4 gap-3">
-        <IconSearch className="w-4 h-4 text-black/30 shrink-0" />
-        <input
-          type="text"
-          placeholder="Find a photographer in Lisbon, conflict footage from 2024, or ask anything..."
-          className="flex-1 bg-transparent text-[12px] text-black placeholder:text-black/30 outline-none"
-        />
+      {/* ── Share trigger (creators only, FFF flag on) ──
+          Opens the global share composer overlay. The composer
+          is mounted once in app/layout.tsx and lifted into the
+          draft store so any nav button can fire it. */}
+      {fffEnabled && SHOW_COMPOSER.has(activeUserType) && (
         <button
           type="button"
-          className="w-7 h-7 flex items-center justify-center bg-white text-[#0000ff] border-2 border-[#0000ff] shrink-0 hover:bg-[#0000ff] hover:text-white transition-colors"
-          aria-label="Send search"
+          onClick={() => openComposer()}
+          aria-label="Share to Frontfiles feed"
+          title="Share to feed"
+          className="h-full w-20 flex items-center justify-center text-[12px] font-bold uppercase tracking-wider border-l border-black transition-colors shrink-0 text-black hover:text-[#0000ff]"
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14" />
-            <path d="m12 5 7 7-7 7" />
-          </svg>
+          Share
         </button>
-      </div>
+      )}
 
-      {/* ── Upload CTA ── */}
-      <Link
-        href="/vault/upload"
-        className="h-full flex items-center px-6 bg-[#0000ff] text-white text-[12px] font-bold uppercase tracking-wider hover:bg-[#0000cc] transition-colors shrink-0"
-      >
-        Upload
-      </Link>
+      {/* ── Assignments (buyer only) ── */}
+      {SHOW_ASSIGNMENTS.has(activeUserType) && (
+        <Link
+          href="/assignment"
+          className={`h-full w-28 flex items-center justify-center text-[12px] font-bold uppercase tracking-wider border-l border-black transition-colors shrink-0 ${
+            onAssignments ? 'text-[#0000ff]' : 'text-black hover:text-[#0000ff]'
+          }`}
+        >
+          Assignments
+        </Link>
+      )}
 
-      {/* ── Lightbox ── */}
-      <Link
-        href="/lightbox"
-        className="h-full flex items-center px-4 border-l border-black/10 text-[10px] font-bold uppercase tracking-wider text-[#0000ff] hover:text-[#0000cc] transition-colors shrink-0"
-      >
-        Lightbox
-      </Link>
+      {/* ── Avatar dropdown (centered) ──
+          Phase C: the old "avatar is just a link" pattern was
+          replaced with a facet-aware dropdown menu that anchors
+          the whole account navigation (profile, personal info,
+          buyer details, companies, security, role switch, sign
+          out). Implementation lives in `AvatarMenu`. */}
+      <AvatarMenu />
+
+      {/* ── Right cluster — Upload / Lightbox / Composer ──
+          These three buttons share the entire span between the avatar
+          cluster and the cart icon. Each is `flex-1 min-w-[112px]` so
+          they stretch evenly across the available width. No right
+          spacer — the buttons themselves fill that role. */}
+
+      {/* ── Upload CTA (creator only) ── */}
+      {SHOW_UPLOAD.has(activeUserType) && (
+        <Link
+          href="/vault/upload"
+          className="h-full flex-1 min-w-[112px] flex items-center justify-center bg-[#0000ff] text-white text-[12px] font-bold uppercase tracking-wider hover:bg-[#0000cc] transition-colors"
+        >
+          Upload
+        </Link>
+      )}
+
+      {/* ── Lightbox (creator + buyer) ── */}
+      {SHOW_LIGHTBOX.has(activeUserType) && (
+        <Link
+          href="/lightbox"
+          className="h-full flex-1 min-w-[112px] flex items-center justify-center border-l border-black text-[10px] font-bold uppercase tracking-wider text-[#0000ff] hover:text-[#0000cc] transition-colors"
+        >
+          Lightbox
+        </Link>
+      )}
+
+      {/* ── Composer (creator only) ──
+          Lives in the right-side cluster, immediately after Lightbox. */}
+      {SHOW_COMPOSER.has(activeUserType) && (
+        <Link
+          href="/vault/composer"
+          className={`h-full flex-1 min-w-[112px] flex items-center justify-center border-l border-black text-[12px] font-bold uppercase tracking-wider transition-colors ${
+            pathname === '/vault/composer' ? 'text-[#0000ff]' : 'text-black hover:text-[#0000ff]'
+          }`}
+        >
+          Composer
+        </Link>
+      )}
+
+      <CartNavButton />
 
       <NavIconButton href="/messages" label="Messages">
         <IconMail className="w-[18px] h-[18px]" />
@@ -174,20 +238,33 @@ export function DiscoveryNav() {
         <IconSettings className="w-[18px] h-[18px]" />
       </NavIconButton>
 
-      {/* ── Avatar ── */}
-      <Link
-        href="/creator/sarahchen/frontfolio"
-        className="w-10 h-10 border-l border-black/10 flex items-center justify-center shrink-0"
-        aria-label="Frontfolio"
-      >
-        <Avatar src="/assets/avatars/pexels-anete-lusina-4793183.jpg" name="Sarah Chen" size="sm" className="border-0" />
-      </Link>
-
       {/* ── Language ── */}
-      <button className="h-full flex items-center gap-1 px-4 border-l border-black/10 text-[10px] font-bold uppercase tracking-wider text-black/40 hover:text-black transition-colors shrink-0">
+      <button className="h-full w-28 flex items-center justify-center gap-1 border-l border-black text-[10px] font-bold uppercase tracking-wider text-black hover:text-[#0000ff] transition-colors shrink-0">
         EN
         <IconChevronDown className="w-3 h-3" />
       </button>
     </header>
+  )
+}
+
+// ══════════════════════════════════════════════
+// CART NAV BUTTON (with item count badge)
+// ══════════════════════════════════════════════
+
+function CartNavButton() {
+  const { cartItemCount } = useTransaction()
+  return (
+    <Link
+      href="/cart"
+      className="w-10 h-10 border-l border-black flex items-center justify-center text-black hover:text-[#0000ff] transition-colors relative"
+      aria-label="Cart"
+    >
+      <IconCart className="w-[18px] h-[18px]" />
+      {cartItemCount > 0 && (
+        <span className="absolute top-1 right-1 min-w-[14px] h-[14px] bg-blue-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5">
+          {cartItemCount}
+        </span>
+      )}
+    </Link>
   )
 }

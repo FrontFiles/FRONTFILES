@@ -1,6 +1,8 @@
 'use client'
 
 import { Panel, EmptyPanel } from '@/components/platform/Panel'
+import { creators, publicAssets, stories, articles } from '@/data'
+import { mockTransactions } from '@/lib/mock-data'
 
 const STAFF_MODULES = [
   { id: 'onboarding-queue', label: 'Onboarding Queue', description: 'Review pending creator applications', count: 3 },
@@ -41,24 +43,24 @@ export default function StaffPage() {
             ))}
           </div>
 
-          {/* Quick stats */}
+          {/* Quick stats — derived from data, not hardcoded */}
           <Panel title="Platform summary" headerStyle="black" borderStyle="emphasis">
             <div className="grid grid-cols-4 gap-4">
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Creators</span>
-                <span className="text-lg font-bold text-black font-mono">1</span>
+                <span className="text-lg font-bold text-black font-mono">{creators.length}</span>
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total assets</span>
-                <span className="text-lg font-bold text-black font-mono">10</span>
+                <span className="text-lg font-bold text-black font-mono">{publicAssets.length}</span>
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Transactions</span>
-                <span className="text-lg font-bold text-black font-mono">1</span>
+                <span className="text-lg font-bold text-black font-mono">{mockTransactions.length}</span>
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Active disputes</span>
-                <span className="text-lg font-bold text-black font-mono">1</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Stories</span>
+                <span className="text-lg font-bold text-black font-mono">{stories.length}</span>
               </div>
             </div>
           </Panel>

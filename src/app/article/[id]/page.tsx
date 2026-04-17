@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { AssetCard } from '@/components/discovery/AssetCard'
 import { StoryCard } from '@/components/discovery/StoryCard'
 import { ArticleCard } from '@/components/discovery/ArticleCard'
+import { getAvatarCrop } from '@/lib/avatar-crop'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 import {
   articleMap,
   assetMap,
@@ -13,258 +15,382 @@ import {
   articles,
   assets as allPlatformAssets,
   type AssetData,
+  type ArticleData,
 } from '@/data'
+import {
+  PREVIEW_ARTICLE_ID,
+  readPreviewArticle,
+} from '@/lib/composer/preview'
 
 export default function ArticleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+
+  // Composer preview: magic id reads the draft from sessionStorage so the
+  // full rendered surface can be reused without a second preview subsystem.
+  if (id === PREVIEW_ARTICLE_ID) {
+    return <ComposerPreviewLoader />
+  }
+
   const article = articleMap[id]
 
   if (!article) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="flex-1 bg-white flex items-center justify-center">
         <p className="text-sm text-slate-400">Article not found.</p>
       </div>
     )
   }
 
-  const heroAsset = assetMap[article.heroAssetId]
-  const sourceAssets = article.sourceAssetIds.map(aid => assetMap[aid]).filter(Boolean)
-  const sourceStories = article.sourceStoryIds.map(sid => storyMap[sid]).filter(Boolean)
-  const sourceCreators = article.sourceCreatorIds.map(cid => creatorMap[cid]).filter(Boolean)
-  const relatedArticles = article.relatedArticleIds.map(aid => articleMap[aid]).filter(Boolean)
-  const relatedStories = article.relatedStoryIds
-    .filter(sid => !article.sourceStoryIds.includes(sid))
+  return <ArticleDetailView article={article} />
+}
+
+function ComposerPreviewLoader() {
+  const [article, setArticle] = useState<ArticleData | null>(null)
+  const [resolved, setResolved] = useState(false)
+
+  useEffect(() => {
+    setArticle(readPreviewArticle())
+    setResolved(true)
+  }, [])
+
+  if (!resolved) {
+    return (
+      <div className="flex-1 bg-white flex items-center justify-center">
+        <p className="text-sm text-slate-400">Loading preview…</p>
+      </div>
+    )
+  }
+
+  if (!article) {
+    return (
+      <div className="flex-1 bg-white flex items-center justify-center">
+        <div className="max-w-md text-center">
+          <p className="text-sm font-bold text-black">Preview not available.</p>
+          <p className="text-xs text-slate-500 mt-2">
+            Open Composer, start a draft, and click <strong>Preview article</strong> to see
+            it rendered here.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return <ArticleDetailView article={article} />
+}
+
+// ── Editable draft type ───────────────────────────────
+interface ArticleDraft {
+  title: string
+  dek: string
+  summary: string
+  topicTags: string[]
+  heroAssetId: string
+}
+
+function ArticleDetailView({ article }: { article: ArticleData }) {
+  const STORAGE_KEY = `article-edit-${article.id}`
+  const ORDER_KEY = `article-source-order-${article.id}`
+
+  // ── Editing state ─────────────────────────────────
+  const [isEditing, setIsEditing] = useState(false)
+  const [draft, setDraft] = useState<ArticleDraft>({
+    title: article.title,
+    dek: article.dek,
+    summary: article.summary,
+    topicTags: [...article.topicTags],
+    heroAssetId: article.heroAssetId,
+  })
+  const [savedEdits, setSavedEdits] = useState<ArticleDraft | null>(null)
+  const [newTag, setNewTag] = useState('')
+
+  // ── Source asset ordering (drag to reorder, first = hero) ──
+  const [sourceOrder, setSourceOrder] = useState<string[]>(article.sourceAssetIds)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(ORDER_KEY)
+      if (saved) {
+        const ids: string[] = JSON.parse(saved)
+        // Merge: keep saved order, append any new IDs not in saved
+        const known = new Set(ids)
+        const merged = [...ids.filter(id => article.sourceAssetIds.includes(id))]
+        for (const id of article.sourceAssetIds) {
+          if (!known.has(id)) merged.push(id)
+        }
+        setSourceOrder(merged)
+      }
+    } catch {}
+  }, [ORDER_KEY, article.sourceAssetIds])
+
+  function handleSourceDrop(fromIdx: number, toIdx: number) {
+    if (fromIdx === toIdx) return
+    const next = [...sourceOrder]
+    const [moved] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, moved)
+    setSourceOrder(next)
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(next)) } catch {}
+  }
+
+  // Load persisted edits from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) setSavedEdits(JSON.parse(raw))
+    } catch {}
+  }, [STORAGE_KEY])
+
+  // Merged display data (saved edits override base article)
+  const display = savedEdits ? { ...article, ...savedEdits } : article
+
+  function startEdit() {
+    setDraft({
+      title: display.title,
+      dek: display.dek,
+      summary: display.summary,
+      topicTags: [...display.topicTags],
+      heroAssetId: display.heroAssetId,
+    })
+    setIsEditing(true)
+  }
+
+  function saveEdit() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(draft)) } catch {}
+    setSavedEdits({ ...draft })
+    setIsEditing(false)
+  }
+
+  function cancelEdit() {
+    setIsEditing(false)
+  }
+
+  function removeTag(tag: string) {
+    setDraft(d => ({ ...d, topicTags: d.topicTags.filter(t => t !== tag) }))
+  }
+
+  function addTag() {
+    const t = newTag.trim().toLowerCase()
+    if (t && !draft.topicTags.includes(t)) {
+      setDraft(d => ({ ...d, topicTags: [...d.topicTags, t] }))
+    }
+    setNewTag('')
+  }
+
+  // Derived display values — hero comes from source order (first = cover)
+  const effectiveHeroId = isEditing ? draft.heroAssetId : (sourceOrder[0] || display.heroAssetId)
+  const heroAsset = assetMap[effectiveHeroId]
+  const sourceAssets = sourceOrder.map(aid => assetMap[aid]).filter(Boolean)
+  const sourceStories = display.sourceStoryIds.map(sid => storyMap[sid]).filter(Boolean)
+  const sourceCreators = display.sourceCreatorIds.map(cid => creatorMap[cid]).filter(Boolean)
+  const relatedArticles = display.relatedArticleIds.map(aid => articleMap[aid]).filter(Boolean)
+  const relatedStories = display.relatedStoryIds
+    .filter(sid => !display.sourceStoryIds.includes(sid))
     .map(sid => storyMap[sid])
     .filter(Boolean)
-  const relatedAssets = article.relatedAssetIds.map(aid => assetMap[aid]).filter(Boolean)
+  const relatedAssets = display.relatedAssetIds.map(aid => assetMap[aid]).filter(Boolean)
 
-  // Primary creator (first source creator)
   const primaryCreator = sourceCreators[0]
+  const authorName = article.articleType === 'creator_article'
+    ? (article.creatorName || primaryCreator?.name || 'Creator')
+    : (article.editorName || 'Frontfiles Editorial')
+
+  const hasEdits = savedEdits !== null
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <main className="flex-1">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="flex-1 overflow-y-auto bg-white">
 
-          {/* ── Format identification (top) ────────── */}
-          <div className="mb-6">
+      {/* ── Edit mode sticky toolbar ─────────────────── */}
+      {isEditing && (
+        <div className="sticky top-0 z-50 bg-[#0000ff] border-b-2 border-black flex items-center justify-between px-6 py-2.5">
+          <div className="flex items-center gap-3">
+            <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white">
+              Editing as {authorName}
+            </span>
+            <span className="text-[9px] text-white/50 font-mono">· changes saved locally</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={cancelEdit}
+              className="text-[10px] font-bold uppercase tracking-wider text-white/70 hover:text-white px-3 py-1.5 border border-white/30 hover:border-white transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              onClick={saveEdit}
+              className="text-[10px] font-bold uppercase tracking-wider bg-white text-[#0000ff] hover:bg-white/90 px-4 py-1.5 transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main>
+        <div className="w-[min(calc(100%-2rem),1080px)] mx-auto py-10">
+
+          {/* ── Format badge + canonical action ───── */}
+          <div className="mb-6 flex items-center gap-3">
             <span className="inline-block text-xs font-black uppercase tracking-[0.18em] bg-[#0000ff] text-white px-3 py-1">
               Article
             </span>
-          </div>
-
-          {/* ── Creator / Author banner ──────────── */}
-          <div className="flex items-start justify-between mb-8">
-            {primaryCreator ? (
-              <Link
-                href={`/creator/${primaryCreator.slug}`}
-                className="flex items-center gap-3 group"
+            {hasEdits && !isEditing && (
+              <span className="text-[9px] font-bold uppercase tracking-widest text-[#0000ff] border border-[#0000ff] px-2 py-0.5">
+                Edited
+              </span>
+            )}
+            {article.id !== PREVIEW_ARTICLE_ID && (
+              <a
+                href={`/article/${article.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto text-[10px] font-black uppercase tracking-widest border-2 border-black bg-white text-black px-3 py-1.5 hover:bg-black hover:text-white transition-colors"
+                title="Open the canonical rendered article in a new tab"
               >
-                <div className="w-10 h-10 bg-slate-200 border-2 border-black overflow-hidden shrink-0">
-                  {primaryCreator.avatarRef ? (
-                    <img src={primaryCreator.avatarRef} alt={primaryCreator.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-slate-400">
-                      {primaryCreator.name.charAt(0)}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <span className="text-sm font-bold text-black group-hover:text-[#0000ff] transition-colors">
-                    {primaryCreator.name}
-                  </span>
-                  <span className="block text-[11px] text-slate-400">{primaryCreator.locationBase}</span>
-                </div>
-              </Link>
-            ) : article.editorName ? (
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-black border-2 border-black overflow-hidden shrink-0 flex items-center justify-center">
-                  <span className="text-[11px] font-bold text-white">FF</span>
-                </div>
-                <div>
-                  <span className="text-sm font-bold text-black">{article.editorName}</span>
-                  <span className="block text-[11px] text-slate-400">Frontfiles Editorial</span>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Additional source creators */}
-            {sourceCreators.length > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mr-1">
-                  {sourceCreators.length} sources
-                </span>
-                <div className="flex -space-x-2">
-                  {sourceCreators.map(c => (
-                    <Link key={c.id} href={`/creator/${c.slug}`} title={c.name}>
-                      <div className="w-7 h-7 bg-slate-200 border-2 border-white overflow-hidden shrink-0">
-                        {c.avatarRef ? (
-                          <img src={c.avatarRef} alt={c.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-slate-400">
-                            {c.name.charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
+                View finished article
+              </a>
             )}
           </div>
 
-          {/* ── Title + Dek ────────────────────────── */}
-          <div className="mb-6">
-            <h1 className="text-[clamp(1.75rem,3.5vw,2.5rem)] font-extrabold text-black tracking-tight leading-[1.1] mb-3">
-              {article.title}
-            </h1>
-            <p className="text-base text-slate-500 leading-relaxed max-w-3xl">{article.dek}</p>
-          </div>
+          {/* ── Article header with right rail ────── */}
+          <div className="flex gap-8 mb-8">
+            {/* Left: hero + title + dek + summary */}
+            <div className="flex-1 min-w-0">
+              {/* Hero image */}
+              {heroAsset && (
+                <div className="aspect-video overflow-hidden bg-slate-100 mb-6">
+                  <img src={resolveProtectedUrl(heroAsset.id, 'thumbnail')} alt={display.title} className="w-full h-full object-cover" />
+                </div>
+              )}
 
-          {/* ── Hero image ───────────────────────── */}
-          {heroAsset && (
-            <Link href={`/asset/${heroAsset.id}`} className="block relative bg-slate-50 border-2 border-black overflow-hidden mb-6 group">
-              <img
-                src={heroAsset.thumbnailRef}
-                alt={article.title}
-                className="w-full h-auto max-h-[60vh] object-cover group-hover:scale-[1.01] transition-transform duration-300"
-              />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">
-                  Hero asset · {heroAsset.format}
-                </span>
-              </div>
-            </Link>
-          )}
+              <h1 className="text-[clamp(1.75rem,3.5vw,2.5rem)] font-extrabold text-black tracking-tight leading-[1.1] mb-3">
+                {display.title}
+              </h1>
+              <p className="text-base text-slate-500 leading-relaxed">{display.dek}</p>
+              <p className="text-sm text-slate-400 leading-relaxed mt-3">{display.summary}</p>
+            </div>
 
-          {/* ── Summary ──────────────────────────── */}
-          <p className="text-sm text-slate-600 leading-relaxed mb-6 max-w-3xl">{article.summary}</p>
-
-          {/* ── Metadata strip ───────────────────── */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-8 border-b border-slate-200 pb-4">
-            <span>{(article.wordCount / 1000).toFixed(1)}k words</span>
-            <span>{article.sourceAssetIds.length} source assets</span>
-            <span>{article.sourceStoryIds.length} source stories</span>
-            <span>{article.primaryGeography}</span>
-            <span>{new Date(article.publishedAt).toISOString().split('T')[0]}</span>
-          </div>
-
-          {/* ── Tags ─────────────────────────────── */}
-          <div className="flex flex-wrap gap-1.5 mb-8">
-            {article.topicTags.map(t => (
-              <Link
-                key={t}
-                href={`/search?q=${encodeURIComponent(t)}`}
-                className="text-[10px] font-bold uppercase tracking-wider border-2 border-slate-200 px-2.5 py-1 text-slate-500 hover:border-black hover:text-black transition-colors"
-              >
-                {t}
-              </Link>
-            ))}
-          </div>
-
-          {/* ── Source assets ─────────────────────── */}
-          {sourceAssets.length > 0 && (
-            <section className="mb-10">
-              <SectionLabel label="Source assets" sublabel={`${sourceAssets.length} certified sources`} />
-              <div className="grid grid-cols-3 gap-4">
-                {sourceAssets.map(a => (
-                  <AssetCard key={a.id} asset={a} size="compact" showCreator />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── Source-connected Stories ──────────── */}
-          {sourceStories.length > 0 && (
-            <section className="mb-10">
-              <SectionLabel label="Source Stories" sublabel="Stories supplying source assets" />
-              <div className="grid grid-cols-2 gap-4">
-                {sourceStories.map(s => (
-                  <StoryCard key={s.id} story={s} reason="Source-connected content" />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── Source creators detail ────────────── */}
-          {sourceCreators.length > 0 && (
-            <section className="mb-10">
-              <SectionLabel label="Source creators" />
-              <div className="grid grid-cols-3 gap-4">
-                {sourceCreators.map(c => (
-                  <Link
-                    key={c.id}
-                    href={`/creator/${c.slug}`}
-                    className="border-2 border-slate-200 p-4 hover:border-black transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-slate-200 border border-black overflow-hidden shrink-0">
-                        {c.avatarRef ? (
-                          <img src={c.avatarRef} alt={c.name} className="w-full h-full object-cover" />
+            {/* Right rail: author + metadata */}
+            <div className="hidden lg:block w-[280px] shrink-0 border-l-2 border-[#0b1220] pl-6">
+              <div className="flex flex-col gap-4">
+                {/* Author */}
+                {primaryCreator ? (
+                  <div className="pb-4 border-b border-slate-200">
+                    <Link href={`/creator/${primaryCreator.slug}/frontfolio`} className="flex items-center gap-3 group">
+                      <div className="w-10 h-10 bg-slate-200 border-2 border-black overflow-hidden shrink-0">
+                        {primaryCreator.avatarRef ? (
+                          <img src={primaryCreator.avatarRef} alt={primaryCreator.name} className="w-full h-full object-cover" style={{ objectPosition: getAvatarCrop(primaryCreator.slug) }} />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-400">
-                            {c.name.charAt(0)}
-                          </div>
+                          <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-slate-400">{primaryCreator.name.charAt(0)}</div>
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-black">{c.name}</p>
-                        <p className="text-[10px] text-slate-400">{c.locationBase}</p>
+                        <span className="text-sm font-bold text-black group-hover:text-[#0000ff] transition-colors">{primaryCreator.name}</span>
+                        <span className="block text-[11px] text-slate-400">{primaryCreator.locationBase}</span>
+                      </div>
+                    </Link>
+                    <div className="flex items-center gap-3 mt-3 ml-[52px]">
+                      <a href="#" className="text-slate-400 hover:text-[#0000ff] transition-colors" title="Website">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                      </a>
+                      <a href="#" className="text-slate-400 hover:text-[#0000ff] transition-colors" title="Instagram">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><path d="M17.5 6.5h.01" /></svg>
+                      </a>
+                      <a href="#" className="text-slate-400 hover:text-[#0000ff] transition-colors" title="X / Twitter">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                      </a>
+                      <a href="#" className="text-slate-400 hover:text-[#0000ff] transition-colors" title="LinkedIn">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                ) : article.editorName ? (
+                  <div className="pb-4 border-b border-slate-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-black border-2 border-black overflow-hidden shrink-0 flex items-center justify-center">
+                        <span className="text-[11px] font-bold text-white">FF</span>
+                      </div>
+                      <div>
+                        <span className="text-sm font-bold text-black">{article.editorName}</span>
+                        <span className="block text-[11px] text-slate-400">Frontfiles Editorial</span>
                       </div>
                     </div>
-                    <span className="inline-block mt-3 text-[9px] font-bold uppercase tracking-widest border border-slate-300 text-slate-400 px-2 py-0.5">
-                      {c.trustBadge}
-                    </span>
-                  </Link>
+                  </div>
+                ) : null}
+
+                {article.price && (
+                  <div className="pb-4 border-b border-slate-200">
+                    <span className="text-2xl font-bold font-mono text-black">&euro;{article.price}</span>
+                    {article.licenseType && (
+                      <span className="block text-[9px] font-bold uppercase tracking-widest text-[#0000ff] mt-1">{article.licenseType} license</span>
+                    )}
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-[#0000ff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="m21 15-5-5L5 21" />
+                  </svg>
+                  <span className="text-lg font-bold text-black">{sourceAssets.length}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Published</span>
+                  <span className="text-xs font-mono text-black">{new Date(article.publishedAt).toISOString().split('T')[0]}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Geography</span>
+                  <span className="text-xs font-bold text-black">{article.primaryGeography.replace('geo-', '').replace(/-/g, ' ')}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Words</span>
+                  <span className="text-xs font-bold text-black">{(article.wordCount / 1000).toFixed(1)}k</span>
+                </div>
+                {display.topicTags.length > 0 && (
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-2">Topics</span>
+                    <div className="flex flex-wrap gap-1">
+                      {display.topicTags.map(tag => (
+                        <span key={tag} className="inline-flex items-center h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider border-2 border-black bg-white text-black">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {sourceStories.length > 0 && (
+                  <div className="pt-3 border-t border-slate-200">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-2">Appears in</span>
+                    {sourceStories.map(s => (
+                      <Link
+                        key={s.id}
+                        href={`/story/${s.id}`}
+                        className="block border-2 border-slate-200 p-3 hover:border-black transition-colors mb-2"
+                      >
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-[#0000ff]">Story</span>
+                        <p className="text-sm font-bold text-black mt-1 leading-tight">{s.title}</p>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Source assets — canonical grid ────── */}
+          {sourceAssets.length > 0 && (
+            <>
+              <div className="mt-8 border-t-2 border-black" />
+              <SectionLabel label="Source assets" sublabel={`${sourceAssets.length} certified sources`} />
+              <div className="grid grid-cols-4 gap-4 mb-10">
+                {sourceAssets.map(a => (
+                  <AssetCard key={a.id} asset={a} showCreator />
                 ))}
               </div>
-            </section>
+            </>
           )}
-
-          {/* ── Related Articles ──────────────────── */}
-          {relatedArticles.length > 0 && (
-            <section className="mb-10">
-              <SectionLabel label="Related Articles" sublabel="Related coverage" />
-              <div className="flex flex-col gap-4">
-                {relatedArticles.map(a => (
-                  <ArticleCard key={a.id} article={a} reason="Related coverage" />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── Related Stories ───────────────────── */}
-          {relatedStories.length > 0 && (
-            <section className="mb-10">
-              <SectionLabel label="Related Stories" />
-              <div className="grid grid-cols-2 gap-4">
-                {relatedStories.map(s => (
-                  <StoryCard key={s.id} story={s} reason="Same geography" />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── Related assets ───────────────────── */}
-          {relatedAssets.length > 0 && (
-            <section className="mb-10">
-              <SectionLabel label="Related assets" />
-              <div className="grid grid-cols-3 gap-4">
-                {relatedAssets.map(a => (
-                  <AssetCard key={a.id} asset={a} size="compact" showCreator />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── Suggested for you (infinite scroll) ── */}
-          <InfiniteRecommendations
-            articleId={article.id}
-            tags={article.topicTags}
-            geography={article.primaryGeography}
-            sourceCreatorIds={article.sourceCreatorIds}
-            sourceAssetIds={article.sourceAssetIds}
-          />
         </div>
       </main>
     </div>

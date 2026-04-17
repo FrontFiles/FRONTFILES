@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { StateBadge } from './StateBadge'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 import type { VaultAsset } from '@/lib/types'
 
 interface VaultDetailDrawerProps {
@@ -36,8 +37,8 @@ export function VaultDetailDrawer({ asset, onClose }: VaultDetailDrawerProps) {
       <div className="flex-1 px-5 py-5 flex flex-col gap-5">
         {/* Preview */}
         <div className="aspect-video bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
-          {asset.thumbnailUrl ? (
-            <img src={asset.thumbnailUrl} alt={asset.title} className="w-full h-full object-cover" />
+          {asset.id ? (
+            <img src={resolveProtectedUrl(asset.id, 'thumbnail')} alt={asset.title} className="w-full h-full object-cover" />
           ) : (
             <span className="text-sm font-bold font-mono text-slate-300">{formatIcon[asset.format]}</span>
           )}

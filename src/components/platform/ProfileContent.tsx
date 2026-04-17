@@ -1,12 +1,23 @@
 'use client'
 
+import { useMemo } from 'react'
 import Link from 'next/link'
 import { StateBadge } from './StateBadge'
 import { LikeButton } from '@/components/social/LikeButton'
 import { CommentCount } from '@/components/social/CommentSection'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 import { mockSocialCounts } from '@/lib/mock-data'
 import type { CreatorProfile, CertificationEvent, VaultAsset, Story, Article, Collection } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { hydratePosts } from '@/lib/post/hydrate'
+import { useDraftStore } from '@/lib/post/draft-store'
+import { isFffSharingEnabled } from '@/lib/flags'
+import {
+  isPublishedPublicAsset,
+  isPublishedPublicStory,
+  isPublicCollection,
+} from '@/lib/asset/visibility'
+import { PostCard, PostCardUnavailable } from '@/components/post/PostCard'
 
 interface ProfileContentProps {
   profile: CreatorProfile
@@ -15,17 +26,75 @@ interface ProfileContentProps {
   stories?: Story[]
   articles?: Article[]
   collections?: Collection[]
+  /** Canonical users.id for the profile being displayed. */
+  creatorId?: string
 }
 
-export function ProfileContent({ profile, events, assets = [], stories = [], articles = [], collections = [] }: ProfileContentProps) {
-  const publicAssets = assets.filter(a => a.privacy === 'PUBLIC' && a.publication === 'PUBLISHED')
-  const publicStories = stories.filter(s => s.privacy === 'PUBLIC' && s.publication === 'PUBLISHED')
+export function ProfileContent({ profile, events, assets = [], stories = [], articles = [], collections = [], creatorId }: ProfileContentProps) {
+  const { unifiedRows, openComposer } = useDraftStore()
+  // Visibility predicates centralized in `lib/asset/visibility`.
+  // Every profile / frontfolio surface reads the same rule from
+  // that module so the "public + published" gate cannot drift.
+  const publicAssets = assets.filter(isPublishedPublicAsset)
+  const publicStories = stories.filter(isPublishedPublicStory)
   const publishedArticles = articles.filter(a => a.publishState === 'published')
-  const publicCollections = collections.filter(c => c.privacy === 'PUBLIC')
+  const publicCollections = collections.filter(isPublicCollection)
+
+  // FFF Sharing — show up to 3 recent posts as a preview block.
+  // Reads from the unified pool so newly composed drafts appear
+  // here too (was previously seed-only via `getPostsByAuthor`).
+  const postResults = useMemo(() => {
+    if (!creatorId) return []
+    const rows = unifiedRows
+      .filter(
+        (r) => r.author_user_id === creatorId && r.status === 'published',
+      )
+      .sort((a, b) => b.published_at.localeCompare(a.published_at))
+      .slice(0, 3)
+    return hydratePosts(rows)
+  }, [unifiedRows, creatorId])
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-3xl px-8 py-8 flex flex-col gap-8">
+
+        {/* Posts preview — up to 3 most recent. Suppressed
+            entirely when the FFF Sharing feature flag is off. */}
+        {isFffSharingEnabled() && creatorId && postResults.length > 0 && (
+          <ContentSection
+            label="Posts"
+            count={postResults.length}
+            rightSlot={
+              <Link
+                href={`/creator/${profile.username}/posts`}
+                className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] hover:text-[#0000cc] transition-colors"
+              >
+                View all posts →
+              </Link>
+            }
+          >
+            <div className="flex flex-col gap-4">
+              {postResults.map((result) =>
+                result.ok ? (
+                  <PostCard
+                    key={result.card.id}
+                    card={result.card}
+                    onRepost={() => {
+                      const row = unifiedRows.find((r) => r.id === result.card.id)
+                      if (row) openComposer({ repostOf: row })
+                    }}
+                  />
+                ) : (
+                  <PostCardUnavailable
+                    key={result.placeholder.id}
+                    placeholder={result.placeholder}
+                    reason={result.reason}
+                  />
+                ),
+              )}
+            </div>
+          </ContentSection>
+        )}
 
         {/* Assets */}
         {publicAssets.length > 0 && (
@@ -91,12 +160,13 @@ export function ProfileContent({ profile, events, assets = [], stories = [], art
   )
 }
 
-function ContentSection({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
+function ContentSection({ label, count, children, rightSlot }: { label: string; count: number; children: React.ReactNode; rightSlot?: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</span>
         <span className="font-mono text-[10px] text-slate-300">{count}</span>
+        {rightSlot && <div className="ml-auto">{rightSlot}</div>}
       </div>
       {children}
     </div>
@@ -121,8 +191,8 @@ function AssetCard({ asset }: { asset: VaultAsset }) {
       className="block border border-slate-200 hover:border-slate-400 transition-colors"
     >
       <div className="aspect-video bg-slate-100 flex items-center justify-center relative overflow-hidden">
-        {asset.thumbnailUrl ? (
-          <img src={asset.thumbnailUrl} alt={asset.title} className="w-full h-full object-cover" />
+        {asset.id ? (
+          <img src={resolveProtectedUrl(asset.id, 'thumbnail')} alt={asset.title} className="w-full h-full object-cover" />
         ) : (
           <span className="text-lg font-bold font-mono text-slate-300">{FORMAT_ICON[asset.format]}</span>
         )}
@@ -264,7 +334,7 @@ function ArticleCard({ article }: { article: Article }) {
           <span className="font-mono text-[10px] text-slate-400">
             {article.publishedAt ? new Date(article.publishedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unpublished'}
           </span>
-          <span className="font-mono text-[10px] text-slate-400">{article.wordCount.toLocaleString()} words</span>
+          <span className="font-mono text-[10px] text-slate-400">{article.wordCount.toLocaleString('en-US')} words</span>
           {social && (
             <div className="flex items-center gap-2 ml-auto">
               <LikeButton initialCount={social.likes} initialLiked={social.userLiked} size="sm" />

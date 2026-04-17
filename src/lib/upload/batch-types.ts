@@ -16,6 +16,7 @@ import type {
   AnalysisResult,
   StoryRef,
 } from './types'
+import type { WatermarkMode } from '@/lib/watermark/types'
 
 // ── Asset State (batch context) ──
 
@@ -136,6 +137,10 @@ export interface BatchAsset {
   // Recommendation
   priceRecommendation: PriceRecommendation | null
 
+  // Watermark
+  /** Per-asset watermark mode override. null = inherit from batch defaults / context. */
+  watermarkMode: WatermarkMode | null
+
   // Timestamps
   createdAt: string
   committedAt: string | null
@@ -149,6 +154,8 @@ export interface BatchDefaults {
   enabledLicences: LicenceType[]
   tags: string[]
   applyRecommendedPrice: boolean
+  /** Default watermark mode for assets in this batch. null = use context default. */
+  watermarkMode: WatermarkMode | null
 }
 
 // ── Batch Session ──

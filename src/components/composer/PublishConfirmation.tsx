@@ -4,6 +4,7 @@ import { useComposer } from '@/lib/composer/context'
 import { getArticleReadiness, getCrossStoryMap, getSourceAssets, getInlineTextAssets } from '@/lib/composer/selectors'
 import { computeArticleSplit, formatEur } from '@/lib/composer/split-engine'
 import { ValidationBadge } from '@/components/discovery/ValidationBadge'
+import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 
 export function PublishConfirmation() {
   const { state, dispatch } = useComposer()
@@ -54,7 +55,7 @@ export function PublishConfirmation() {
             {sourceAssets.map(asset => (
               <div key={asset.id} className="flex items-center gap-2">
                 <div className="w-8 h-6 bg-slate-100 shrink-0 overflow-hidden">
-                  <img src={asset.thumbnailRef} alt="" className="w-full h-full object-cover" />
+                  <img src={resolveProtectedUrl(asset.id, 'composer')} alt="" className="w-full h-full object-cover" />
                 </div>
                 <span className="text-[10px] font-bold text-black truncate flex-1">{asset.title}</span>
                 <ValidationBadge state={asset.validationDeclaration} />

@@ -1,161 +1,298 @@
 'use client'
 
-import { useMemo, useState, useRef, useCallback, Fragment } from 'react'
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useComposer } from '@/lib/composer/context'
 import { getFilteredSearchAssets, getSourceAssets, getInlineTextAssets } from '@/lib/composer/selectors'
 import { publicAssets, creatorMap } from '@/data'
 import type { AssetData } from '@/data'
 import { ValidationBadge } from '@/components/discovery/ValidationBadge'
-import type { AssetFormat } from '@/lib/types'
+import { resolveProtectedUrl, resolveProtectedMediaUrl } from '@/lib/media/delivery-policy'
+import { type MapSize } from '@/components/discovery/DiscoveryMap'
+import { GeoDiscoveryPanel } from '@/components/discovery/GeoDiscoveryPanel'
+import { GeoBoltControlGroup, type ContextualPanel } from '@/components/discovery/GeoBoltControlGroup'
+import { BoltPanel } from '@/components/discovery/BoltPanel'
+import { useBoltSession } from '@/hooks/useBoltSession'
+import { deriveScopeFromComposerSearch } from '@/lib/bolt/scope'
 
-const FORMAT_FILTERS: (AssetFormat | 'all')[] = [
-  'all', 'photo', 'video', 'audio', 'text', 'illustration', 'infographic', 'vector',
-]
+const VAULT_FORMATS = ['All', 'Photo', 'Video', 'Audio', 'Text', 'Illustration', 'Infographic', 'Vector'] as const
 
-export function SearchRail() {
+export interface SearchRailProps {
+  /** Fires whenever the active contextual panel changes. ComposerShell
+   *  uses this to collapse its SearchRail column down to just the rail
+   *  (no gallery, no panel) when both Geo and BOLT are closed. */
+  onActivePanelChange?: (panel: ContextualPanel) => void
+}
+
+export function SearchRail({ onActivePanelChange }: SearchRailProps = {}) {
   const { state, dispatch } = useComposer()
-  const results = useMemo(() => getFilteredSearchAssets(state, publicAssets), [state])
+  const allResults = useMemo(() => getFilteredSearchAssets(state, publicAssets), [state])
   const sourceAssets = getSourceAssets(state)
   const inlineTextAssets = getInlineTextAssets(state)
   const totalSelected = sourceAssets.length + inlineTextAssets.length
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mapSize, setMapSize] = useState<MapSize>('small')
+  const [viewMode, setViewMode] = useState<'grid4' | 'grid2' | 'grid1' | 'list'>('grid4')
+  const [hoverEnabled, setHoverEnabled] = useState(true)
+  const [fmtFilter, setFmtFilter] = useState('All')
+
+  // ── BOLT — wired identically to Discovery's /search page ──
+  // Same `useBoltSession` hook + same `BoltPanel` component as Discovery.
+  // The only difference vs Discovery is the scope source: Discovery reads
+  // URL params, Composer reads the Composer reducer.
+  const boltButtonRef = useRef<HTMLButtonElement>(null)
+  const boltScope = useMemo(
+    () => deriveScopeFromComposerSearch(state.search),
+    [state.search]
+  )
+  const bolt = useBoltSession(boltScope)
+
+  // Geo ↔ BOLT mutual exclusivity — same derived-state + single-funnel
+  // pattern used in `src/app/search/page.tsx`. The GeoBoltControlGroup
+  // rail is dumb; every toggle lands in `handleSelectPanel`.
+  const boltOpen = bolt.state.status !== 'closed'
+  const activePanel: ContextualPanel = sidebarOpen ? 'geo' : boltOpen ? 'bolt' : null
+  // Mirror activePanel to ComposerShell so it can collapse the SearchRail
+  // column width when both panels are closed.
+  useEffect(() => {
+    onActivePanelChange?.(activePanel)
+  }, [activePanel, onActivePanelChange])
+  const handleSelectPanel = useCallback((next: ContextualPanel) => {
+    if (next === 'geo') {
+      bolt.close()
+      setSidebarOpen(true)
+      // Same map-revival rule as Discovery: if the user previously dismissed
+      // the in-map HIDE button (which sets mapSize='hidden'), restore a
+      // visible size on every Geo open.
+      setMapSize((prev) => (prev === 'hidden' ? 'small' : prev))
+    } else if (next === 'bolt') {
+      setSidebarOpen(false)
+      void bolt.run()
+    } else {
+      bolt.close()
+      setSidebarOpen(false)
+    }
+  }, [bolt])
+  const handleBoltRequestScope = useCallback(() => {
+    bolt.close()
+    // Return focus to the canonical Composer search input above.
+    document
+      .querySelector<HTMLInputElement>('input[data-composer-search]')
+      ?.focus()
+  }, [bolt])
+
+  const results = useMemo(() => {
+    if (fmtFilter === 'All') return allResults
+    return allResults.filter(a => a.format.toLowerCase() === fmtFilter.toLowerCase())
+  }, [allResults, fmtFilter])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Search header */}
-      <div className="px-3 py-3 border-b border-slate-200 shrink-0">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-2">
-          Source assets
-        </span>
-        <input
-          type="text"
-          value={state.search.query}
-          onChange={e => dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
-          placeholder="Search vault..."
-          className="w-full h-8 border-2 border-black px-2 text-xs text-black placeholder:text-slate-300 focus:outline-none focus:border-[#0000ff]"
-        />
-        {/* Format filter — all 7 formats */}
-        <div className="flex flex-wrap gap-1 mt-2">
-          {FORMAT_FILTERS.map(f => (
-            <button
-              key={f}
-              onClick={() => dispatch({ type: 'SET_SEARCH_FORMAT_FILTER', payload: f })}
-              className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 border transition-colors ${
-                state.search.formatFilter === f
-                  ? 'bg-[#0000ff] text-white border-[#0000ff]'
-                  : 'bg-white text-slate-400 border-slate-200 hover:border-black hover:text-black'
-              }`}
-            >
-              {f === 'infographic' ? 'infog.' : f}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Single scrollable area */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
 
-      {/* Selected sources — vault assets + inline text assets */}
-      {totalSelected > 0 && (
-        <div className="px-3 py-2 border-b border-slate-200 shrink-0">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#0000ff] block mb-1">
-            Selected ({totalSelected})
-          </span>
-          <div className="flex flex-col gap-1 max-h-[140px] overflow-y-auto">
-            {sourceAssets.map(asset => (
-              <div key={asset.id} className="flex items-center gap-2 group">
-                <div className="w-8 h-6 bg-slate-100 shrink-0 overflow-hidden">
-                  <img src={asset.thumbnailRef} alt="" className="w-full h-full object-cover" />
-                </div>
-                <span className="text-[10px] font-bold text-black truncate flex-1">{asset.title}</span>
-                <button
-                  onClick={() => dispatch({ type: 'REMOVE_SOURCE_ASSET', payload: { assetId: asset.id } })}
-                  className="text-[10px] text-slate-300 hover:text-black opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                >
-                  &times;
-                </button>
+        {/* ── Geo + BOLT panel section ──
+            Same paired rail + same panel surfaces as Discovery. Mutual
+            exclusivity is enforced by `activePanel` + `handleSelectPanel`
+            above — only one of geo/bolt is mounted in the column slot at
+            any moment, identical to Discovery's behaviour.
+
+            When BOLT is the active surface, this section grows to fill
+            the entire SearchRail scroll area (`flex-1 min-h-0` + inner
+            `items-stretch h-full`) so BoltPanel takes the whole column
+            vertically. BoltPanel itself is given an `outerClassName`
+            override so it fills the remaining width next to the rail
+            instead of sitting at its default 480px fixed width.
+
+            In the Geo or closed states the section is content-sized
+            (`shrink-0` + `items-start`) so the gallery below can flow
+            naturally and the rail stays at its 240px min-height. */}
+        <div
+          className={`${
+            activePanel === 'bolt' ? 'flex-1 min-h-0' : 'shrink-0'
+          } border-b-2 border-black`}
+        >
+          <div
+            className={`flex px-3 pt-3 pb-3 ${
+              activePanel === 'bolt' ? 'items-stretch h-full' : 'items-start'
+            }`}
+          >
+            <GeoBoltControlGroup
+              ref={boltButtonRef}
+              activePanel={activePanel}
+              onSelectPanel={handleSelectPanel}
+            />
+            {sidebarOpen && (
+              <div className="flex-1 min-w-0">
+                <GeoDiscoveryPanel
+                  mapSize={mapSize}
+                  onMapSizeChange={setMapSize}
+                  onHide={() => handleSelectPanel(null)}
+                  showSpotlight={false}
+                />
               </div>
-            ))}
-            {inlineTextAssets.map(ta => (
-              <div key={ta.blockId} className="flex items-center gap-2">
-                <div className="w-8 h-6 bg-black shrink-0 flex items-center justify-center">
-                  <span className="text-[7px] font-bold uppercase text-white">Text</span>
-                </div>
-                <span className="text-[10px] font-bold text-black truncate flex-1">{ta.title}</span>
-                <span className="text-[9px] font-mono text-slate-400 shrink-0">{ta.wordCount}w</span>
-              </div>
-            ))}
+            )}
+            <BoltPanel
+              state={bolt.state}
+              preview={bolt.preview}
+              onClose={bolt.close}
+              onRetry={() => { void bolt.run() }}
+              onRequestScope={handleBoltRequestScope}
+              openButtonRef={boltButtonRef}
+              outerClassName="flex-1 min-w-0 border-l-2 border-black bg-white flex flex-col h-full overflow-hidden"
+            />
           </div>
         </div>
-      )}
 
-      {/* Saved searches */}
-      {state.savedSearches.length > 0 && (
-        <div className="px-3 py-2 border-b border-slate-200 shrink-0">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
-            Saved searches
-          </span>
-          <div className="flex flex-col gap-1 max-h-[100px] overflow-y-auto">
-            {state.savedSearches.map(s => (
-              <div key={s.id} className="flex items-center gap-1 group/saved">
+        {/* Selected sources strip */}
+        {totalSelected > 0 && (
+          <div className="px-3 py-2 border-b border-black/10 shrink-0 bg-[#0000ff]/[0.03]">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-[#0000ff] block mb-1">
+              In article ({totalSelected})
+            </span>
+            <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto">
+              {sourceAssets.map(asset => (
+                <div key={asset.id} className="flex items-center gap-2 group">
+                  <div className="w-8 h-6 bg-slate-100 shrink-0 overflow-hidden">
+                    <img src={resolveProtectedUrl(asset.id, 'composer')} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <span className="text-[10px] font-bold text-black truncate flex-1">{asset.title}</span>
+                  <button
+                    onClick={() => dispatch({ type: 'REMOVE_SOURCE_ASSET', payload: { assetId: asset.id } })}
+                    className="text-[10px] text-slate-300 hover:text-black opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+              {inlineTextAssets.map(ta => (
+                <div key={ta.blockId} className="flex items-center gap-2">
+                  <div className="w-8 h-6 bg-black shrink-0 flex items-center justify-center">
+                    <span className="text-[7px] font-bold uppercase text-white">Text</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-black truncate flex-1">{ta.title}</span>
+                  <span className="text-[9px] font-mono text-slate-400 shrink-0">{ta.wordCount}w</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Asset gallery — search + toolbar + grid ──
+            Coupled to Geo visibility (`sidebarOpen`). The gallery is the
+            sibling surface of the map: when the user switches to BOLT, the
+            gallery collapses together with the map so the column reads as
+            "BOLT takes the whole context" (same pattern as Discovery's
+            right-column spotlight hiding when BOLT opens).
+            The canonical search bar lives at the top of this block, just
+            above the format chip toolbar, so it reads as the gallery's own
+            header — but it still writes to `state.search.query`, the
+            single source of truth that feeds both Geo and BOLT scope. */}
+        {sidebarOpen && (
+          <>
+            {/* Composer canonical search bar — single source of truth */}
+            <div className="shrink-0 border-b-2 border-black px-3 pt-3 pb-3">
+              <div className="flex items-stretch h-9 border-2 border-[#0000ff] bg-white">
+                <div className="flex items-center px-3 shrink-0 text-[#0000ff]/40">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M21 21l-4.35-4.35" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  data-composer-search
+                  value={state.search.query}
+                  onChange={(e) =>
+                    dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })
+                  }
+                  placeholder="Describe the content, story, coverage or help required."
+                  className="flex-1 min-w-0 bg-transparent outline-none text-[12px] text-black placeholder:text-[#0000ff]/30"
+                />
+              </div>
+            </div>
+
+            {/* Unified results bar: count + format chips (scrollable) + hover toggle + view toggles */}
+            <div className="flex items-center gap-3 px-3 py-2 border-b border-black/10 shrink-0">
+              {/* Left: count + format chips */}
+              <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto scrollbar-none">
+                <span className="text-[10px] font-mono text-black/40 shrink-0 mr-2">{results.length}</span>
+                {VAULT_FORMATS.map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFmtFilter(f)}
+                    className={`h-9 px-3 inline-flex items-center justify-center text-[10px] font-bold uppercase tracking-wider border-2 transition-colors whitespace-nowrap shrink-0 ${
+                      fmtFilter === f
+                        ? 'bg-[#0000ff] text-white border-[#0000ff]'
+                        : 'bg-white border-black text-black hover:bg-[#0000ff] hover:text-white hover:border-[#0000ff]'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+              {/* Right: hover toggle + view toggles */}
+              <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => dispatch({ type: 'APPLY_SAVED_SEARCH', payload: { id: s.id } })}
-                  className="text-[10px] text-[#0000ff] hover:text-[#00008b] truncate flex-1 text-left"
-                >
-                  {s.label}
-                </button>
-                <button
-                  onClick={() => dispatch({ type: 'TOGGLE_SEARCH_ALERT', payload: { id: s.id } })}
-                  className={`text-[8px] font-bold uppercase px-1 py-0.5 border transition-colors shrink-0 ${
-                    s.alertEnabled
+                  onClick={() => setHoverEnabled(h => !h)}
+                  className={`h-9 w-9 inline-flex items-center justify-center border-2 transition-colors ${
+                    hoverEnabled
                       ? 'bg-[#0000ff] text-white border-[#0000ff]'
-                      : 'bg-white text-slate-400 border-slate-200 hover:border-black'
+                      : 'bg-white text-black border-black hover:bg-[#0000ff] hover:text-white hover:border-[#0000ff]'
                   }`}
-                  title={s.alertEnabled ? 'Alert on' : 'Alert off'}
+                  title={hoverEnabled ? 'Hover preview on' : 'Hover preview off'}
                 >
-                  {s.alertEnabled ? 'Alert on' : 'Alert'}
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5 2v17l4.5-4.5 3.5 7 2.5-1.3-3.5-7H17.5L5 2z" />
+                    {!hoverEnabled && <rect x="1" y="1" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 3" rx="0" />}
+                  </svg>
                 </button>
-                <button
-                  onClick={() => dispatch({ type: 'REMOVE_SAVED_SEARCH', payload: { id: s.id } })}
-                  className="text-[10px] text-slate-300 hover:text-black opacity-0 group-hover/saved:opacity-100 transition-opacity shrink-0"
-                >
-                  &times;
-                </button>
+                <div className="flex items-stretch h-9 border-2 border-black">
+                  {([
+                    ['grid4', <><span className="flex gap-[2px] w-3 h-3 items-stretch"><span className="bg-current flex-1" /><span className="bg-current flex-1" /><span className="bg-current flex-1" /><span className="bg-current flex-1" /></span></>],
+                    ['grid2', <><span className="grid grid-cols-2 gap-[2px] w-3 h-3"><span className="bg-current col-span-1 row-span-2 h-3" /><span className="bg-current col-span-1 row-span-2 h-3" /></span></>],
+                    ['grid1', <><span className="flex flex-col gap-[2px] w-3 h-3"><span className="bg-current flex-1" /></span></>],
+                    ['list',  <><span className="flex flex-col gap-[2px] w-3 h-3"><span className="bg-current h-[2px]" /><span className="bg-current h-[2px]" /><span className="bg-current h-[2px]" /></span></>],
+                  ] as [string, React.ReactNode][]).map(([vm, icon], i) => (
+                    <button
+                      key={vm}
+                      onClick={() => setViewMode(vm as typeof viewMode)}
+                      className={`w-9 inline-flex items-center justify-center transition-colors ${i > 0 ? 'border-l-2 border-black' : ''} ${
+                        viewMode === vm ? 'bg-[#0000ff] text-white' : 'bg-white text-black hover:bg-[#0000ff] hover:text-white'
+                      }`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* Save current search button */}
-      {state.search.query.trim() && (
-        <div className="px-3 py-1.5 border-b border-slate-200 shrink-0">
-          <SaveSearchButton />
-        </div>
-      )}
+            {/* Results grid */}
+            <div className={
+              viewMode === 'grid4' ? 'grid grid-cols-4 gap-0' :
+              viewMode === 'grid2' ? 'grid grid-cols-2 gap-0' :
+              viewMode === 'grid1' ? 'flex flex-col' :
+              'flex flex-col'
+            }>
+              {results.length === 0 && (
+                <p className="text-[10px] text-slate-400 px-3 py-4 col-span-4">No matching assets.</p>
+              )}
+              {results.slice(0, 60).map(asset => (
+                <SearchResultCard key={asset.id} asset={asset} compact={viewMode === 'grid4' || viewMode === 'grid2'} hoverEnabled={hoverEnabled} />
+              ))}
+            </div>
+          </>
+        )}
 
-      {/* Search results */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="flex flex-col">
-          {results.length === 0 && (
-            <p className="text-[10px] text-slate-400 px-3 py-4">No matching assets.</p>
-          )}
-          {results.slice(0, 50).map(asset => (
-            <SearchResultCard key={asset.id} asset={asset} />
-          ))}
-        </div>
-      </div>
-
-      {/* Result count */}
-      <div className="px-3 py-2 border-t border-slate-200 shrink-0">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-          {results.length} results
-        </span>
-      </div>
+      </div>{/* end scroll area */}
     </div>
   )
 }
 
 // ── Search result card with preview ─────────────────────────
 
-function SearchResultCard({ asset }: { asset: AssetData }) {
+function SearchResultCard({ asset, compact = false, hoverEnabled = true }: { asset: AssetData; compact?: boolean; hoverEnabled?: boolean }) {
   const { dispatch } = useComposer()
   const creator = creatorMap[asset.creatorId]
 
@@ -166,13 +303,14 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
 
   // Click-to-preview (fullscreen, does not block drag)
   const [showPreview, setShowPreview] = useState(false)
-  const [textContent, setTextContent] = useState<string | null>(null)
+  // Text preview uses asset.textExcerpt — full text is original-only.
 
   const hasVideo = !!asset.videoUrl
   const hasAudio = !!asset.audioUrl
   const hasText = asset.format === 'Text' && !!asset.textExcerpt
 
   const handleMouseEnter = useCallback(() => {
+    if (!hoverEnabled) return
     // Only inline playback — no fullscreen magnify on hover
     if (hasAudio && audioRef.current) {
       audioRef.current.play().catch(() => {})
@@ -181,7 +319,7 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
       videoRef.current.currentTime = 0
       videoRef.current.play().catch(() => {})
     }
-  }, [hasAudio, hasVideo])
+  }, [hoverEnabled, hasAudio, hasVideo])
 
   const handleMouseLeave = useCallback(() => {
     if (audioRef.current) {
@@ -196,11 +334,8 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
   }, [])
 
   const openPreview = useCallback(() => {
-    if (hasText && !textContent && asset.textUrl) {
-      fetch(asset.textUrl).then(r => r.text()).then(t => setTextContent(t)).catch(() => {})
-    }
     setShowPreview(true)
-  }, [hasText, textContent, asset.textUrl])
+  }, [])
 
   return (
     <>
@@ -219,7 +354,7 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
           {asset.videoUrl ? (
             <video
               ref={videoRef}
-              src={asset.videoUrl}
+              src={resolveProtectedMediaUrl(asset.id, 'video', 'composer')}
               muted
               loop
               playsInline
@@ -229,7 +364,7 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
             />
           ) : hasAudio ? (
             <div className="w-full h-full bg-black flex items-center justify-center relative">
-              <audio ref={audioRef} src={asset.audioUrl!} preload="metadata" />
+              <audio ref={audioRef} src={resolveProtectedMediaUrl(asset.id, 'audio', 'composer')} preload="metadata" />
               {!audioPlaying && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                   <div className="w-8 h-8 border-2 border-white/60 flex items-center justify-center">
@@ -258,7 +393,7 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
               <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white to-transparent" />
             </div>
           ) : (
-            <img src={asset.thumbnailRef} alt={asset.title} className="w-full h-full object-cover" />
+            <img src={resolveProtectedUrl(asset.id, 'composer')} alt={asset.title} className="w-full h-full object-cover" />
           )}
 
           {/* Format badge */}
@@ -305,21 +440,23 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
           </div>
         </div>
 
-        {/* Info */}
-        <div className="px-2 py-1.5">
-          <div className="text-[10px] font-bold text-black truncate">{asset.title}</div>
-          <div className="flex items-center gap-1 mt-0.5">
-            {creator && <span className="text-[9px] text-slate-400 truncate">{creator.name}</span>}
-            <span className="text-[9px] text-slate-300">&middot;</span>
-            <span className="text-[9px] text-slate-400">{asset.locationLabel}</span>
+        {/* Info — hidden in compact grid mode */}
+        {!compact && (
+          <div className="px-2 py-1.5">
+            <div className="text-[10px] font-bold text-black truncate">{asset.title}</div>
+            <div className="flex items-center gap-1 mt-0.5">
+              {creator && <span className="text-[9px] text-slate-400 truncate">{creator.name}</span>}
+              <span className="text-[9px] text-slate-300">&middot;</span>
+              <span className="text-[9px] text-slate-400">{asset.locationLabel}</span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              <ValidationBadge state={asset.validationDeclaration} />
+              {asset.price && (
+                <span className="text-[9px] font-bold font-mono text-black">&euro;{asset.price.toFixed(2)}</span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 mt-1">
-            <ValidationBadge state={asset.validationDeclaration} />
-            {asset.price && (
-              <span className="text-[9px] font-bold font-mono text-black">&euro;{asset.price}</span>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Fullscreen preview portal — click-triggered, click to dismiss */}
@@ -346,12 +483,12 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
                 <span className="text-[80px] font-black uppercase tracking-[0.2em] text-black/[0.04] rotate-[-30deg] whitespace-nowrap select-none">LICENSABLE</span>
               </div>
               <p className="text-[13px] leading-[1.8] text-black/80 font-serif whitespace-pre-line relative z-10">
-                {textContent || asset.textExcerpt}
+                {asset.textExcerpt}
               </p>
             </div>
           ) : hasVideo ? (
             <video
-              src={asset.videoUrl}
+              src={resolveProtectedMediaUrl(asset.id, 'video', 'composer')}
               autoPlay
               muted
               loop
@@ -373,12 +510,12 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
                   />
                 ))}
               </div>
-              <audio src={asset.audioUrl!} autoPlay controls className="w-64" />
+              <audio src={resolveProtectedMediaUrl(asset.id, 'audio', 'composer')} autoPlay controls className="w-64" />
               <style>{`@keyframes audioBar { 0% { transform: scaleY(0.4); } 100% { transform: scaleY(1); } }`}</style>
             </div>
           ) : (
             <img
-              src={asset.thumbnailRef}
+              src={resolveProtectedUrl(asset.id, 'composer')}
               alt={asset.title}
               className="max-w-[85vw] max-h-[85vh] object-contain"
             />
@@ -413,56 +550,3 @@ function SearchResultCard({ asset }: { asset: AssetData }) {
   )
 }
 
-// ── Save search button ─────────────────────────────────────
-
-function SaveSearchButton() {
-  const { state, dispatch } = useComposer()
-  const [naming, setNaming] = useState(false)
-  const [label, setLabel] = useState('')
-
-  if (!naming) {
-    return (
-      <button
-        onClick={() => { setNaming(true); setLabel(state.search.query) }}
-        className="text-[9px] font-bold uppercase tracking-widest text-[#0000ff] hover:text-[#00008b] transition-colors"
-      >
-        Save this search
-      </button>
-    )
-  }
-
-  return (
-    <div className="flex items-center gap-1">
-      <input
-        type="text"
-        value={label}
-        onChange={e => setLabel(e.target.value)}
-        autoFocus
-        className="flex-1 h-5 border border-slate-200 px-1 text-[10px] text-black focus:outline-none focus:border-[#0000ff]"
-        onKeyDown={e => {
-          if (e.key === 'Enter' && label.trim()) {
-            dispatch({ type: 'SAVE_CURRENT_SEARCH', payload: { label: label.trim() } })
-            setNaming(false)
-            setLabel('')
-          }
-          if (e.key === 'Escape') {
-            setNaming(false)
-            setLabel('')
-          }
-        }}
-      />
-      <button
-        onClick={() => {
-          if (label.trim()) {
-            dispatch({ type: 'SAVE_CURRENT_SEARCH', payload: { label: label.trim() } })
-          }
-          setNaming(false)
-          setLabel('')
-        }}
-        className="text-[9px] font-bold text-[#0000ff] hover:text-[#00008b]"
-      >
-        Save
-      </button>
-    </div>
-  )
-}

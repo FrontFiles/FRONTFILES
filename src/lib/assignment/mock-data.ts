@@ -387,6 +387,91 @@ export const hybridAssignment: Assignment = {
 }
 
 // ══════════════════════════════════════════════
+// 4. PENDING FUNDING — Accepted brief awaiting escrow capture
+// ══════════════════════════════════════════════
+
+export const pendingFundingAssignment: Assignment = {
+  id: 'asgn-fund-001',
+  buyerId: 'buyer-ap-01',
+  creatorId: 'creator-sofia-01',
+  assignmentClass: 'material',
+  state: 'brief_issued',
+  subState: 'accepted_pending_escrow',
+  plan: {
+    scope: 'Commissioned photo coverage of the EU Parliament spring session debates in Strasbourg. Minimum 15 editorial-quality photographs documenting plenary sessions, committee meetings, and corridor diplomacy.',
+    deadline: '2026-05-15T23:59:00Z',
+    acceptanceCriteria: 'Minimum 15 photographs at editorial resolution. Chamber and committee access confirmed. No staged or posed shots.',
+    requiredEvidenceTypes: ['vault_asset'],
+    reviewWindowDays: 5,
+    notes: 'Creator holds EU Parliament press accreditation (valid through 2027).',
+  },
+  milestones: [
+    {
+      id: 'ms-fund-001-1',
+      assignmentId: 'asgn-fund-001',
+      ordinal: 1,
+      title: 'Plenary session coverage',
+      scopeSummary: 'First batch: 8+ photographs from plenary debates and key votes.',
+      milestoneType: 'material',
+      state: 'pending',
+      dueDate: '2026-05-08T23:59:00Z',
+      acceptanceCriteria: '8+ photos from plenary sessions. Subject identification in metadata.',
+      requiredEvidenceTypes: ['vault_asset'],
+      releasableAmountCents: 80000, // €800
+      partialAcceptancePermitted: false,
+      reviewWindowDays: 5,
+      fulfilmentSubmissions: [],
+      reviewDetermination: null,
+      createdAt: '2026-04-10T10:00:00Z',
+      completedAt: null,
+    },
+    {
+      id: 'ms-fund-001-2',
+      assignmentId: 'asgn-fund-001',
+      ordinal: 2,
+      title: 'Committee and corridor coverage',
+      scopeSummary: 'Second batch: 7+ photographs from committee meetings and corridor interactions.',
+      milestoneType: 'material',
+      state: 'pending',
+      dueDate: '2026-05-15T23:59:00Z',
+      acceptanceCriteria: '7+ photos from committee sessions and informal meetings.',
+      requiredEvidenceTypes: ['vault_asset'],
+      releasableAmountCents: 70000, // €700
+      partialAcceptancePermitted: true,
+      reviewWindowDays: 5,
+      fulfilmentSubmissions: [],
+      reviewDetermination: null,
+      createdAt: '2026-04-10T10:00:00Z',
+      completedAt: null,
+    },
+  ],
+  rightsRecord: {
+    assetRights: {
+      usageRights: 'Non-exclusive editorial licence. Buyer may publish across owned wire service properties.',
+      exclusivityTerms: '48-hour exclusivity window from delivery confirmation.',
+      permittedModifications: 'Cropping and colour correction permitted. No compositing or AI alteration.',
+      duration: '1 year from delivery confirmation.',
+      territory: 'Worldwide.',
+      publicationScope: 'Editorial wire service distribution. Not for advertising or promotional use.',
+    },
+    serviceTerms: null,
+  },
+  escrow: {
+    stripePaymentIntentId: null,
+    totalCapturedCents: 0,
+    totalReleasedCents: 0,
+    totalRefundedCents: 0,
+    totalFrozenCents: 0,
+    capturedAt: null,
+  },
+  ccrHistory: [],
+  createdAt: '2026-04-10T10:00:00Z',
+  acceptedAt: '2026-04-12T14:00:00Z',
+  completedAt: null,
+  cancelledAt: null,
+}
+
+// ══════════════════════════════════════════════
 // ALL MOCK ASSIGNMENTS
 // ══════════════════════════════════════════════
 
@@ -394,6 +479,7 @@ export const mockAssignments: Assignment[] = [
   materialAssignment,
   serviceAssignment,
   hybridAssignment,
+  pendingFundingAssignment,
 ]
 
 export const mockAssignmentMap: Record<string, Assignment> = Object.fromEntries(

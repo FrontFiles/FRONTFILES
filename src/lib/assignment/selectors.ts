@@ -275,3 +275,12 @@ export function getAssignmentClassDescription(cls: AssignmentClass): string {
     case 'hybrid': return 'Service obligations and material outputs'
   }
 }
+
+// ══════════════════════════════════════════════
+// OPERATIONAL STATUS
+// ══════════════════════════════════════════════
+
+/** Assignment is operational: funded, contracted, and work authorized or completed. */
+export function isAssignmentOperational(assignment: Assignment): boolean {
+  return assignment.state === 'in_progress' || assignment.state === 'delivered' || assignment.state === 'confirmed'
+}

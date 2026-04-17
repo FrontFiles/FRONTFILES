@@ -1,25 +1,28 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { TrustBadge } from './TrustBadge'
 import { StateBadge } from './StateBadge'
 import { Avatar } from '@/components/discovery/Avatar'
-import { FollowStats } from '@/components/social/FollowStats'
-import type { CreatorProfile, FollowState } from '@/lib/types'
+import { ConnectionStats } from '@/components/social/ConnectionStats'
+import type { CreatorProfile, ConnectionState } from '@/lib/types'
 
 interface ProfileLeftRailProps {
   profile: CreatorProfile
-  followState?: FollowState
+  connectionState?: ConnectionState
 }
 
-export function ProfileLeftRail({ profile, followState }: ProfileLeftRailProps) {
-  const verifiedDate = new Date(profile.lastVerifiedAt).toLocaleDateString('en-GB', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+export function ProfileLeftRail({ profile, connectionState }: ProfileLeftRailProps) {
+  const verifiedDate = profile.lastVerifiedAt
+    ? new Date(profile.lastVerifiedAt).toLocaleDateString('en-GB', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : null
 
-  const mergedCoverageAndSpecs = [...new Set([...profile.coverageAreas, ...profile.specialisations])]
+  const mergedCoverageAndSpecs = [...new Set([...(profile.coverageAreas ?? []), ...(profile.specialisations ?? [])])]
 
   return (
     <aside className="w-80 border-r border-slate-200 bg-white shrink-0 overflow-y-auto">
@@ -72,12 +75,34 @@ export function ProfileLeftRail({ profile, followState }: ProfileLeftRailProps) 
 
       <div className="px-6 py-5 flex flex-col gap-5">
         {/* Biography */}
-        <RailSection label="Biography">
-          <RailExpandableBio text={profile.biography} />
-        </RailSection>
+        {profile.biography && (
+          <RailSection label="Biography">
+            <RailExpandableBio text={profile.biography} />
+          </RailSection>
+        )}
 
-        {/* Buttons: Assign me to, Message, Follow */}
+        {/* Buttons: View Frontfolio, View posts, Assign me to, Message, Connect */}
         <div className="flex flex-col gap-2">
+          <Link
+            href={`/creator/${profile.username}/frontfolio`}
+            className="w-full h-10 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-colors border-2 border-[#0000ff] bg-[#0000ff] text-white hover:bg-[#003fd1] hover:border-[#003fd1]"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M3 9h18" />
+              <path d="M9 21V9" />
+            </svg>
+            View Frontfolio
+          </Link>
+          <Link
+            href={`/creator/${profile.username}/posts`}
+            className="w-full h-10 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-colors border-2 border-black bg-white text-black hover:bg-black hover:text-white"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            View posts
+          </Link>
           <RailAssignButton creatorName={profile.displayName} />
           <a
             href={`/messages?to=${profile.username}`}
@@ -89,15 +114,15 @@ export function ProfileLeftRail({ profile, followState }: ProfileLeftRailProps) 
             </svg>
             Message
           </a>
-          {followState && <FollowStats initialState={followState} />}
+          {connectionState && <ConnectionStats initialState={connectionState} />}
         </div>
 
         {/* 12. Also me — social icons + website */}
-        {(profile.alsoMeLinks.length > 0 || profile.websiteUrl) && (
+        {((profile.alsoMeLinks?.length ?? 0) > 0 || profile.websiteUrl) && (
           <RailSection label="Also me">
             <div className="flex flex-col gap-3">
               {/* Social icons row */}
-              {profile.alsoMeLinks.length > 0 && (
+              {(profile.alsoMeLinks?.length ?? 0) > 0 && (
                 <div className="flex items-center gap-2">
                   {profile.alsoMeLinks.map((link, i) => {
                     const platform = detectPlatform(link)
@@ -139,26 +164,35 @@ export function ProfileLeftRail({ profile, followState }: ProfileLeftRailProps) 
         )}
 
         {/* 13. Skill pool */}
-        <RailSection label="Skill pool">
-          <ChipList items={profile.skills} />
-        </RailSection>
+        {profile.skills.length > 0 && (
+          <RailSection label="Skill pool">
+            <ChipList items={profile.skills} />
+          </RailSection>
+        )}
 
         {/* 14. Coverage & specializations (merged) */}
-        <RailSection label="Coverage & specializations">
-          <ChipList items={mergedCoverageAndSpecs} />
-        </RailSection>
+        {mergedCoverageAndSpecs.length > 0 && (
+          <RailSection label="Coverage & specializations">
+            <ChipList items={mergedCoverageAndSpecs} />
+          </RailSection>
+        )}
 
         {/* 15. Media affiliations */}
-        <RailSection label="Media affiliations">
-          <ValueList items={profile.mediaAffiliations} />
-        </RailSection>
+        {profile.mediaAffiliations.length > 0 && (
+          <RailSection label="Media affiliations">
+            <ValueList items={profile.mediaAffiliations} />
+          </RailSection>
+        )}
 
         {/* 16. Press accreditations */}
-        <RailSection label="Press accreditations">
-          <ValueList items={profile.pressAccreditations} />
-        </RailSection>
+        {profile.pressAccreditations.length > 0 && (
+          <RailSection label="Press accreditations">
+            <ValueList items={profile.pressAccreditations} />
+          </RailSection>
+        )}
 
         {/* 17. Published works (with real previews) */}
+        {profile.publishedIn.length > 0 && (
         <RailSection label="Published works">
           <div className="flex flex-col gap-3">
             {profile.publishedIn.map((pub, i) => {
@@ -181,20 +215,25 @@ export function ProfileLeftRail({ profile, followState }: ProfileLeftRailProps) 
             })}
           </div>
         </RailSection>
+        )}
 
         {/* Last verified — bottom of rail */}
-        <div className="border-t border-slate-200 pt-4">
-          <span className="font-mono text-[10px] text-slate-400">
-            Last verified: {verifiedDate}
-          </span>
-        </div>
+        {verifiedDate && (
+          <div className="border-t border-slate-200 pt-4">
+            <span className="font-mono text-[10px] text-slate-400">
+              Last verified: {verifiedDate}
+            </span>
+          </div>
+        )}
 
         {/* Validation disclaimer */}
-        <div className="border border-slate-200 px-3 py-2 mt-2">
-          <p className="text-[9px] text-slate-400 leading-relaxed">
-            This certification attests to identity and provenance, not to the accuracy or truthfulness of published content.
-          </p>
-        </div>
+        {verifiedDate && (
+          <div className="border border-slate-200 px-3 py-2 mt-2">
+            <p className="text-[9px] text-slate-400 leading-relaxed">
+              This certification attests to identity and provenance, not to the accuracy or truthfulness of published content.
+            </p>
+          </div>
+        )}
       </div>
     </aside>
   )
