@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect, Suspense } from 'react'
 import { GridToolbar, type OverlayMode } from '@/components/discovery/GridToolbar'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -40,11 +40,30 @@ import { deriveScopeFromSearchParams } from '@/lib/bolt/scope'
 import { resolveProtectedUrl } from '@/lib/media/delivery-policy'
 import { CREATOR_COORDS, parseGeoContextFromQuery, type GeoContext } from '@/lib/search-data'
 
+// ══════════════════════════════════════════════════════
+// Default export — wraps the searchParams-reading content in a
+// Suspense boundary per Next.js 16 requirements. The inner
+// SearchPageContent is unchanged; this wrapper is purely
+// structural (KD-1).
+// ══════════════════════════════════════════════════════
+
+function SearchPageFallback() {
+  return <div className="flex-1 bg-white overflow-hidden" aria-busy="true" />
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchPageFallback />}>
+      <SearchPageContent />
+    </Suspense>
+  )
+}
+
 // Discovery refactor — Phase 1: results grid extracted into
 // `@/components/discovery/DiscoveryResultsGrid`. Phase 2 will mount
 // the new conversation band on top.
 
-export default function SearchPage() {
+function SearchPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const initialQuery = searchParams.get('q') || ''

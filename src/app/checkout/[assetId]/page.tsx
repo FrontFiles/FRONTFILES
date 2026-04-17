@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { use, useReducer } from 'react'
+import { use, useReducer, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { StateBadge } from '@/components/platform/StateBadge'
 import { Panel } from '@/components/platform/Panel'
@@ -99,7 +99,19 @@ function createInitialCheckout(
 // PAGE
 // ══════════════════════════════════════════════
 
+function CheckoutPageFallback() {
+  return <div className="h-screen flex flex-col bg-white" aria-busy="true" />
+}
+
 export default function CheckoutPage({ params }: { params: Promise<{ assetId: string }> }) {
+  return (
+    <Suspense fallback={<CheckoutPageFallback />}>
+      <CheckoutPageContent params={params} />
+    </Suspense>
+  )
+}
+
+function CheckoutPageContent({ params }: { params: Promise<{ assetId: string }> }) {
   const { assetId } = use(params)
   const searchParams = useSearchParams()
   const asset = mockVaultAssets.find(a => a.id === assetId)
