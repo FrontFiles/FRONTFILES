@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useMemo, useRef, useCallback, useEffect, type ReactNode } from 'react'
+import { Suspense, useState, useMemo, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -28,6 +28,14 @@ import {
 const FORMATS = ['All', 'Article', 'Story', 'Collection', 'Photo', 'Video', 'Audio', 'Text', 'Infographic', 'Illustration', 'Vector'] as const
 
 export default function SearchPage() {
+  return (
+    <Suspense fallback={null}>
+      <SearchPageInner />
+    </Suspense>
+  )
+}
+
+function SearchPageInner() {
   const searchParams = useSearchParams()
   const initialQuery = searchParams.get('q') || ''
   const [formatFilters, setFormatFilters] = useState<Set<string>>(new Set(['All']))

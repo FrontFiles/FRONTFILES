@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { use, useReducer } from 'react'
+import { Suspense, use, useReducer } from 'react'
 import { StateBadge } from '@/components/platform/StateBadge'
 import { Panel } from '@/components/platform/Panel'
 import { mockVaultAssets, mockCreatorProfile } from '@/lib/mock-data'
@@ -73,6 +73,14 @@ function createInitialCheckout(): CheckoutState {
 }
 
 export default function CheckoutPage({ params }: { params: Promise<{ assetId: string }> }) {
+  return (
+    <Suspense fallback={null}>
+      <CheckoutPageInner params={params} />
+    </Suspense>
+  )
+}
+
+function CheckoutPageInner({ params }: { params: Promise<{ assetId: string }> }) {
   const { assetId } = use(params)
   const asset = mockVaultAssets.find(a => a.id === assetId)
   const [state, dispatch] = useReducer(checkoutReducer, null, createInitialCheckout)
