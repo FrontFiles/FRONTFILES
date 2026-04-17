@@ -128,6 +128,11 @@ export type AuditEventType =
   | 'dispute.filed'
   | 'dispute.classified'
   | 'dispute.resolved'
+  // Email (transactional + marketing)
+  | 'email.transactional.sent'
+  | 'email.transactional.failed'
+  | 'email.marketing.sent'
+  | 'email.marketing.failed'
   // Admin / staff
   | 'staff.action'
 
