@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { use, useReducer } from 'react'
 import { StateBadge } from '@/components/platform/StateBadge'
 import { Panel } from '@/components/platform/Panel'
