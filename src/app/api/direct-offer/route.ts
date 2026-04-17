@@ -4,28 +4,75 @@
  */
 
 import type { NextRequest } from 'next/server'
+import { z } from 'zod'
 import { createOffer } from '@/lib/direct-offer/services'
 import { listThreads, putThread, putEvents, getThread } from '@/lib/direct-offer/store'
 import { success, errorResponse, withOfferError } from '@/lib/direct-offer/api-helpers'
 import { mockVaultAssets } from '@/lib/mock-data'
 import { requireGrant } from '@/lib/identity/guards'
+import { parseBody } from '@/lib/api/validation'
+import {
+  checkWriteActionRate,
+  buildWriteRateLimitResponse,
+} from '@/lib/rate-limit'
+
+// ─── Request schema ──────────────────────────────────────────────
+//
+// Body contract for POST /api/direct-offer. Tight enough to reject
+// obviously-malformed requests (wrong types, missing fields, silly
+// values) without locking down fields whose canonical enums aren't
+// fully resolved yet (licenceType — see D-DO lock decisions). Those
+// get tightened in a follow-up once the enum is locked.
+
+// Mirrors the LicenceType union in src/lib/types.ts. Kept local so this
+// route's schema is self-describing; we'll extract a shared Zod-enum
+// helper when a second route starts using it.
+const LICENCE_TYPE_VALUES = [
+  'editorial',
+  'commercial',
+  'broadcast',
+  'print',
+  'digital',
+  'web',
+  'merchandise',
+] as const
+
+const CreateDirectOfferBody = z.object({
+  assetId: z.string().min(1),
+  buyerId: z.string().min(1),
+  creatorId: z.string().min(1).optional(),
+  licenceType: z.enum(LICENCE_TYPE_VALUES),
+  offerAmount: z.number().positive(),
+  message: z.string().max(2000).nullable().optional(),
+  responseWindowMinutes: z.number().int().positive().max(10_080).optional(),
+})
 
 export async function POST(request: NextRequest) {
   return withOfferError(async () => {
-    const body = await request.json()
+    // 1. Zod validation — types, presence, ranges.
+    const [body, parseErr] = await parseBody(
+      request,
+      CreateDirectOfferBody,
+      'POST /api/direct-offer',
+    )
+    if (parseErr) return parseErr
 
-    if (!body.assetId || !body.buyerId || !body.licenceType || !body.offerAmount) {
-      return errorResponse('VALIDATION_ERROR', 'Missing required fields: assetId, buyerId, licenceType, offerAmount')
+    // 2. Rate limit — protect against offer spam.
+    //    Keyed by `buyerId` because that's the subject identity for
+    //    this route until session-based auth lands.
+    const rate = checkWriteActionRate({
+      actorId: body.buyerId,
+      actionType: 'direct-offer.create',
+    })
+    if (!rate.allowed) {
+      return buildWriteRateLimitResponse(rate.retryAfterSeconds ?? 30, rate.exceededLimit)
     }
 
-    // Phase B — server-side role gate.
-    // Creating a direct offer is a buyer-scoped action, so the
-    // acting `buyerId` must hold the 'buyer' grant. `requireGrant`
-    // resolves the grant through the identity store (dual-mode).
+    // 3. Role gate — buyer grant required.
     const grantDenial = await requireGrant(body.buyerId, 'buyer')
     if (grantDenial) return grantDenial
 
-    // Resolve asset from authoritative source
+    // 4. Resolve asset from authoritative source.
     const asset = mockVaultAssets.find(a => a.id === body.assetId)
     if (!asset) {
       return errorResponse('ASSET_NOT_FOUND', `Asset ${body.assetId} not found`, 404)

@@ -21,9 +21,27 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
 import { isRealUploadEnabled } from '@/lib/flags'
 import { createBatch } from '@/lib/upload/batch-service'
+import { parseBody } from '@/lib/api/validation'
+import {
+  checkWriteActionRate,
+  buildWriteRateLimitResponse,
+} from '@/lib/rate-limit'
+
+// ─── Request schema ──────────────────────────────────────────────
+//
+// POST /api/v2/batch accepts an optional body. When a body is
+// provided, the only honoured field is `newsroom_mode: boolean`.
+// An empty body is valid — newsroom_mode defaults to false.
+
+const CreateBatchBody = z
+  .object({
+    newsroom_mode: z.boolean().optional().default(false),
+  })
+  .default({ newsroom_mode: false })
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. Flag gate — nothing else runs while the feature is off.
@@ -44,42 +62,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     )
   }
 
-  // 3. Parse optional JSON body. An empty body is valid —
-  //    newsroom_mode defaults to false.
-  let newsroomMode = false
-  const contentLength = req.headers.get('content-length')
-  if (contentLength && Number(contentLength) > 0) {
-    let body: unknown
-    try {
-      body = await req.json()
-    } catch (err) {
-      return NextResponse.json(
-        { code: 'bad_request', detail: `malformed JSON: ${toErrorMessage(err)}` },
-        { status: 400 },
-      )
-    }
-
-    if (body !== null && body !== undefined) {
-      if (typeof body !== 'object' || Array.isArray(body)) {
-        return NextResponse.json(
-          { code: 'bad_request', detail: 'body must be a JSON object' },
-          { status: 400 },
-        )
-      }
-      const raw = (body as Record<string, unknown>).newsroom_mode
-      if (raw !== undefined) {
-        if (typeof raw !== 'boolean') {
-          return NextResponse.json(
-            { code: 'bad_request', detail: 'newsroom_mode must be a boolean' },
-            { status: 400 },
-          )
-        }
-        newsroomMode = raw
-      }
-    }
+  // 3. Rate limit — protect against upload-batch storms.
+  const rate = checkWriteActionRate({
+    actorId: creatorId,
+    actionType: 'upload.batch.create',
+  })
+  if (!rate.allowed) {
+    return buildWriteRateLimitResponse(rate.retryAfterSeconds ?? 30, rate.exceededLimit)
   }
 
-  // 4. Create the batch.
+  // 4. Parse optional JSON body. Empty body is valid — we pass an
+  //    empty object to parseBody, and the schema's `.default` fills
+  //    in newsroom_mode: false.
+  const contentLength = req.headers.get('content-length')
+  const hasBody = Boolean(contentLength) && Number(contentLength) > 0
+
+  let newsroomMode = false
+  if (hasBody) {
+    const [parsed, parseErr] = await parseBody(
+      req,
+      CreateBatchBody,
+      'POST /api/v2/batch',
+    )
+    if (parseErr) return parseErr
+    newsroomMode = parsed.newsroom_mode
+  }
+
+  // 5. Create the batch.
   const result = await createBatch({ creatorId, newsroomMode })
   if (!result.ok) {
     return NextResponse.json(
@@ -97,9 +106,4 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     },
     { status: 201 },
   )
-}
-
-function toErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message
-  return String(err)
 }

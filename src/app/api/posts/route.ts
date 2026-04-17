@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { NextRequest } from 'next/server'
+import { z } from 'zod'
 import {
   createPost,
   getAuthorPostRows,
@@ -21,6 +22,34 @@ import type { PostInput } from '@/lib/post/types'
 import { errorResponse, success, withInternalError } from '@/lib/post/api-helpers'
 import { hasGrant } from '@/lib/identity/guards'
 import { isFffSharingEnabled } from '@/lib/flags'
+import { parseBody } from '@/lib/api/validation'
+import {
+  checkWriteActionRate,
+  buildWriteRateLimitResponse,
+} from '@/lib/rate-limit'
+
+// ─── Request schema ──────────────────────────────────────────────
+//
+// Body contract for POST /api/posts. Enforces the canonical
+// attachment kinds (asset | story | article | collection) at
+// parse time so the handler doesn't need a secondary enum check.
+
+const CreatePostBody = z.object({
+  authorId: z.string().min(1),
+  body: z.string().max(5000),
+  attachment: z.object({
+    kind: z.enum(['asset', 'story', 'article', 'collection']),
+    id: z.string().min(1),
+    creatorUserId: z.string(),
+  }),
+  // `repostOf` is a full PostRow snapshot the client sends with the
+  // request (see src/lib/post/client.ts). It's accepted as-is here
+  // and passed through to createPost, which uses
+  // `input.repostOf.id` + `input.repostOf.author_user_id` etc.
+  // TODO: extract a shared PostRow Zod schema so this becomes a
+  // structural validation instead of a passthrough.
+  repostOf: z.any().nullable().optional(),
+})
 
 // ─── GET ─────────────────────────────────────────────────────
 
@@ -72,33 +101,9 @@ export async function POST(request: NextRequest) {
       return errorResponse('FEATURE_DISABLED', 'FFF Sharing is not enabled.', 404)
     }
 
-    const body = await request.json()
-
-    if (
-      !body ||
-      typeof body !== 'object' ||
-      !body.authorId ||
-      !body.attachment ||
-      typeof body.body !== 'string'
-    ) {
-      return errorResponse(
-        'INVALID_INPUT',
-        'Expected { authorId, body, attachment, repostOf }.',
-      )
-    }
-
-    // ── Authorization ─────────────────────────────────────
-    //
-    // Rule: the acting user must hold the `creator` grant. The
-    // viewer id comes from the `x-frontfiles-user-id` header
-    // (the same header the media route already trusts in this
-    // prototype) — when real auth lands, swap this for the
-    // session user id from the auth cookie. Until then we still
-    // require the header so the endpoint is not silently open.
-    //
-    // Cross-author posts are NOT allowed: a viewer can only
-    // create posts authored by themselves. This matches the
-    // RLS policy planned for the `posts` table.
+    // 1. Identity: viewer must be authenticated.
+    //    Header-based for now; replaced by session cookie when
+    //    real auth lands in Phase 4.
     const viewerId = request.headers.get('x-frontfiles-user-id')
     if (!viewerId) {
       return errorResponse(
@@ -107,7 +112,29 @@ export async function POST(request: NextRequest) {
         401,
       )
     }
-    if (viewerId !== String(body.authorId)) {
+
+    // 2. Rate limit — protect against post spam by known actor.
+    const rate = checkWriteActionRate({
+      actorId: viewerId,
+      actionType: 'post.create',
+    })
+    if (!rate.allowed) {
+      return buildWriteRateLimitResponse(rate.retryAfterSeconds ?? 30, rate.exceededLimit)
+    }
+
+    // 3. Zod validation — types, presence, attachment kind enum.
+    const [body, parseErr] = await parseBody(
+      request,
+      CreatePostBody,
+      'POST /api/posts',
+    )
+    if (parseErr) return parseErr
+
+    // 4. Authorization:
+    //    - Cross-author posts are NOT allowed (viewer === authorId).
+    //    - Viewer must hold the `creator` grant.
+    //    Matches the planned RLS policy for the `posts` table.
+    if (viewerId !== body.authorId) {
       return errorResponse(
         'FORBIDDEN_AUTHOR',
         'You can only publish posts authored by yourself.',
@@ -124,12 +151,12 @@ export async function POST(request: NextRequest) {
     }
 
     const input: PostInput = {
-      authorId: String(body.authorId),
-      body: String(body.body),
+      authorId: body.authorId,
+      body: body.body,
       attachment: {
         kind: body.attachment.kind,
-        id: String(body.attachment.id),
-        creatorUserId: String(body.attachment.creatorUserId ?? ''),
+        id: body.attachment.id,
+        creatorUserId: body.attachment.creatorUserId,
       },
       repostOf: body.repostOf ?? null,
     }
