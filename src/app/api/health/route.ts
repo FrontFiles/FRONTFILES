@@ -21,12 +21,17 @@
 
 import { NextResponse } from 'next/server'
 import { env } from '@/lib/env'
+import { logger } from '@/lib/logger'
 
 // Force dynamic — this endpoint must reflect live process state, not a
 // pre-rendered stale value.
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  // Observability only — liveness probes should NEVER write to audit_log.
+  // audit_log is compliance-grade; health hits are operational noise.
+  logger.info({ route: '/api/health' }, 'health probe')
+
   return NextResponse.json(
     {
       status: 'ok',
