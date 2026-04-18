@@ -37,7 +37,7 @@ This audit doc only surfaces the candidate; the owner (João) decides whether to
 | ID (if opened) | next free (currently KD-10) |
 | Title | Inter-run state leak in `auth.users` causes order-dependent auth/provider tests |
 | Origin | KD-9 audit, candidate A above |
-| Severity (proposed) | Low–Medium. Affects ~6 tests in `auth/provider` (`signUpOrAdoptAuthUser — happy path`, `— password mismatch`, `— verification required` ×2) and plausibly 2 in `onboarding/account-creation` where "first-contact" assertions hinge on absence of prior `auth.users` rows. |
+| Severity (proposed) | Low–Medium. Affects ~6 tests in `auth/provider` (`signUpOrAdoptAuthUser — happy path`, `— password mismatch`, `— verification required` ×2). *(Earlier speculation that 2 tests in `onboarding/account-creation` might be KD-10-adjacent was retired at commit 8b1fcf1 — those 2 tests are (a.2.ii) env-scope-dependent, not first-contact-dependent; see §Phase 2 amendment.)* |
 | Relationship to KD-9 | Orthogonal. KD-9 fails whether the flakiness exists or not; clearing the flakiness won't collapse any of the 105 KD-9 failures, only the 6-test delta between 99 and 105. |
 | Resolution direction (not designed) | Either (i) per-suite `afterAll` that deletes seeded `auth.users` rows via service-role client with uniquified email prefixes, or (ii) route auth/provider tests through a per-test Supabase schema reset. |
 | Why kept separate | KD-9's scope is the architectural response to CCP 3/4 design choices. Test-order flakiness is a test-hygiene concern, orthogonal to whether env-cache / fixture-drift should be redesigned. Keeping them separate prevents scope contamination. |
@@ -72,7 +72,7 @@ Every row below maps to a real failing test in `/tmp/kd9-run.log`. Within each s
 | 14 | `src/lib/entitlement/__tests__/authorization-invariants.test.ts` | (a) env-cache | entitlement | 3 | Eligible-role invariants seeded via `putMembership` (mock-store helper) → invariants evaluated against empty real-path store, return `false` where `true` expected | `AssertionError: expected false to be true` |
 | 15 | `src/lib/onboarding/__tests__/resume.test.ts` | (a) env-cache | onboarding | 3 | `reconcileOnboardingState` should advance past buyer-details and emit `clear-email-verification` when the mock auth provider reports confirmed → real auth path rejects non-UUID probe IDs, emits `noop` instead of `clear-email-verification` | `AssertionError: expected { action: 'noop' } to deeply equal { action: 'clear-email-verification' }` · `Error: @supabase/auth-js: Expected parameter to be UUID but is not` |
 | 16 | `src/lib/onboarding/__tests__/account-creation.test.ts` | (a) env-cache | onboarding | 4 | `createOnboardingAccount` assertions tied to mock-path side effects (username canonicalisation, `reused` flag, grant assertion via `getUserWithFacets`) → real path doesn't exhibit the expected side effects because `_resetStore` on the mock store has no effect on the real store | `AssertionError: expected true to be false` · `AssertionError: expected 'test-user' to be 'mixedcase'` |
-| 17 | `src/lib/onboarding/__tests__/account-creation.test.ts` | (b) fixture-drift | onboarding | 2 | Uniqueness + password-mismatch retries expect specific thrown error shapes → real Supabase returns native constraint error; real auth path does not throw on password mismatch in the same branch | `AssertionError: expected [Function] to throw error matching /already taken/i but got 'duplicate key value violates unique c…'` · `AssertionError: promise resolved "{ user: { … } }" instead of rejecting` |
+| 17 | `src/lib/onboarding/__tests__/account-creation.test.ts` | (a) env-cache *(reclassified at commit 8b1fcf1 — see §Phase 2 amendment)* | onboarding | 2 | Uniqueness + password-mismatch retries expect specific thrown error shapes from the mock auth provider's in-memory `auth.users` dedupe / password-check codepaths → those codepaths only run when the 3 Supabase env vars are absent; without forced mock mode the real path surfaces a native constraint error or resolves instead | `AssertionError: expected [Function] to throw error matching /already taken/i but got 'duplicate key value violates unique c…'` · `AssertionError: promise resolved "{ user: { … } }" instead of rejecting` *(symptom preserved for historical record; actual mechanism is (a.2.ii) per §Phase 2 amendment)* |
 | 18 | `src/lib/onboarding/__tests__/integration.test.ts` | (a) env-cache | onboarding | 4 | End-to-end mock-path assertions (idempotent retry, `users.id` sync, checkpoint clearing, partial-failure recovery) → real path diverges because test never flipped `MODE`; checkpoint branch emits `noop` | `AssertionError: expected false to be true` · `AssertionError: expected true to be false` · `AssertionError: expected { action: 'noop' } to deeply equal { action: 'clear-email-verification' }` |
 | 19 | `src/lib/onboarding/__tests__/account-creation-verification.test.ts` | (a) env-cache | onboarding | 2 | `needsEmailVerification` branch assertions depend on mock auth provider defaults — real path's verification-required defaults differ | `AssertionError: expected true to be false` |
 
@@ -84,8 +84,8 @@ Every row below maps to a real failing test in `/tmp/kd9-run.log`. Within each s
 
 | Bucket | Count | % of 105 |
 |---|---:|---:|
-| (a) env-cache | **54** | 51.4 % |
-| (b) fixture-drift | **51** | 48.6 % |
+| (a) env-cache | **56** | 53.3 % |
+| (b) fixture-drift | **49** | 46.7 % |
 | (c) other | 0 | 0 % |
 
 Both patterns from the KD-9 brief account for every failing test. No residual bucket needed.
@@ -103,8 +103,8 @@ Both patterns from the KD-9 brief account for every failing test. No residual bu
 
 | | upload | onboarding | entitlement | other | row total |
 |---|---:|---:|---:|---:|---:|
-| (a) env-cache | 20 | 15 | 19 | 0 | 54 |
-| (b) fixture-drift | 31 | 8 | 0 | 12 | 51 |
+| (a) env-cache | 20 | 17 | 19 | 0 | 56 |
+| (b) fixture-drift | 31 | 6 | 0 | 12 | 49 |
 | column total | 51 | 23 | 19 | 12 | **105** |
 
 Observations (factual, not prescriptive):
@@ -113,7 +113,7 @@ Observations (factual, not prescriptive):
 - `upload/commit-service` and `upload/batch-service` are **pure (b) fixture-drift** — every failure is a real-Supabase constraint error hit before any assertion.
 - `entitlement/*` is **pure (a)** — tests use mock-store helpers (`putGrant`, `putMembership`) that do not drive the real store.
 - `providers/service` is **pure (b)** — 12 real-path INSERT / unique-constraint / native-error-shape drifts.
-- `auth/provider`, `onboarding/account-creation` are the only suites that **mix buckets** within the same file.
+- `auth/provider` is the only suite that **mixes buckets** within the same file *(onboarding/account-creation reclassified pure-(a) at commit 8b1fcf1 — see §Phase 2 amendment)*.
 
 ---
 
@@ -127,16 +127,16 @@ The original KD-9 brief assumed a 3-way sub-CCP split. The Phase 1 inventory sur
 |---|---|---:|---|---|
 | KD-9.0 | provider spine fixture reset | 12 | pure (b) | `src/lib/providers/service.test.ts` |
 | KD-9.1 | upload | 51 | 20 (a) + 31 (b) | 8 (storage, processing×2, upload×2, api×3) |
-| KD-9.2 | onboarding | 23 | 15 (a) + 8 (b) | 5 (auth/provider + onboarding×4) |
+| KD-9.2 | onboarding | 23 | 17 (a) + 6 (b) | 5 (auth/provider + onboarding×4) |
 | KD-9.3 | entitlement | 19 | pure (a) | 2 (entitlement/services + authorization-invariants) |
-| **Total** | | **105** | 54 (a) + 51 (b) | 16 |
+| **Total** | | **105** | 56 (a) + 49 (b) | 16 |
 
 ### Fit check against the Phase 1 inventory
 
 - **Every failure lands in exactly one sub-CCP.** 12 + 51 + 23 + 19 = 105, matches the vitest roll-up.
 - **Every failing suite lands in exactly one sub-CCP.** 1 + 8 + 5 + 2 = 16, matches the 16-suite failure set.
-- **No suite straddles two sub-CCPs.** The three mixed-bucket suites (auth/provider, onboarding/account-creation, api/v2/batch/[id]/commit) each stay in a single sub-CCP; the bucket split within them determines Phase-3 gating (see per-test tables below), not sub-CCP membership.
-- **Cross-tab reconciles.** 20 (a) + 15 (a) + 19 (a) = 54 (a); 31 (b) + 8 (b) + 12 (b) = 51 (b).
+- **No suite straddles two sub-CCPs.** The two mixed-bucket suites (auth/provider, api/v2/batch/[id]/commit) each stay in a single sub-CCP; the bucket split within them determines Phase-3 gating (see per-test tables below), not sub-CCP membership *(three at audit time; onboarding/account-creation reclassified pure-(a) at commit 8b1fcf1 — see §Phase 2 amendment)*.
+- **Cross-tab reconciles.** 20 (a) + 17 (a) + 19 (a) = 56 (a); 31 (b) + 6 (b) + 12 (b) = 49 (b).
 
 **Verdict: the revised 4-way split fits the data.** No counter-proposal needed.
 
@@ -177,10 +177,10 @@ One framing clarification worth flagging: the founder's rationale for KD-9.0 rea
 #### KD-9.2 — onboarding
 
 - **Scope:** 5 suites — `auth/provider`, `onboarding/resume`, `onboarding/account-creation`, `onboarding/integration`, `onboarding/account-creation-verification`.
-- **Failures:** 23 · **Buckets:** 15 (a) + 8 (b).
+- **Failures:** 23 · **Buckets:** 17 (a) + 6 (b) *(reclassified at commit 8b1fcf1 — see §Phase 2 amendment)*.
 - **Pure-bucket composition:**
-  - Pure (a), 9 failures: `onboarding/resume` (3) · `onboarding/integration` (4) · `onboarding/account-creation-verification` (2).
-  - Mixed, 14 failures: `auth/provider` (2 a + 6 b) · `onboarding/account-creation` (4 a + 2 b).
+  - Pure (a), 15 failures: `onboarding/resume` (3) · `onboarding/integration` (4) · `onboarding/account-creation-verification` (2) · `onboarding/account-creation` (6) *(reclassified at commit 8b1fcf1 — see §Phase 2 amendment)*.
+  - Mixed, 8 failures: `auth/provider` (2 a + 6 b) *(onboarding/account-creation was 4 a + 2 b at audit time; reclassified pure-(a) at commit 8b1fcf1 — see §Phase 2 amendment)*.
 - **Mixed-suite per-test mapping — `auth/provider` (8 failures):**
 
   | # | Test | Bucket | Phase 3 gated? |
@@ -196,7 +196,7 @@ One framing clarification worth flagging: the founder's rationale for KD-9.0 rea
 
   Of the 6 (b) failures, tests #1–#4 overlap with the **KD-10 candidate** (inter-run state leak — see above); their "first-contact" assertions are also order-dependent on prior `auth.users` rows. Resolving the KD-10 candidate would likely green 4 of these 6; the other 2 would still fail on real-path semantics.
 
-- **Mixed-suite per-test mapping — `onboarding/account-creation` (6 failures):**
+- **Per-test mapping — `onboarding/account-creation` (6 failures, pure (a) post-reclassification at commit 8b1fcf1):**
 
   | # | Test | Bucket | Phase 3 gated? |
   |---|---|---|:-:|
@@ -204,10 +204,10 @@ One framing clarification worth flagging: the founder's rationale for KD-9.0 rea
   | 2 | `happy path > adopts the auth user id as the users row id` | (a) env-cache | **yes** |
   | 3 | `happy path > lowercases the username on write` | (a) env-cache | **yes** |
   | 4 | `idempotency > adopts the existing row on same-email retry and returns reused=true` | (a) env-cache | **yes** |
-  | 5 | `idempotency > throws "taken" when a different email claims the same username` | (b) fixture-drift | no |
-  | 6 | `idempotency > throws when the retry password does not match the auth row` | (b) fixture-drift | no |
+  | 5 | `idempotency > throws "taken" when a different email claims the same username` | (a) env-cache *(reclassified at commit 8b1fcf1)* | **yes** |
+  | 6 | `idempotency > throws when the retry password does not match the auth row` | (a) env-cache *(reclassified at commit 8b1fcf1)* | **yes** |
 
-- **Phase 3 (pattern-a) gating:** 15 of 23 failures (65.2 %) are (a) and wait on the Phase 3 decision. Landing the 8 (b) failures (and the 4 KD-10-overlapping ones above) without first locking the (a) approach risks rework — a chosen (a) mechanism (module reload vs. getter vs. DI seam) changes how these test files set up state.
+- **Phase 3 (pattern-a) gating:** 17 of 23 failures (73.9 %) are (a) and wait on the Phase 3 decision. Landing the 6 (b) failures (and the 4 KD-10-overlapping ones above) without first locking the (a) approach risks rework — a chosen (a) mechanism (module reload vs. getter vs. DI seam) changes how these test files set up state.
 
 #### KD-9.3 — entitlement
 
@@ -222,11 +222,11 @@ One framing clarification worth flagging: the founder's rationale for KD-9.0 rea
 |---|---:|---:|---:|
 | KD-9.0 | 12 | 0 | **0 %** |
 | KD-9.1 | 51 | 20 (+ indirect rework risk on the other 31) | 39.2 % direct |
-| KD-9.2 | 23 | 15 | 65.2 % |
+| KD-9.2 | 23 | 17 | 73.9 % |
 | KD-9.3 | 19 | 19 | **100 %** |
-| **Aggregate** | **105** | **54** | **51.4 %** |
+| **Aggregate** | **105** | **56** | **53.3 %** |
 
-- **54 of 105 failures (51.4 %) wait on the Phase 3 decision** about how tests should invalidate the module-load-time cached `flags.*` / `MODE`.
+- **56 of 105 failures (53.3 %) wait on the Phase 3 decision** about how tests should invalidate the module-load-time cached `flags.*` / `MODE`.
 - **KD-9.3 cannot start** until Phase 3 is locked. All 19 failures there are (a).
 - **KD-9.2 cannot close** without Phase 3 — two-thirds of its failures are (a), and the mixed suites blend (a) and (b) at the file level.
 - **KD-9.1 has significant indirect exposure** even though only 39 % of its failures are pure (a): (a) and (b) failures share test files, so any test-harness change from Phase 3 will touch the same files a (b) fixture reshape is touching.
@@ -236,7 +236,7 @@ Treating Phase 3 as parallel (e.g., "start KD-9.1 fixture work while the pattern
 
 ### Phase 2 close
 
-Revised 4-way split confirmed against the Phase 1 data. All 105 failures accounted for. Three mixed-bucket suites mapped per-test with Phase-3-gating flags. Phase 3 gate reinforced with numbers. KD-10 flakiness candidate flagged separately.
+Revised 4-way split confirmed against the Phase 1 data. All 105 failures accounted for. Two mixed-bucket suites mapped per-test with Phase-3-gating flags *(three at audit time; onboarding/account-creation reclassified pure-(a) at commit 8b1fcf1 — see §Phase 2 amendment)*. Phase 3 gate reinforced with numbers. KD-10 flakiness candidate flagged separately.
 
 ## Phase 3 — Architecture decision for pattern (a) [GATE — blocks KD-9.1 / 9.2 / 9.3]
 
@@ -360,7 +360,7 @@ Five tickets, ordered:
 | 1 | **Pattern-a CCP** (Option 2b rollout) | Phase 3 gate lift. 54 (a) failures green on its merge; no other sub-CCP can fully close without it. Not part of KD-9.X — it is the architectural pre-requisite. |
 | 2 | **KD-9.0 — provider spine fixture reset** | Phase-3-independent (0 % (a)), smallest cluster (12 tests, 1 file), canonicalises the real-DB fixture-reshape pattern that KD-9.1 reuses at scale. Lands without waiting on Pattern-a's greening to settle. |
 | 3 | **KD-9.3 — entitlement verify + close** | After Pattern-a, the 19 tests in `entitlement/*` need only a small `beforeEach` hook that forces mock mode via env-scoping; the mock-data helpers (`putGrant`, `putMembership`) then work as originally intended. Smallest remaining fixture surface; closes an entire domain in one session. |
-| 4 | **KD-9.2 — onboarding** | 5 test files, 23 failures. Requires env-scoping hooks for the (a) failures + fixture reshape for the (b) failures. Overlaps with the KD-10 flakiness candidate (4 of 6 auth/provider (b) failures). Ahead of KD-9.1 because smaller blast radius. |
+| 4 | **KD-9.2 — onboarding** | 4 test files (post correction 1 auth/provider split to KD-9.2.aux), 15 failures, all pure (a.2.ii) per reclassification at commit 8b1fcf1. Requires env-scoping via shared helper at `src/lib/test/env-scope.ts` (landed 8b1fcf1). No fixture reshape needed in the 4 files. KD-10 flakiness candidate still applies via KD-9.2.aux. Ahead of KD-9.1 because smaller blast radius. |
 | 5 | **KD-9.1 — upload** | Biggest cluster (8 files, 51 failures). Mixes storage-driver, processing pipeline, upload services, and three API-route suites. Reuses KD-9.0's fixture-reshape pattern. Last because biggest and relies on the three prior sub-CCPs to settle their respective concerns. |
 
 Sequence rationale in one line: **architecture first, then smallest Phase-3-independent cluster, then close out by ascending blast radius.**
@@ -435,7 +435,7 @@ Counter-argument considered and rejected: "rolling Pattern-a into KD-9.0 keeps t
 
 Exit:
 - (a.1) flags-cache failures and (a.2.i) withEnv-using failures: flip green OR change signature to non-(a) (typically to (b) fixture-drift, handed off to KD-9.1).
-- (a.2.ii) default-mock-dependent failures: remain (a.2.ii) at Pattern-a merge. Mechanism (pure-lazy getMode()) is delivered; test-side consumption (beforeEach that unsets the 3 Supabase vars) ships under KD-9.3 (19 entitlement), KD-9.2 (13 onboarding), and KD-9.2.aux (2 auth/provider _markMockAuth*). These failures retire under those tickets, not here.
+- (a.2.ii) default-mock-dependent failures: remain (a.2.ii) at Pattern-a merge. Mechanism (pure-lazy getMode()) is delivered; test-side consumption (beforeEach that unsets the 3 Supabase vars) ships under KD-9.3 (19 entitlement), KD-9.2 (15 onboarding — reclassified from 13 at commit 8b1fcf1), and KD-9.2.aux (2 auth/provider _markMockAuth*). These failures retire under those tickets, not here.
 - No previously-green suite regresses vs d02b9f9 baseline.
 - Net failure count drops materially via the (a.1) + (a.2.i) subset (expected ~13–17 outright flips plus signature conversions of handler-execution tests).
 - `grep -rn "^const MODE:" src/lib` returns zero matches.
