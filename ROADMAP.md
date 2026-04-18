@@ -1,7 +1,7 @@
 # Frontfiles — Pre-Integration Roadmap
 
 **View:** Now / Next / Later · **Source of truth for detail:** `INTEGRATION_READINESS.md` v2 (2026-04-17) + `CLAUDE_CODE_PROMPT_SEQUENCE.md`
-**Owner:** João Nuno Martins · **Last updated:** 2026-04-17 (post-CCP 3 closeout)
+**Owner:** João Nuno Martins · **Last updated:** 2026-04-17 (post-CCP 4 closeout — Phase 1 Foundation complete, G2 passed)
 
 > This document is the communication-altitude view of the pre-integration work. It is deliberately thin. For phase-item granularity, size, and rationale, read `INTEGRATION_READINESS.md`. Do not duplicate detail here.
 
@@ -12,26 +12,27 @@
 | Signal | State |
 |---|---|
 | G1 — Architectural decisions D1–D12 | **Passed** (2026-04-17) |
-| Phase 0 pre-flight (CCP 1) | **Closed** (2026-04-17) — P0.2 resolved via KD-1 micro-fix (commit `4681e92`); `bun run build` exit 0 across 47 routes. |
+| Phase 0 pre-flight (CCP 1) | **Closed** (2026-04-17) — P0.2 resolved via KD-1 micro-fix (commit `4681e92`); `bun run build` exit 0 across 81 routes. |
 | CCP 2 — Supabase foundation + RLS | **GREEN on dev** — commit `c05928f` · migration `20260420000000` applied on Remote dev Supabase · Vercel preview/prod env wiring deferred as a parallel human task. Historical RLS 8/9 pass count needs re-measurement once KD-8 (bun test env loading) lands. |
-| CCP 3 — pgvector + ai_analysis + audit_log + env-schema | **GREEN** (2026-04-17) — items 1.7–1.9 pre-landed in migration `20260419110000`; item 1.10 landed in `src/lib/env.ts` + consolidation pass across 9 source files. `tsc --noEmit` clean, `bun run build` exit 0 (47 routes), grep drops 19 → 5 documented-exception files. |
-| G2 — Phase 1 (Foundation) completion | In flight — CCP 1/2/3 + KD-1 done; CCP 4 (flip mocks → real dual-mode) is next, plus 1.1 (Vercel preview/prod env wiring) remains a parallel human task. |
+| CCP 3 — pgvector + ai_analysis + audit_log + env-schema | **GREEN** (2026-04-17) — items 1.7–1.9 pre-landed in migration `20260419110000`; item 1.10 landed in `src/lib/env.ts` + consolidation pass across 9 source files. `tsc --noEmit` clean, `bun run build` exit 0 (81 routes — route-count correction from the stale 47 baseline), grep drops 19 → 5 documented-exception files. |
+| CCP 4 — Flip mocks → real dual-mode (item 1.3) | **GREEN** (2026-04-17) — 3 commits (`a89c9a4`, `3468008`, `5755d02`). All 5 modules canonicalised (auth, post, providers, asset-media, watermark profiles). Modules 4–5 promoted sync→async with every call-site awaited. `tsc --noEmit` clean per module, `bun run build` exit 0 (81 routes). Closes the "mocks silently swallow writes" risk. |
+| G2 — Phase 1 (Foundation) completion | **Passed** (2026-04-17) — CCP 1/2/3/4 + KD-1 done. Only parallel human task remaining is 1.1 (Vercel preview/prod env wiring), which blocks live deploy but not Phase 4/5 design work. |
 | G3 — Legal pages + Google verification | Not started |
 | G4 — Stripe Connect application approval | Not started |
 | G5 — Waterdog audit + schema mapping signed | **Blocked** on Q1–Q7 |
 | G6 — Full dry-run rehearsal on staging | Not started |
 
-**One-line:** Architectural layer locked + Phase 0 truly closed + CCP 2/3 green + env-consolidation pass in. Build stays provably clean (`bun run build` exit 0 across 47 routes). Phase 1 foundation continues; CCP 4 (flip mocks → real dual-mode) is the next prompt. Nothing else real-world turns on until G2 passes. Commit `5e652df` shows Phase 3.1 (Resend) already partially done — ahead-of-sequence, acceptable.
+**One-line:** Architectural layer locked + Phase 0 truly closed + CCP 2/3/4 green + Phase 1 foundation **closed** (G2 passed). Build stays provably clean (`bun run build` exit 0 across 81 routes; the earlier "47 routes" figure was a stale baseline). Real-world switches (Phase 4 Google, Phase 5 Stripe) are now unblocked at the architecture gate; they still wait on G3 (legal + Google verification) and G4 (Stripe Connect approval). KD-8 is the recommended next micro-CCP to restore reliable test signal before Phase 2/3 lands. Commit `5e652df` shows Phase 3.1 (Resend) already partially done — ahead-of-sequence, acceptable.
 
 ---
 
 ## Critical path
 
 ```
-Phase 0 (pre-flight, including PAT rotation)
+Phase 0 (pre-flight, including PAT rotation)  ✓ closed
    │
    ▼
-Phase 1 (Foundation)  ── G2
+Phase 1 (Foundation)  ── G2  ✓ passed (2026-04-17)
    │
    ├─► Phase 2 (Observability)  ─┐
    ├─► Phase 3 (Email)            │
@@ -40,7 +41,7 @@ Phase 1 (Foundation)  ── G2
    └─► Phase 7 (Hardening)       ─┘
 ```
 
-The single longest dependency chain is: Phase 0 → Phase 1 → (Phase 4 ∥ Phase 5) → Phase 6. Phases 2/3/7 parallelise once Phase 1 clears.
+The single longest dependency chain is: Phase 0 → Phase 1 → (Phase 4 ∥ Phase 5) → Phase 6. Phases 2/3/7 parallelise once Phase 1 clears — which it has.
 
 ---
 
@@ -50,13 +51,12 @@ Commit-grade work, high-confidence scope and sequence.
 
 | Item | Why it's Now | Ref |
 |---|---|---|
-| **CCP 4 — Flip mocked modules to real dual-mode** | Closes Phase 1 by retiring the "mocks silently swallow writes" risk. Primary active item now that CCP 3 is green. | `CLAUDE_CODE_PROMPT_SEQUENCE.md` §CCP 4 / INTEGRATION_READINESS §Phase 1 item 1.3 |
-| Waterdog repo audit — answer Q1–Q7 (H6) | Blocks Phase 6 from concretising. Can run in parallel to CCP 4. Cheap to start. | INTEGRATION_READINESS §Open questions |
-| Vercel env wiring (preview + prod scopes) | Full Phase 1 closeout requires env parity across dev/preview/prod. Not a CCP 4 blocker, but required before Phase 4/5 integration. Do in parallel via Vercel dashboard or install `vercel` CLI. | INTEGRATION_READINESS §Phase 1 item 1.1 |
-| KD-8 micro-CCP — `bun test` env loading | Medium severity. Without it, RLS + v2/batch tests skip or error on env-validation. Test signal is unreliable until fixed. Higher priority now that CCP 4 relies on dual-mode test coverage. Quick win (`bunfig.toml` preload). | INTEGRATION_READINESS §Known debt KD-8 |
-| KD-7 micro-CCP — `force-dynamic` → `connection()` on `/search` + `/checkout/[assetId]` | Low severity. Build is green with the Suspense fix; the `force-dynamic` directive is only soft-deprecated. Not blocking anything. Queue between CCPs when appetite exists. | INTEGRATION_READINESS §Known debt KD-7 |
+| **KD-8 micro-CCP — `bun test` env loading** | Promoted to top of Now. CCP 4 landed without reliable test signal because `bun test` does not load `.env.local`; the `tsc --noEmit` + `bun run build` pair carried verification. Phase 2/3 work will be safer with tests restored first. Quick win (`bunfig.toml` preload). | INTEGRATION_READINESS §Known debt KD-8 |
+| Waterdog repo audit — answer Q1–Q7 (H6) | Blocks Phase 6 from concretising. Cheap to start; parallel-safe. | INTEGRATION_READINESS §Open questions |
+| Vercel env wiring (preview + prod scopes) | Parallel human task. Required before Phase 4/5 integration goes live, not before Phase 2/3 design work. Install `vercel` CLI or use dashboard. | INTEGRATION_READINESS §Phase 1 item 1.1 |
+| KD-7 micro-CCP — `force-dynamic` → `connection()` on `/search` + `/checkout/[assetId]` | Low severity. Build is green with the Suspense fix; the `force-dynamic` directive is only soft-deprecated. Queue between CCPs when appetite exists. | INTEGRATION_READINESS §Known debt KD-7 |
 
-**Concrete next action:** Commit CCP 3 closeout (code + governance) on top of `4681e92`, push `main` to origin, tag a new checkpoint (`checkpoint/ccp3-green-<timestamp>`). Then paste CCP 4 — no blocking micro-CCPs in the way. KD-7 and KD-8 remain parallel side-fixes that can slot between CCPs.
+**Concrete next action:** Paste KD-8 prompt to restore `bun test` env loading, then move into Phase 2 (Sentry + structured logging) or Phase 3 (Resend hardening, given `5e652df` already started it). G2 has passed; the order between Phase 2 and Phase 3 is a capacity call, not an architectural one.
 
 ---
 
@@ -119,9 +119,12 @@ New scope items from today's decision locks (already listed in INTEGRATION_READI
 | **KD-1 closed** (2026-04-17, commit `4681e92`) | Suspense boundaries wrapped around `useSearchParams()` on `/search` and `/checkout/[assetId]`. `bun run build` exit 0 across 47 routes. Phase 0 is now fully closed. |
 | **KD-7 opened** (follow-up from KD-1 fix) | `force-dynamic` retained on both fixed pages; soft-deprecated in Next.js 16 in favor of `connection()`. Low severity; queued as independent micro-CCP. |
 | **KD-8 opened** (discovered during KD-1 verification) | `bun test` does not load `.env.local` — RLS and v2/batch tests skip or error on env validation. Medium severity; blocks reliable test signal until a `bunfig.toml` preload is configured. Historical RLS "8/9 pass" claim needs re-measurement once KD-8 lands. |
-| **CCP 3 closed** (2026-04-17) | Items 1.7–1.9 verified pre-landed in migration `20260419110000_phase1_vector_cache_audit.sql` (pgvector + `asset_embeddings` + HNSW; `ai_analysis` cache with COALESCE-aware unique key; `audit_log` with event/actor/target/trace indexes; all RLS service-role-only). Item 1.10 = `src/lib/env.ts` (Zod fail-fast) plus a 9-file consolidation pass migrating direct `process.env.*` reads to `env.*` / `flags.*` imports. Grep dropped 19 → 5 documented-exception files. Build green (47 routes). |
+| **CCP 3 closed** (2026-04-17) | Items 1.7–1.9 verified pre-landed in migration `20260419110000_phase1_vector_cache_audit.sql` (pgvector + `asset_embeddings` + HNSW; `ai_analysis` cache with COALESCE-aware unique key; `audit_log` with event/actor/target/trace indexes; all RLS service-role-only). Item 1.10 = `src/lib/env.ts` (Zod fail-fast) plus a 9-file consolidation pass migrating direct `process.env.*` reads to `env.*` / `flags.*` imports. Grep dropped 19 → 5 documented-exception files. Build green. |
+| **Route-count baseline corrected** (2026-04-17) | Prior closeouts cited "47 routes" as the `bun run build` output. Actual post-CCP-3 baseline is **81 routes**. Nothing regressed between CCPs; the earlier figure was stale. All historical "47 routes" references in `INTEGRATION_READINESS.md` and this file are annotated as superseded. |
+| **CCP 4 closed** (2026-04-17) | Phase 1 item 1.3 delivered across 3 commits: `a89c9a4` (auth/post/providers), `3468008` (asset-media), `5755d02` (watermark profiles). Mode contract honoured: `MODE` decided once at load from `isSupabaseEnvPresent`, single `[ff:mode]` log per module on first use gated to non-prod, public TS types identical across paths. Modules 4 and 5 promoted sync→async (Q1 signoff) with all downstream call-sites awaited (`/api/media/[id]`, `/api/packages/[packageId]/artifacts/[artifactId]`, `/api/entitlements/[assetId]`, `src/lib/processing/pipeline.ts`, vitest suite). `getAllSeedProfiles` reinterpreted in real mode as "list all rows" (Q2 signoff). `tsc --noEmit` clean per module (5×), `bun run build` exit 0 (81 routes). `bun test` skipped — KD-8 is the pre-existing blocker. No new KD entries opened. |
+| **G2 passed** (2026-04-17) | Phase 1 (Foundation) closed. Only parallel human task remaining is 1.1 Vercel preview/prod env wiring; it does not block Phase 2/3/4/5 design work, only live deploys. |
 
-No timeline moves, no reprioritisation of later phases. Phase 0 is now demonstrably closed; CCP 3 closes; Phase 1 continues toward CCP 4.
+No timeline moves, no reprioritisation of later phases. Phase 0 closed; CCP 2/3/4 closed; Phase 1 closed; G2 passed. KD-8 now sits at the top of Now because CCP 4 landed without a live test suite — Phase 2/3 work should restore that signal first.
 
 ---
 
@@ -139,14 +142,14 @@ Do not commit external dates (to creators, investors, or partners) off this docu
 
 ## Exact next step
 
-1. **Commit CCP 3 closeout** — one code commit for the 9-file `process.env → @/lib/env` consolidation, one governance commit for `INTEGRATION_READINESS.md` + `ROADMAP.md` reconciliation. Push `main` to origin, tag a new checkpoint (`checkpoint/ccp3-green-<timestamp>`).
-2. **Paste CCP 4** in a fresh session — flip mocked modules (`auth/provider.ts`, `post/store.ts`, `providers/store.ts`, `media/asset-media-repo.ts`, `processing/profiles.ts`) to real dual-mode. Closes item 1.3.
-3. **In parallel (medium priority, blocks reliable test signal)** — KD-8 micro-CCP to fix `bun test` env loading. Has become more important now that CCP 4 will lean on test coverage to prove dual-mode correctness.
+1. **Governance commit landed** (2026-04-17) — `INTEGRATION_READINESS.md` + `ROADMAP.md` reconciled to reflect CCP 4 closure and G2 passage. Push `main` to origin, tag `checkpoint/ccp4-green-20260417-<hhmm>`.
+2. **Paste KD-8 prompt** — fix `bun test` env loading (`bunfig.toml` preload of `.env.local`, or equivalent). Promoted to top of Now because CCP 4 landed without live test signal; Phase 2/3 work is safer once tests are restored.
+3. **Then choose Phase 2 or Phase 3** — both unblocked by G2. Phase 3 is partially started (`5e652df`); finishing it first reduces ahead-of-sequence drift. Phase 2 (Sentry + structured logging) is the more conservative pre-Stripe move. Capacity call.
 4. **In parallel (low priority, discretionary)** — KD-7 micro-CCP (`force-dynamic` → `connection()`).
 5. **In parallel (long tail)** — execute H6 (Waterdog clone + mount) so CCP 16 is unblocked when the main chain reaches it.
-6. **In parallel (human task)** — wire Vercel preview + prod env vars (install `vercel` CLI or use dashboard). Not a CCP 4 blocker but required before Phase 4/5.
+6. **In parallel (human task)** — wire Vercel preview + prod env vars (install `vercel` CLI or use dashboard). Required before Phase 4/5 ships to a live URL, not before they're built.
 
-Expect CCP 4 to surface real-mode fallout the same way CCP 2/3 surfaced KDs — dual-mode parity tests, missing entitlement checks in the previously-mocked paths, and a few test-fixture reshapes. Governance captures them as KD items and moves on.
+Note for the next session: CCP 4 deliberately did not touch entitlement-check hardening on the previously-mocked asset-media paths. That work belongs in Phase 5 (Stripe fulfilment) and should not be re-scoped into Phase 2/3.
 
 ---
 
