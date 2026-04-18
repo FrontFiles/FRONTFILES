@@ -7,7 +7,7 @@
  *   describe → it → expect, beforeEach cleanup, factory helpers.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { resolveDownloadAuthorization } from '../services'
 import { putGrant, putMembership, _resetStore } from '../store'
 import {
@@ -21,9 +21,27 @@ import {
   COMPANY_ID,
 } from './helpers'
 
+// Force mock mode for this suite: unset the 3 Supabase env vars so
+// isSupabaseEnvPresent() (Pattern-a, live-read) returns false and the
+// entitlement store routes through putGrant/putMembership-seeded mock
+// maps instead of real Supabase. Snapshot captured once at module
+// load; restored in afterEach so per-test env state is isolated.
+const ORIG_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const ORIG_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const ORIG_SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+
 beforeEach(() => {
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL
+  delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY
   _resetStore()
   resetCounters()
+})
+
+afterEach(() => {
+  if (ORIG_SUPABASE_URL !== undefined) process.env.NEXT_PUBLIC_SUPABASE_URL = ORIG_SUPABASE_URL
+  if (ORIG_SUPABASE_ANON_KEY !== undefined) process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = ORIG_SUPABASE_ANON_KEY
+  if (ORIG_SUPABASE_SERVICE_ROLE_KEY !== undefined) process.env.SUPABASE_SERVICE_ROLE_KEY = ORIG_SUPABASE_SERVICE_ROLE_KEY
 })
 
 // ══════════════════════════════════════════════
