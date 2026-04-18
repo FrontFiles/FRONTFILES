@@ -7,6 +7,20 @@ import {
   _markMockAuthVerified,
   _markMockAuthUnverified,
 } from '../provider'
+import { scopeEnvVars } from '@/lib/test/env-scope'
+
+// Force mock mode: unset the 3 Supabase env vars so Pattern-a's
+// live-read isSupabaseEnvPresent() returns false. The auth provider
+// then routes signUpOrAdoptAuthUser / getAuthUserEmailConfirmed through
+// its mock branches, and the _markMockAuth* helpers take effect instead
+// of short-circuiting as real-mode no-ops. See KD-9-audit.md §Phase 4.A
+// §KD-9.2.aux — this file consumes the shared helper landed at
+// src/lib/test/env-scope.ts in KD-9.2.
+scopeEnvVars([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+])
 
 /**
  * Auth provider — mock-mode contract tests.
