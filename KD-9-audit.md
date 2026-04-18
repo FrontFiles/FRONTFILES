@@ -432,7 +432,12 @@ Counter-argument considered and rejected: "rolling Pattern-a into KD-9.0 keeps t
 ### E. Exit criteria per sub-CCP (falsifiable)
 
 **Pattern-a CCP:**
-- `bun run test` baseline diff shows **all 54 (a)-bucket failures** from Phase 1's inventory green, OR failing with a non-(a) error signature (i.e., no `expected 503 to be N`, no `expected 'NO_ACTIVE_GRANT' to be 'GRANT_*'` on seed-via-mock-helper tests — after per-suite env-scoping which KD-9.X will ship, that is; here we measure: no (a)-style failures when the test file's current code runs against the new env.ts).
+
+Exit:
+- (a.1) flags-cache failures and (a.2.i) withEnv-using failures: flip green OR change signature to non-(a) (typically to (b) fixture-drift, handed off to KD-9.1).
+- (a.2.ii) default-mock-dependent failures: remain (a.2.ii) at Pattern-a merge. Mechanism (pure-lazy getMode()) is delivered; test-side consumption (beforeEach that unsets the 3 Supabase vars) ships under KD-9.3 (19 entitlement), KD-9.2 (13 onboarding), and KD-9.2.aux (2 auth/provider _markMockAuth*). These failures retire under those tickets, not here.
+- No previously-green suite regresses vs d02b9f9 baseline.
+- Net failure count drops materially via the (a.1) + (a.2.i) subset (expected ~13–17 outright flips plus signature conversions of handler-execution tests).
 - `grep -rn "^const MODE:" src/lib` returns zero matches.
 - `grep -nE "^export const isSupabaseEnvPresent" src/lib/env.ts` returns zero matches; `grep -nE "^export function isSupabaseEnvPresent" src/lib/env.ts` returns one.
 - `bun x tsc --noEmit` exits 0.
@@ -458,6 +463,8 @@ Counter-argument considered and rejected: "rolling Pattern-a into KD-9.0 keeps t
 **KD-9.1:**
 - All 51 originally-failing tests in the 8 upload suites now pass.
 - Global pass count reaches the target set by KD-9's global exit criteria (below) minus any KD-10-deferred skips.
+
+*Revised 2026-04-18 post-Pattern-a merge (f926a27). Prior wording conflated mechanism delivery with test-side consumption and was internally inconsistent.*
 
 ### F. Global KD-9 exit criteria
 
