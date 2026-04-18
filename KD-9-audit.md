@@ -110,7 +110,7 @@ Both patterns from the KD-9 brief account for every failing test. No residual bu
 Observations (factual, not prescriptive):
 
 - The four API-route suites (api/upload, api/v2/batch, api/v2/batch/[id]/commit) and the storage/index suite are **pure (a) env-cache** — every failure there is a frozen `flags.realUpload` (or `FFF_STORAGE_DRIVER`) not observing a `withEnv` mutation.
-- `upload/commit-service` and `upload/batch-service` are **pure (b) fixture-drift** — every failure is a real-Supabase constraint error hit before any assertion.
+- `upload/commit-service` and `upload/batch-service` *(appeared as)* **pure (b) fixture-drift** at audit time — every failure is a real-Supabase constraint error hit before any assertion. *(Reclassified pure-(a.2.ii) at commit 79df5cf; mock-mode routing via scopeEnvVars sidesteps the UUID-column constraint, so all 19 failures share the same default-mock-dependent mechanism as KD-9.3 / KD-9.2 / KD-9.2.aux. See §Phase 2 amendment.)*
 - `entitlement/*` is **pure (a)** — tests use mock-store helpers (`putGrant`, `putMembership`) that do not drive the real store.
 - `providers/service` is **pure (b)** — 12 real-path INSERT / unique-constraint / native-error-shape drifts.
 - `auth/provider` is the only suite that **mixes buckets** within the same file *(onboarding/account-creation reclassified pure-(a) at commit 8b1fcf1 — see §Phase 2 amendment)*.
@@ -126,17 +126,17 @@ The original KD-9 brief assumed a 3-way sub-CCP split. The Phase 1 inventory sur
 | Sub-CCP | Cluster | Failures | Buckets | Suites |
 |---|---|---:|---|---|
 | KD-9.0 | provider spine fixture reset | 12 | pure (b) | `src/lib/providers/service.test.ts` |
-| KD-9.1 | upload | 51 | 20 (a) + 31 (b) | 8 (storage, processing×2, upload×2, api×3) |
+| KD-9.1 | upload | 51 | 48 (a) + 3 (b) *(reclassified at commit 79df5cf — see §Phase 2 amendment)* | 8 (storage, processing×2, upload×2, api×3) |
 | KD-9.2 | onboarding | 23 | 23 (a) + 0 (b) *(reclassified at commits 8b1fcf1 and 7c140ab — see §Phase 2 amendment)* | 5 (auth/provider + onboarding×4) |
 | KD-9.3 | entitlement | 19 | pure (a) | 2 (entitlement/services + authorization-invariants) |
-| **Total** | | **105** | 62 (a) + 43 (b) *(reclassified at commits 8b1fcf1 and 7c140ab — see §Phase 2 amendment)* | 16 |
+| **Total** | | **105** | 90 (a) + 15 (b) *(reclassified at commits 8b1fcf1, 7c140ab, 79df5cf — see §Phase 2 amendment)* | 16 |
 
 ### Fit check against the Phase 1 inventory
 
 - **Every failure lands in exactly one sub-CCP.** 12 + 51 + 23 + 19 = 105, matches the vitest roll-up.
 - **Every failing suite lands in exactly one sub-CCP.** 1 + 8 + 5 + 2 = 16, matches the 16-suite failure set.
 - **No suite straddles two sub-CCPs.** The two mixed-bucket suites (auth/provider, api/v2/batch/[id]/commit) each stay in a single sub-CCP; the bucket split within them determines Phase-3 gating (see per-test tables below), not sub-CCP membership *(three at audit time; onboarding/account-creation reclassified pure-(a) at commit 8b1fcf1 — see §Phase 2 amendment)*.
-- **Cross-tab reconciles.** 20 (a) + 23 (a) + 19 (a) = 62 (a); 31 (b) + 0 (b) + 12 (b) = 43 (b) *(reclassified at commits 8b1fcf1 and 7c140ab — see §Phase 2 amendment)*.
+- **Cross-tab reconciles.** 48 (a) + 23 (a) + 19 (a) = 90 (a); 3 (b) + 0 (b) + 12 (b) = 15 (b) *(reclassified at commits 8b1fcf1, 7c140ab, 79df5cf — see §Phase 2 amendment)*.
 
 **Verdict: the revised 4-way split fits the data.** No counter-proposal needed.
 
@@ -155,24 +155,25 @@ One framing clarification worth flagging: the founder's rationale for KD-9.0 rea
 #### KD-9.1 — upload
 
 - **Scope:** 8 suites — `storage/index`, `processing/pipeline`, `processing/profiles`, `upload/commit-service`, `upload/batch-service`, `api/upload`, `api/v2/batch`, `api/v2/batch/[id]/commit`.
-- **Failures:** 51 · **Buckets:** 20 (a) + 31 (b).
-- **Pure-bucket composition:**
-  - Pure (a), 17 failures: `storage/index` (4) · `api/upload` (6) · `api/v2/batch` (7).
-  - Pure (b), 27 failures: `processing/pipeline` (3) · `processing/profiles` (5) · `upload/commit-service` (12) · `upload/batch-service` (7).
-  - Mixed, 7 failures: `api/v2/batch/[id]/commit` (3 a + 4 b).
-- **Mixed-suite per-test mapping — `api/v2/batch/[id]/commit`:**
+- **Failures:** 51 · **Buckets:** 48 (a) + 3 (b) *(reclassified at commit 79df5cf — see §Phase 2 amendment)*.
+- **Pure-bucket composition (post-reclassification at commit 79df5cf):**
+  - Pure (a), 48 failures: `storage/index` (4) *(a.2.i, flipped at Pattern-a)* · `api/upload` (6) *(5 a.2.i flipped at Pattern-a + 1 a.2.ii reclassified at 79df5cf)* · `api/v2/batch` (4 of 7) *(1 a.2.i flipped at Pattern-a + 3 a.2.ii reclassified at 79df5cf)* · `api/v2/batch/[id]/commit` (7) *(3 a.2.i flipped at Pattern-a + 4 a.2.ii reclassified at 79df5cf)* · `processing/pipeline` (3) *(reclassified at 79df5cf)* · `processing/profiles` (5) *(reclassified at 79df5cf)* · `upload/commit-service` (12) *(reclassified at 79df5cf)* · `upload/batch-service` (7) *(reclassified at 79df5cf)*.
+  - (b), 3 failures: `api/v2/batch` body-validation describe block — genuine fixture-drift against an obsolete `parseBody` response shape (stale `{code, detail}` assertions vs. current `{error: {code, message, fields}}`); addressed via 3-assertion refresh at commit 79df5cf, not a UUID/seed reshape.
+- **Pre-reclassification Mixed-suite per-test mapping — `api/v2/batch/[id]/commit` (retained as historical record):**
 
-  | # | Test | Bucket | Phase 3 gated? |
-  |---|---|---|:-:|
-  | 1 | `validation > returns 400 when the batch id is not a UUID` | (a) env-cache | **yes** |
-  | 2 | `validation > returns 401 when X-Creator-Id is missing` | (a) env-cache | **yes** |
-  | 3 | `error paths > returns 404 when the batch does not exist` | (a) env-cache | **yes** |
-  | 4 | `happy path > returns 200 with state=committed when the batch exists and is open` | (b) fixture-drift | no |
-  | 5 | `error paths > returns 403 when the creator does not own the batch` | (b) fixture-drift | no |
-  | 6 | `error paths > returns 409 when the batch is already committed` | (b) fixture-drift | no |
-  | 7 | `error paths > returns 409 when the batch is cancelled` | (b) fixture-drift | no |
+  | # | Test | Bucket (at audit time) | Bucket (post-reclassification at 79df5cf) |
+  |---|---|---|---|
+  | 1 | `validation > returns 400 when the batch id is not a UUID` | (a) env-cache | (a.2.i) — flipped at Pattern-a |
+  | 2 | `validation > returns 401 when X-Creator-Id is missing` | (a) env-cache | (a.2.i) — flipped at Pattern-a |
+  | 3 | `error paths > returns 404 when the batch does not exist` | (a) env-cache | (a.2.i) — flipped at Pattern-a |
+  | 4 | `happy path > returns 200 with state=committed when the batch exists and is open` | (b) fixture-drift | (a.2.ii) — reclassified at 79df5cf |
+  | 5 | `error paths > returns 403 when the creator does not own the batch` | (b) fixture-drift | (a.2.ii) — reclassified at 79df5cf |
+  | 6 | `error paths > returns 409 when the batch is already committed` | (b) fixture-drift | (a.2.ii) — reclassified at 79df5cf |
+  | 7 | `error paths > returns 409 when the batch is cancelled` | (b) fixture-drift | (a.2.ii) — reclassified at 79df5cf |
 
-- **Phase 3 (pattern-a) gating:** 20 of 51 failures (39.2 %) are (a) and wait on the Phase 3 decision. The 31 (b) failures are not directly gated, but (a) and (b) co-inhabit several files (commit-service + batch-service + the mixed route suite), so in practice KD-9.1 cannot fully close until Phase 3 lands — any test-harness change from Phase 3 will touch the same files a (b) fixture reshape is touching.
+  *(Pre-reclassification note, retained for historical record.)* At audit time, 31 of KD-9.1's 51 failures were classified (b) fixture-drift. Reclassification at commit 79df5cf moved 28 of those 31 to (a.2.ii) default-mock-dependent — the failures share the same mechanism as KD-9.3 / KD-9.2 / KD-9.2.aux (`.env.local` loads Supabase vars via `vitest.setup.ts` → `isSupabaseConfigured()` true → dual-mode stores hit the real path). The remaining 3 (b) failures are a separate kind of fixture-drift — test assertions stale against `parseBody`'s current response shape. Third reclassification cycle in the KD-9 program (after 8b1fcf1 and 7c140ab).
+
+- **Phase 3 (pattern-a) gating:** At audit time, 20 of 51 (39.2 %) were (a) and gated; post-reclassification at commit 79df5cf, 48 of 51 (94.1 %) were (a) and all retired via scopeEnvVars after Pattern-a merged. The (a)/(b) co-inhabitation-in-same-file rework risk noted here proved largely moot in practice — the mechanism closed the majority of failures in a single module-top-level edit per file, so Phase 3's scopeEnvVars consumer pattern subsumed most of the "fixture reshape" work the audit originally planned.
 
 #### KD-9.2 — onboarding
 
@@ -221,7 +222,7 @@ One framing clarification worth flagging: the founder's rationale for KD-9.0 rea
 | Sub-CCP | Total failures | (a) env-cache waiting on Phase 3 | % blocked |
 |---|---:|---:|---:|
 | KD-9.0 | 12 | 0 | **0 %** |
-| KD-9.1 | 51 | 20 (+ indirect rework risk on the other 31) | 39.2 % direct |
+| KD-9.1 | 51 | 48 *(reclassified at commit 79df5cf — see §Phase 2 amendment)* | 94.1 % direct *(pre-reclassification: 39.2 %)* |
 | KD-9.2 | 23 | 17 | 73.9 % |
 | KD-9.3 | 19 | 19 | **100 %** |
 | **Aggregate** | **105** | **56** | **53.3 %** |
@@ -229,7 +230,7 @@ One framing clarification worth flagging: the founder's rationale for KD-9.0 rea
 - **56 of 105 failures (53.3 %) wait on the Phase 3 decision** about how tests should invalidate the module-load-time cached `flags.*` / `MODE`.
 - **KD-9.3 cannot start** until Phase 3 is locked. All 19 failures there are (a).
 - **KD-9.2 cannot close** without Phase 3 — two-thirds of its failures are (a), and the mixed suites blend (a) and (b) at the file level.
-- **KD-9.1 has significant indirect exposure** even though only 39 % of its failures are pure (a): (a) and (b) failures share test files, so any test-harness change from Phase 3 will touch the same files a (b) fixture reshape is touching.
+- **KD-9.1 has significant indirect exposure** even though only 39 % of its failures are pure (a): (a) and (b) failures share test files, so any test-harness change from Phase 3 will touch the same files a (b) fixture reshape is touching. *(Pre-reclassification narrative, retained for historical record. Post-reclassification at commit 79df5cf: 94.1 % are (a); the "indirect exposure" concern proved to be a mis-read of the (b) classification — most of those failures were (a.2.ii) default-mock-dependent and retired via scopeEnvVars, not fixture reshape.)*
 - **KD-9.0 is the only sub-CCP with zero Phase 3 dependency** — which is why the founder's amendment sequences it first.
 
 Treating Phase 3 as parallel (e.g., "start KD-9.1 fixture work while the pattern-(a) debate is in flight") is an anti-pattern here. Sequence to observe: **KD-9.0 → Phase 3 decision locks → KD-9.1 / 9.2 / 9.3 in whatever order Phase 4 resolves.**
@@ -361,7 +362,7 @@ Five tickets, ordered:
 | 2 | **KD-9.0 — provider spine fixture reset** | Phase-3-independent (0 % (a)), smallest cluster (12 tests, 1 file), canonicalises the real-DB fixture-reshape pattern that KD-9.1 reuses at scale. Lands without waiting on Pattern-a's greening to settle. |
 | 3 | **KD-9.3 — entitlement verify + close** | After Pattern-a, the 19 tests in `entitlement/*` need only a small `beforeEach` hook that forces mock mode via env-scoping; the mock-data helpers (`putGrant`, `putMembership`) then work as originally intended. Smallest remaining fixture surface; closes an entire domain in one session. |
 | 4 | **KD-9.2 — onboarding** | 4 test files (post correction 1 auth/provider split to KD-9.2.aux), 15 failures, all pure (a.2.ii) per reclassification at commit 8b1fcf1. Requires env-scoping via shared helper at `src/lib/test/env-scope.ts` (landed 8b1fcf1). No fixture reshape needed in the 4 files. KD-10 flakiness candidate still applies via KD-9.2.aux. Ahead of KD-9.1 because smaller blast radius. |
-| 5 | **KD-9.1 — upload** | Biggest cluster (8 files, 51 failures). Mixes storage-driver, processing pipeline, upload services, and three API-route suites. Reuses KD-9.0's fixture-reshape pattern. Last because biggest and relies on the three prior sub-CCPs to settle their respective concerns. |
+| 5 | **KD-9.1 — upload** | Biggest cluster (8 files, 51 failures). Mixes storage-driver, processing pipeline, upload services, and three API-route suites. Reuses KD-9.0's fixture-reshape pattern. Last because biggest and relies on the three prior sub-CCPs to settle their respective concerns. **CLOSED at commit 79df5cf (2026-04-18) — 48 of 51 failures retired via scopeEnvVars (reclassified (b) → (a.2.ii)), 3 retired via parseBody-assertion refresh. KD-9 globally closed.** |
 
 Sequence rationale in one line: **architecture first, then smallest Phase-3-independent cluster, then close out by ascending blast radius.**
 
@@ -435,7 +436,7 @@ Counter-argument considered and rejected: "rolling Pattern-a into KD-9.0 keeps t
 
 Exit:
 - (a.1) flags-cache failures and (a.2.i) withEnv-using failures: flip green OR change signature to non-(a) (typically to (b) fixture-drift, handed off to KD-9.1).
-- (a.2.ii) default-mock-dependent failures: remain (a.2.ii) at Pattern-a merge. Mechanism (pure-lazy getMode()) is delivered; test-side consumption (beforeEach that unsets the 3 Supabase vars) ships under KD-9.3 (19 entitlement), KD-9.2 (15 onboarding — reclassified from 13 at commit 8b1fcf1), and KD-9.2.aux (8 auth/provider default-mock-dependent — reclassified from 2 at commit 7c140ab). These failures retire under those tickets, not here.
+- (a.2.ii) default-mock-dependent failures: remain (a.2.ii) at Pattern-a merge. Mechanism (pure-lazy getMode()) is delivered; test-side consumption (beforeEach that unsets the 3 Supabase vars) ships under KD-9.3 (19 entitlement), KD-9.2 (15 onboarding — reclassified from 13 at commit 8b1fcf1), KD-9.2.aux (8 auth/provider default-mock-dependent — reclassified from 2 at commit 7c140ab), and KD-9.1 (35 upload-domain default-mock-dependent reclassified at commit 79df5cf, covering commit-service ×12, batch-service ×7, processing/pipeline ×3, processing/profiles ×5, api/upload/route ×1, api/v2/batch/route ×3, api/v2/batch/[id]/commit ×4). These failures retire under those tickets, not here.
 - No previously-green suite regresses vs d02b9f9 baseline.
 - Net failure count drops materially via the (a.1) + (a.2.i) subset (expected ~13–17 outright flips plus signature conversions of handler-execution tests).
 - `grep -rn "^const MODE:" src/lib` returns zero matches.
@@ -462,25 +463,26 @@ Exit:
 - If path (ii): 23 / 23 pass with per-suite `afterEach` present; KD-10 remains open in `INTEGRATION_READINESS.md`.
 - If path (iii): 19 / 23 pass + 4 skipped with `.skip` markers citing KD-10; pass-count baseline updates accordingly.
 
-**KD-9.1:**
-- All 51 originally-failing tests in the 8 upload suites now pass.
-- Global pass count reaches the target set by KD-9's global exit criteria (below) minus any KD-10-deferred skips.
+**KD-9.1:** *(ATTESTED at commit 79df5cf, 2026-04-18)*
+- All 51 originally-failing tests in the 8 upload suites now pass. ✓
+- Mechanism breakdown: 13 (a.2.i) flipped at Pattern-a merge (storage/index 4 + route-suite withEnv-gated subset); 35 (a.2.ii) flipped at 79df5cf via module-top scopeEnvVars across 7 test files; 3 (b) fixture-drift (parseBody response-shape drift) closed via 3-assertion refresh in api/v2/batch/route.test.ts at 79df5cf.
+- Global pass count reached the target set by KD-9's global exit criteria (below); no KD-10-deferred skips applied.
 
 *Revised 2026-04-18 post-Pattern-a merge (f926a27). Prior wording conflated mechanism delivery with test-side consumption and was internally inconsistent.*
 
-### F. Global KD-9 exit criteria
+### F. Global KD-9 exit criteria — **ATTESTED at commit 79df5cf (2026-04-18)**
 
-KD-9 is closed when **all** of the following hold:
+KD-9 closed when **all** of the following held (attestation in brackets):
 
-- `bun run test`: **46 / 46 suites executing · 0 failed · total skip count reflects only KD-2 plus any deliberate KD-10 deferrals · all non-skipped tests pass.** Decoupled from an absolute pass-count target so the exit criterion holds regardless of which KD-10 resolution path (i / ii / ii' / iii in KD-9.2's entry) the founder chooses. Every skip must be annotated with a line comment citing either KD-2 or the KD-10 candidate row in this audit doc.
-- **No previously-green suite transitions to failing across any KD-9 merge.** Verified by comparing suite-level pass/fail deltas at each merge point against the commit `93987c7` baseline (the audit phases 1-3 commit). A new failure in a previously-green suite is a regression, not in-scope for KD-9, and blocks close-out until resolved.
-- `bun x tsc --noEmit` exits 0.
-- `bun run build` exits 0 with 81 routes.
-- `bunx supabase migration list` clean (no unpushed migrations beyond what Phase 4/5 work introduces later).
+- `bun run test`: **46 / 46 suites executing · 0 failed · total skip count reflects only KD-2 plus any deliberate KD-10 deferrals · all non-skipped tests pass.** Decoupled from an absolute pass-count target so the exit criterion holds regardless of which KD-10 resolution path (i / ii / ii' / iii in KD-9.2's entry) the founder chooses. Every skip must be annotated with a line comment citing either KD-2 or the KD-10 candidate row in this audit doc. **[ATTESTED 79df5cf: 46/46 · 0 failed · 1080 passed · 1 skipped (KD-2). No KD-10 deferrals — all 38 post-Pattern-a failures retired in scope.]**
+- **No previously-green suite transitions to failing across any KD-9 merge.** Verified by comparing suite-level pass/fail deltas at each merge point against the commit `93987c7` baseline (the audit phases 1-3 commit). A new failure in a previously-green suite is a regression, not in-scope for KD-9, and blocks close-out until resolved. **[ATTESTED 79df5cf: no regression in any previously-green suite across the 6-commit KD-9 sequence.]**
+- `bun x tsc --noEmit` exits 0. **[ATTESTED 79df5cf: exit 0.]**
+- `bun run build` exits 0 with 81 routes. *(Not re-measured at 79df5cf; no production code change since last attested build. Recommend post-merge `bun run build` as a belt-and-suspenders check — out of scope for KD-9.1's test-only commit.)*
+- `bunx supabase migration list` clean (no unpushed migrations beyond what Phase 4/5 work introduces later). *(Not touched by KD-9; no migrations introduced by any KD-9 sub-CCP.)*
 - `ROADMAP.md` Now-table: KD-9 row removed or moved to "Changes this update" with a closing commit SHA. *(Founder edit — per founder's governance-doc ownership; this sub-CCP flags, founder commits.)*
-- `INTEGRATION_READINESS.md` KD-9 row: status flipped to **Closed** with a summary of the 5 commits (Pattern-a + 4 sub-CCPs). *(Founder edit — same disclaimer.)*
-- If KD-10 was opened and resolved during KD-9.2, it shows Closed in the same table. If deferred, it remains Open and the KD-9 close-out explicitly notes the residual.
-- A post-KD-9 checkpoint tag on `main` — suggested form `checkpoint/kd9-green-YYYYMMDD-hhmm` — created by the founder after the final sub-CCP merge.
+- `INTEGRATION_READINESS.md` KD-9 row: status flipped to **Closed** with a summary of the 6 commits (Pattern-a + KD-9.0 + KD-9.3 + KD-9.2 + KD-9.2.aux + KD-9.1). *(Founder edit — same disclaimer.)*
+- If KD-10 was opened and resolved during KD-9.2, it shows Closed in the same table. If deferred, it remains Open and the KD-9 close-out explicitly notes the residual. *(KD-10 remains Open as a latent candidate — never triggered in practice because all three potentially-affected sub-CCPs (KD-9.2 onboarding, KD-9.2.aux auth/provider, KD-9.1 api/v2/batch) routed through mock mode via scopeEnvVars, which does not exercise `auth.users`.)*
+- A post-KD-9 checkpoint tag on `main` — suggested form `checkpoint/kd9-green-YYYYMMDD-hhmm` — created by the founder after the final sub-CCP merge. *(Founder action pending.)*
 
 ### G. Agent-coverage mapping
 
