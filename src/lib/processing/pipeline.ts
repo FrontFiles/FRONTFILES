@@ -106,7 +106,7 @@ export async function processDerivative(
 
     if (spec.watermarked) {
       const family: TemplateFamily = resolveTemplateFamily(resized.width, resized.height)
-      const profile = getApprovedProfile(intrusionLevel, family)
+      const profile = await getApprovedProfile(intrusionLevel, family)
 
       if (!profile) {
         throw new Error(
