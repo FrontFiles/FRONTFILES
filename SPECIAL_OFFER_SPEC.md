@@ -566,11 +566,11 @@ All state transitions are validated server-side. The frontend renders state rece
 
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/api/direct-offer` | POST | Create new offer thread |
-| `/api/direct-offer` | GET | List threads (filter by buyerId, creatorId, assetId) |
-| `/api/direct-offer/[id]/counter` | POST | Submit counter-offer |
-| `/api/direct-offer/[id]/accept` | POST | Accept current offer |
-| `/api/direct-offer/[id]/decline` | POST | Creator declines |
+| `/api/special-offer` | POST | Create new offer thread |
+| `/api/special-offer` | GET | List threads (filter by buyerId, creatorId, assetId) |
+| `/api/special-offer/[id]/counter` | POST | Submit counter-offer |
+| `/api/special-offer/[id]/accept` | POST | Accept current offer |
+| `/api/special-offer/[id]/decline` | POST | Creator declines |
 
 ### H.3 Checkout handoff mechanism
 
@@ -643,4 +643,4 @@ The implementation creates events for every state change. Notification delivery 
 
 ---
 
-*This spec defines the complete Special Offer product for Frontfiles. Implementation should follow the canonical types in `src/lib/types.ts`, the domain engine in `src/lib/special-offer/`, and the API routes in `src/app/api/direct-offer/`. Design should follow the Frontfiles design system lock (black, blue-600, white, zero radius, Neue Haas Grotesk).*
+*This spec defines the complete Special Offer product for Frontfiles. Implementation should follow the canonical types in `src/lib/types.ts`, the domain engine in `src/lib/special-offer/`, and the API routes in `src/app/api/special-offer/`. Design should follow the Frontfiles design system lock (black, blue-600, white, zero radius, Neue Haas Grotesk).*

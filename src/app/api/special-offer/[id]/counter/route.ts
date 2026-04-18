@@ -1,5 +1,5 @@
 /**
- * POST /api/direct-offer/[id]/counter — Submit a counter-offer
+ * POST /api/special-offer/[id]/counter — Submit a counter-offer
  *
  * Body: { actorId, amount, role: 'buyer' | 'creator' }
  */

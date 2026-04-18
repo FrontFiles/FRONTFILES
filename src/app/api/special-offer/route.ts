@@ -1,6 +1,6 @@
 /**
- * POST /api/direct-offer — Create a new Direct Offer thread
- * GET  /api/direct-offer — List offer threads (optional ?buyerId= or ?creatorId= or ?assetId=)
+ * POST /api/special-offer — Create a new Direct Offer thread
+ * GET  /api/special-offer — List offer threads (optional ?buyerId= or ?creatorId= or ?assetId=)
  */
 
 import type { NextRequest } from 'next/server'
@@ -18,7 +18,7 @@ import {
 
 // ─── Request schema ──────────────────────────────────────────────
 //
-// Body contract for POST /api/direct-offer. Tight enough to reject
+// Body contract for POST /api/special-offer. Tight enough to reject
 // obviously-malformed requests (wrong types, missing fields, silly
 // values) without locking down fields whose canonical enums aren't
 // fully resolved yet (licenceType — see D-DO lock decisions). Those
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     const [body, parseErr] = await parseBody(
       request,
       CreateDirectOfferBody,
-      'POST /api/direct-offer',
+      'POST /api/special-offer',
     )
     if (parseErr) return parseErr
 

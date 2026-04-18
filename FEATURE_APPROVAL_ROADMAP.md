@@ -115,6 +115,18 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 - In-module docstrings (`Direct Offer Engine — ...` headers) deferred to P2.x sweep.
 - Commit SHA: see `git log --grep="P2 rename"` (self-referential fill deferred — amending the commit to inject its own SHA changes the SHA, making the doc lie; kept as a git-log pointer instead).
 
+**P3 status (landed 2026-04-18):**
+- Route folder renamed: `src/app/api/direct-offer/` → `src/app/api/special-offer/` (4 routes: index, [id]/accept, [id]/counter, [id]/decline) via `git mv`.
+- Route-file internal refs updated: 7 path mentions across the 4 route files (JSDoc route headers + 1 `parseBody` error label `'POST /api/direct-offer'` in `route.ts:56`) swapped to `/api/special-offer`.
+- Client callers updated: 1 file (`src/app/vault/offers/page.tsx`) — 3 `fetch()` sites (accept/counter/decline endpoints on lines 333, 385, 446).
+- Integration/e2e tests updated: 0 (no `__tests__` exist for these routes; no Playwright/Cypress config in repo).
+- Middleware/config: none — no `middleware.ts`; `next.config.ts` is empty `{}` with no rewrites/redirects/matchers; typed routes not enabled.
+- Stale doc refs updated: `PLATFORM_REVIEWS.md` (2 refs, lines 293 + 313), `SPECIAL_OFFER_SPEC.md` (6 refs — API surface table lines 569–573 + closing note line 646), `INTEGRATION_READINESS.md` (1 ref, line 59, KD-8 closure note — path updated to post-P3 location; trade: retains grep cleanliness at minor cost to historical specificity about where the zod-import file lived at fix time).
+- Next.js 16.2.2 convention check: folder-rename of route segments + `route.ts` filename confirmed idiomatic per `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md` — no deprecations.
+- Deferred (out of P3 scope): `actionType: 'direct-offer.create'` in `route.ts:65` (rate-limit namespace key, not a path — deferred to cross-cutting consistency pass); in-route comment `route.ts:24` mentions "D-DO lock decisions" (stale code comment, not identifier/path); `CreateDirectOfferBody` Zod schema identifier in `route.ts:40` (route-local, not path).
+- Still pending under A.0: shared types in `src/lib/types.ts` + `src/lib/schema.ts` (`DirectOfferThread`, `DirectOfferEvent`, `DirectOfferStatus`, `DIRECT_OFFER_MAX_ROUNDS`, etc.) (P4), DB schema `direct_offer_*` (P5), canonical terminology registry `TERMINOLOGY_LOCK.md` (P6).
+- Commit SHA: see `git log --grep="P3 rename"` (self-referential fill deferred per P2 convention).
+
 ---
 
 ### Track 1 — approval gates

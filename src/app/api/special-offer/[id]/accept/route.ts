@@ -1,5 +1,5 @@
 /**
- * POST /api/direct-offer/[id]/accept — Accept the current offer
+ * POST /api/special-offer/[id]/accept — Accept the current offer
  *
  * Body: { actorId, role: 'buyer' | 'creator' }
  */

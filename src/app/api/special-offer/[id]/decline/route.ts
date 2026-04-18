@@ -1,5 +1,5 @@
 /**
- * POST /api/direct-offer/[id]/decline — Creator declines the offer
+ * POST /api/special-offer/[id]/decline — Creator declines the offer
  *
  * Body: { actorId }
  */

@@ -330,7 +330,7 @@ function ThreadCard({
                 onClick={async () => {
                   setSubmitting(true)
                   try {
-                    const res = await fetch(`/api/direct-offer/${thread.id}/accept`, {
+                    const res = await fetch(`/api/special-offer/${thread.id}/accept`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ actorId: thread.creatorId, role: 'creator' }),
@@ -382,7 +382,7 @@ function ThreadCard({
                         if (!cents || cents <= 0) return
                         setSubmitting(true)
                         try {
-                          const res = await fetch(`/api/direct-offer/${thread.id}/counter`, {
+                          const res = await fetch(`/api/special-offer/${thread.id}/counter`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -443,7 +443,7 @@ function ThreadCard({
                     onClick={async () => {
                       setSubmitting(true)
                       try {
-                        const res = await fetch(`/api/direct-offer/${thread.id}/decline`, {
+                        const res = await fetch(`/api/special-offer/${thread.id}/decline`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
