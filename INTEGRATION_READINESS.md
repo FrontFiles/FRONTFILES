@@ -34,9 +34,10 @@ All Phase 0 pre-flight items complete. CCP 1 executed. Evidence below; this bloc
 | P0.5 PR lifecycle | PR #4 (= PR 1.2 `/api/v2/batch` routes) **merged** (`c0d9ac1`). PR 1.3 **never opened** (not started) — formally **deferred**; will be scoped inside Phase 1 upload-substrate work if needed, otherwise killed. | Merge `c0d9ac1` |
 | P0.6 Tag `main` at last-known-good | Tagged | `checkpoint/preflight-green-20260417-1116`, `phase-1-baseline`, plus 4 `backup/pre-filter/*` safety tags |
 
-**Gate status:** G1 passed (D1–D12 locked, 2026-04-17) · Phase 0 **fully closed** — P0.2 resolved via KD-1 micro-fix (commit `4681e92`). CCP 1 complete.
-**Next CCP:** CCP 3 (pgvector + ai_analysis + audit_log + env-schema).
+**Gate status:** G1 passed (D1–D12 locked, 2026-04-17) · Phase 0 **fully closed** — P0.2 resolved via KD-1 micro-fix (commit `4681e92`). CCP 1, CCP 2, CCP 3 complete.
+**Next CCP:** CCP 4 (flip mocked modules to real dual-mode).
 **CCP 2 status (2026-04-17):** **GREEN on dev.** Commit `c05928f feat(rls): apply RLS migration 20260420000000 to dev Supabase`. Verification: grep scan 0 matches; `tsc --noEmit` exit 0; 8/9 RLS tests pass (1 skip = KD-2 fixture drift); migration `20260420000000_rls_all_tables.sql` applied on Remote dev Supabase. Scope item 1 (Vercel preview/prod env wiring) is a follow-up human task; does not block CCP 2 gate but blocks full Phase 1 closeout. 4 deny-all + TODO entries carried forward as KD-3 through KD-6.
+**CCP 3 status (2026-04-17):** **GREEN.** Items 1.7, 1.8, 1.9 landed pre-CCP in migration `20260419110000_phase1_vector_cache_audit.sql` (pgvector + `asset_embeddings` + HNSW index; `ai_analysis` cache with `(subject_type, subject_id, model, model_version, input_hash)` unique; `audit_log` append-only with event_type/actor_id/target indexes; all three RLS-enabled service-role-only; the `20260420000000` RLS migration confirms these were pre-locked and are correctly skipped by the generalised pass). Item 1.10 landed in `src/lib/env.ts` (Zod fail-fast, every required var + optional bank, `env`/`flags`/`isSupabaseEnvPresent` exports). CCP 3 closeout consolidated `process.env` reads in 9 source files to import from `@/lib/env` — grep dropped 19 → 5 non-test files (health-route Vercel build metadata, dynamic secret/rate-limit resolvers, `NEXT_RUNTIME` runtime signal in `instrumentation.ts`; all documented exceptions). Verification: `tsc --noEmit` exit 0; `bun run build` exit 0 with 47 routes; grep count 12 lines across 5 exception files as expected.
 **Drift note (2026-04-17):** commit `5e652df feat(email): wire Resend + audited transactional send pipeline (Phase 3.0)` indicates Phase 3 item 3.1 has also begun ahead of sequence. Not a problem, but Phase 3 state in the "Current state audit" table below is stale — trust commits over the table until the table is refreshed.
 
 ---
@@ -183,10 +184,10 @@ Nothing downstream can go live until this phase is done.
 | 1.4 Supabase Storage bucket policies + signed-URL delivery via `/api/media/[id]` with entitlement checks | HARDEN | M | Protects paid content |
 | 1.5 Zod request schemas on every API route (fill gaps) | HARDEN | S–M | Defense before Stripe + Google touches these routes |
 | 1.6 Rate limiting on auth, upload, checkout, webhook routes | ADD | S | Upstash Ratelimit or equivalent |
-| 1.7 pgvector extension enabled + `asset_embeddings` table | ADD | S | Foundation for search and AI features |
-| 1.8 `ai_analysis` cache table (per asset × model × version) | ADD | S | Prevents re-running Vision on the same image |
-| 1.9 Audit log table mirroring every Stripe + AI + auth event | ADD | S | Forensics + compliance |
-| 1.10 Environment-typed Zod schema for `process.env` (fail-fast on boot if any var missing) | ADD | S | Catches misconfigured deploys |
+| 1.7 pgvector extension enabled + `asset_embeddings` table | ADD | S | **Done (2026-04-17, CCP 3)** — migration `20260419110000_phase1_vector_cache_audit.sql`. `vector(768)` per D7, HNSW cosine index, RLS service-role-only. |
+| 1.8 `ai_analysis` cache table (per asset × model × version) | ADD | S | **Done (2026-04-17, CCP 3)** — same migration. Unique key `(subject_type, subject_id, model, model_version, input_hash)` with COALESCE so NULL `subject_id` (query type) still de-dupes. |
+| 1.9 Audit log table mirroring every Stripe + AI + auth event | ADD | S | **Done (2026-04-17, CCP 3)** — same migration. Indexes on (event_type, created_at), (actor_id, created_at), (target_type, target_id, created_at), (trace_id). Append-only enforced at app layer. |
+| 1.10 Environment-typed Zod schema for `process.env` (fail-fast on boot if any var missing) | ADD | S | **Done (2026-04-17, CCP 3)** — `src/lib/env.ts` + 9-file consolidation commit. `grep process.env src/` = 12 lines across 5 documented-exception files (health route metadata, dynamic resolvers, `NEXT_RUNTIME` signal). |
 
 ---
 
