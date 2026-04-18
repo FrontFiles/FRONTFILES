@@ -127,16 +127,16 @@ The original KD-9 brief assumed a 3-way sub-CCP split. The Phase 1 inventory sur
 |---|---|---:|---|---|
 | KD-9.0 | provider spine fixture reset | 12 | pure (b) | `src/lib/providers/service.test.ts` |
 | KD-9.1 | upload | 51 | 20 (a) + 31 (b) | 8 (storage, processing×2, upload×2, api×3) |
-| KD-9.2 | onboarding | 23 | 17 (a) + 6 (b) | 5 (auth/provider + onboarding×4) |
+| KD-9.2 | onboarding | 23 | 23 (a) + 0 (b) *(reclassified at commits 8b1fcf1 and 7c140ab — see §Phase 2 amendment)* | 5 (auth/provider + onboarding×4) |
 | KD-9.3 | entitlement | 19 | pure (a) | 2 (entitlement/services + authorization-invariants) |
-| **Total** | | **105** | 56 (a) + 49 (b) | 16 |
+| **Total** | | **105** | 62 (a) + 43 (b) *(reclassified at commits 8b1fcf1 and 7c140ab — see §Phase 2 amendment)* | 16 |
 
 ### Fit check against the Phase 1 inventory
 
 - **Every failure lands in exactly one sub-CCP.** 12 + 51 + 23 + 19 = 105, matches the vitest roll-up.
 - **Every failing suite lands in exactly one sub-CCP.** 1 + 8 + 5 + 2 = 16, matches the 16-suite failure set.
 - **No suite straddles two sub-CCPs.** The two mixed-bucket suites (auth/provider, api/v2/batch/[id]/commit) each stay in a single sub-CCP; the bucket split within them determines Phase-3 gating (see per-test tables below), not sub-CCP membership *(three at audit time; onboarding/account-creation reclassified pure-(a) at commit 8b1fcf1 — see §Phase 2 amendment)*.
-- **Cross-tab reconciles.** 20 (a) + 17 (a) + 19 (a) = 56 (a); 31 (b) + 6 (b) + 12 (b) = 49 (b).
+- **Cross-tab reconciles.** 20 (a) + 23 (a) + 19 (a) = 62 (a); 31 (b) + 0 (b) + 12 (b) = 43 (b) *(reclassified at commits 8b1fcf1 and 7c140ab — see §Phase 2 amendment)*.
 
 **Verdict: the revised 4-way split fits the data.** No counter-proposal needed.
 
@@ -177,24 +177,24 @@ One framing clarification worth flagging: the founder's rationale for KD-9.0 rea
 #### KD-9.2 — onboarding
 
 - **Scope:** 5 suites — `auth/provider`, `onboarding/resume`, `onboarding/account-creation`, `onboarding/integration`, `onboarding/account-creation-verification`.
-- **Failures:** 23 · **Buckets:** 17 (a) + 6 (b) *(reclassified at commit 8b1fcf1 — see §Phase 2 amendment)*.
+- **Failures:** 23 · **Buckets:** 23 (a) + 0 (b) *(reclassified at commits 8b1fcf1 and 7c140ab — see §Phase 2 amendment)*.
 - **Pure-bucket composition:**
-  - Pure (a), 15 failures: `onboarding/resume` (3) · `onboarding/integration` (4) · `onboarding/account-creation-verification` (2) · `onboarding/account-creation` (6) *(reclassified at commit 8b1fcf1 — see §Phase 2 amendment)*.
-  - Mixed, 8 failures: `auth/provider` (2 a + 6 b) *(onboarding/account-creation was 4 a + 2 b at audit time; reclassified pure-(a) at commit 8b1fcf1 — see §Phase 2 amendment)*.
-- **Mixed-suite per-test mapping — `auth/provider` (8 failures):**
+  - Pure (a), 23 failures: `onboarding/resume` (3) · `onboarding/integration` (4) · `onboarding/account-creation-verification` (2) · `onboarding/account-creation` (6) *(reclassified at commit 8b1fcf1)* · `auth/provider` (8) *(reclassified at commit 7c140ab — see §Phase 2 amendment)*.
+  - Mixed: none *(onboarding/account-creation was 4 a + 2 b at audit time, reclassified pure-(a) at commit 8b1fcf1; auth/provider was 2 a + 6 b at audit time, reclassified pure-(a.2.ii) at commit 7c140ab — see §Phase 2 amendment)*.
+- **Per-test mapping — `auth/provider` (8 failures, pure (a.2.ii) post-reclassification at commit 7c140ab):**
 
   | # | Test | Bucket | Phase 3 gated? |
   |---|---|---|:-:|
-  | 1 | `signUpOrAdoptAuthUser — happy path > creates a new auth user on first call with a fresh email` | (b) fixture-drift | no |
-  | 2 | `signUpOrAdoptAuthUser — password mismatch > throws when the retry password does not match the existing row` | (b) fixture-drift | no |
-  | 3 | `signUpOrAdoptAuthUser — verification required > writes new rows as unconfirmed when verification is required` | (b) fixture-drift | no |
-  | 4 | `signUpOrAdoptAuthUser — verification required > does not re-apply the verification-required flag after a reset` | (b) fixture-drift | no |
-  | 5 | `getAuthUserEmailConfirmed > returns true for a confirmed auth user` | (b) fixture-drift | no |
-  | 6 | `getAuthUserEmailConfirmed > returns null for an unknown id` | (b) fixture-drift | no |
-  | 7 | `getAuthUserEmailConfirmed > reflects a confirmation flip via _markMockAuthVerified` | (a) env-cache | **yes** |
-  | 8 | `getAuthUserEmailConfirmed > reflects an unverification flip via _markMockAuthUnverified` | (a) env-cache | **yes** |
+  | 1 | `signUpOrAdoptAuthUser — happy path > creates a new auth user on first call with a fresh email` | (a.2.ii) default-mock-dependent *(reclassified at commit 7c140ab)* | **yes** |
+  | 2 | `signUpOrAdoptAuthUser — password mismatch > throws when the retry password does not match the existing row` | (a.2.ii) default-mock-dependent *(reclassified at commit 7c140ab)* | **yes** |
+  | 3 | `signUpOrAdoptAuthUser — verification required > writes new rows as unconfirmed when verification is required` | (a.2.ii) default-mock-dependent *(reclassified at commit 7c140ab)* | **yes** |
+  | 4 | `signUpOrAdoptAuthUser — verification required > does not re-apply the verification-required flag after a reset` | (a.2.ii) default-mock-dependent *(reclassified at commit 7c140ab)* | **yes** |
+  | 5 | `getAuthUserEmailConfirmed > returns true for a confirmed auth user` | (a.2.ii) default-mock-dependent *(reclassified at commit 7c140ab)* | **yes** |
+  | 6 | `getAuthUserEmailConfirmed > returns null for an unknown id` | (a.2.ii) default-mock-dependent *(reclassified at commit 7c140ab)* | **yes** |
+  | 7 | `getAuthUserEmailConfirmed > reflects a confirmation flip via _markMockAuthVerified` | (a.2.ii) default-mock-dependent | **yes** |
+  | 8 | `getAuthUserEmailConfirmed > reflects an unverification flip via _markMockAuthUnverified` | (a.2.ii) default-mock-dependent | **yes** |
 
-  Of the 6 (b) failures, tests #1–#4 overlap with the **KD-10 candidate** (inter-run state leak — see above); their "first-contact" assertions are also order-dependent on prior `auth.users` rows. Resolving the KD-10 candidate would likely green 4 of these 6; the other 2 would still fail on real-path semantics.
+  *(Pre-reclassification note, retained for historical record.)* At audit time, tests #1–#6 were classified (b) fixture-drift and tests #1–#4 were noted as overlapping with the **KD-10 candidate** (inter-run `auth.users` state leak). Reclassification to (a.2.ii) at commit 7c140ab retired both the split and the KD-10 overlap for this file: grounding against the file header's stated mock-only intent (`provider.test.ts:12` — "Auth provider — mock-mode contract tests") and the mock path's match with each assertion showed all 8 failures share the same mechanism as #7–#8. The scopeEnvVars helper routes the suite through the mock path, which never touches `auth.users`, so KD-10 is sidestepped (not resolved) for auth/provider. The KD-10 candidate remains open for real-Supabase auth/provider scenarios, which this file does not cover.
 
 - **Per-test mapping — `onboarding/account-creation` (6 failures, pure (a) post-reclassification at commit 8b1fcf1):**
 
@@ -435,7 +435,7 @@ Counter-argument considered and rejected: "rolling Pattern-a into KD-9.0 keeps t
 
 Exit:
 - (a.1) flags-cache failures and (a.2.i) withEnv-using failures: flip green OR change signature to non-(a) (typically to (b) fixture-drift, handed off to KD-9.1).
-- (a.2.ii) default-mock-dependent failures: remain (a.2.ii) at Pattern-a merge. Mechanism (pure-lazy getMode()) is delivered; test-side consumption (beforeEach that unsets the 3 Supabase vars) ships under KD-9.3 (19 entitlement), KD-9.2 (15 onboarding — reclassified from 13 at commit 8b1fcf1), and KD-9.2.aux (2 auth/provider _markMockAuth*). These failures retire under those tickets, not here.
+- (a.2.ii) default-mock-dependent failures: remain (a.2.ii) at Pattern-a merge. Mechanism (pure-lazy getMode()) is delivered; test-side consumption (beforeEach that unsets the 3 Supabase vars) ships under KD-9.3 (19 entitlement), KD-9.2 (15 onboarding — reclassified from 13 at commit 8b1fcf1), and KD-9.2.aux (8 auth/provider default-mock-dependent — reclassified from 2 at commit 7c140ab). These failures retire under those tickets, not here.
 - No previously-green suite regresses vs d02b9f9 baseline.
 - Net failure count drops materially via the (a.1) + (a.2.i) subset (expected ~13–17 outright flips plus signature conversions of handler-execution tests).
 - `grep -rn "^const MODE:" src/lib` returns zero matches.
@@ -518,9 +518,9 @@ Added per founder correction 1, 2026-04-18. Each ticket scored for agent coverag
 | `src/lib/auth/__tests__/provider.test.ts` | **✗ explicitly excluded** |
 
 - **Recommendation: split the `auth/provider` slice off as a separate ticket KD-9.2.aux, handled engineer-directly with `frontfiles-context` as backstop.**
-  - Rationale: (a) respects the onboarding agent's stated exclusion without stretching it; (b) keeps KD-9.2 focused on the 15 failures in its actual scope; (c) `auth/provider.ts` is the deepest file Pattern-a touches at the MODE layer — isolating its test greening lets any residual auth-path semantics questions surface cleanly, not tangled in onboarding flow work; (d) 4 of the 8 auth/provider failures overlap with the KD-10 candidate, so the KD-9.2 entry-criterion choice (i / ii / ii' / iii) applies identically to KD-9.2.aux — make the decision once, apply it to both tickets.
+  - Rationale: (a) respects the onboarding agent's stated exclusion without stretching it; (b) keeps KD-9.2 focused on the 15 failures in its actual scope; (c) `auth/provider.ts` is the deepest file Pattern-a touches at the MODE layer — isolating its test greening lets any residual auth-path semantics questions surface cleanly, not tangled in onboarding flow work; (d) KD-10 overlap: retired at commit 7c140ab — all 8 auth/provider failures reclassified to (a.2.ii) default-mock-dependent; the scopeEnvVars helper routes the file through the mock path, which never touches `auth.users`, so the KD-9.2 entry-criterion choice (i / ii / ii' / iii) is not required for KD-9.2.aux. The KD-10 candidate itself remains open for real-Supabase auth/provider scenarios outside this file's scope.
   - KD-9.2.aux sequences after Pattern-a. Relative to KD-9.2 it may run before, after, or in parallel; no blocking relation.
-  - 8 auth/provider failures split between buckets per Phase 2: 2 env-cache (tests #7, #8 — `_markMockAuth*` helpers) + 6 fixture-drift (tests #1–6). The KD-10 overlap lives inside the 6 fixture-drift failures (tests #1–4 probe first-contact behaviour that order-dependent `auth.users` persistence perturbs).
+  - 8 auth/provider failures, all pure (a.2.ii) default-mock-dependent post-reclassification at commit 7c140ab. *(Pre-reclassification, split was 2 env-cache (tests #7, #8 — `_markMockAuth*` helpers) + 6 fixture-drift (tests #1–#6); grounding against the file header's mock-only design intent and the mock path's match with each assertion showed tests #1–#6 to be the same (a.2.ii) shape as #7–#8, not (b) fixture-drift.)*
 
 **KD-9.3 — entitlement.** No current agent owns `src/lib/entitlement/**`. Options per founder brief: (a) spin up `frontfiles-entitlement` agent spec, (b) engineer-directly with `frontfiles-context` backstop.
 - **Recommendation: (b), same shape as KD-9.0.** 19 failures across 2 test files, all greened by env-scoping `beforeEach` hooks after Pattern-a merges; no production code change. New agent investment is premature; revisit when Phase 5 Stripe/checkout expands the entitlement surface (licence-grant minting, dispute routing, refund revocation). **Agent file is NOT spun up this session.**
