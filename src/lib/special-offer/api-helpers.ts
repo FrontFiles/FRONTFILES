@@ -2,7 +2,7 @@
  * Direct Offer Engine — API Route Helpers
  */
 
-import { DirectOfferError } from './services'
+import { SpecialOfferError } from './services'
 import { getThread } from './store'
 import type { DirectOfferThread } from '@/lib/types'
 
@@ -33,7 +33,7 @@ export async function withOfferError(
   try {
     return await fn()
   } catch (err) {
-    if (err instanceof DirectOfferError) {
+    if (err instanceof SpecialOfferError) {
       return errorResponse(err.code, err.message)
     }
     const message = err instanceof Error ? err.message : 'Internal server error'

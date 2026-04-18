@@ -106,6 +106,15 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 
 **P1 status (2026-04-18, this commit):** docs-layer rename landed. Spec filename, in-doc references, and decision code now read `Special Offer` / `D-SO1`. Code (`src/app/api/direct-offer/*`, `src/lib/direct-offer/*`, `DirectOffer*` identifiers) and DB (`direct_offer` table + columns) keep legacy names until P2–P5 of A.0 lands the code + schema rename. Legacy-name references in source and migrations therefore remain accurate to current implementation; doc-layer references describe the intended canonical state.
 
+**P2 status (landed 2026-04-18):**
+- Code module renamed: `src/lib/direct-offer/` → `src/lib/special-offer/` (git mv, history preserved).
+- Module-owned TS identifiers renamed: `DirectOfferEngineState`, `DirectOfferAction`, `DirectOfferError`, `initialDirectOfferState`, `directOfferReducer` → `SpecialOffer*` equivalents.
+- Imports updated across 7 files: 4 route files (12 external-path import lines in `src/app/api/direct-offer/{,[id]/accept,[id]/counter,[id]/decline}/route.ts`) and 3 intra-module import lines (`reducer.ts`, `api-helpers.ts`, `__tests__/services.test.ts`) whose identifier names changed.
+- Stale doc refs to the old module path updated in `PLATFORM_REVIEWS.md` and `SPECIAL_OFFER_SPEC.md` as part of this commit.
+- Still pending under A.0: route paths `/api/direct-offer/*` (P3), shared types in `src/lib/types.ts` + `src/lib/schema.ts` (`DirectOfferThread`, `DirectOfferEvent`, `DirectOfferStatus`, `DIRECT_OFFER_MAX_ROUNDS`, etc.) (P4), DB schema `direct_offer_*` (P5), canonical terminology registry `TERMINOLOGY_LOCK.md` (P6).
+- In-module docstrings (`Direct Offer Engine — ...` headers) deferred to P2.x sweep.
+- Commit SHA: see `git log --grep="P2 rename"` (self-referential fill deferred — amending the commit to inject its own SHA changes the SHA, making the doc lie; kept as a git-log pointer instead).
+
 ---
 
 ### Track 1 — approval gates

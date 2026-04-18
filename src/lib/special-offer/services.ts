@@ -99,13 +99,13 @@ function appendEvent(
 // DOMAIN ERROR
 // ══════════════════════════════════════════════
 
-export class DirectOfferError extends Error {
+export class SpecialOfferError extends Error {
   constructor(
     public code: string,
     message: string,
   ) {
     super(message)
-    this.name = 'DirectOfferError'
+    this.name = 'SpecialOfferError'
   }
 }
 
@@ -120,36 +120,36 @@ export function createOffer(
 ): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
   // Self-offer check
   if (isSelfOffer(input.buyerId, input.creatorId)) {
-    throw new DirectOfferError('SELF_OFFER', 'Cannot make an offer on your own asset.')
+    throw new SpecialOfferError('SELF_OFFER', 'Cannot make an offer on your own asset.')
   }
 
   // Asset eligibility
   const eligibility = checkAssetEligibility(asset)
   if (!eligibility.eligible) {
-    throw new DirectOfferError('ASSET_INELIGIBLE', eligibility.reason!)
+    throw new SpecialOfferError('ASSET_INELIGIBLE', eligibility.reason!)
   }
 
   // Licence must be enabled
   if (!asset.enabledLicences.includes(input.licenceType)) {
-    throw new DirectOfferError('LICENCE_NOT_ENABLED', `Licence type "${input.licenceType}" is not enabled for this asset.`)
+    throw new SpecialOfferError('LICENCE_NOT_ENABLED', `Licence type "${input.licenceType}" is not enabled for this asset.`)
   }
 
   // Duplicate thread check
   if (hasActiveThread(existingThreads, input.buyerId, input.assetId, input.licenceType)) {
-    throw new DirectOfferError('DUPLICATE_THREAD', 'An active offer already exists for this buyer, asset, and licence type.')
+    throw new SpecialOfferError('DUPLICATE_THREAD', 'An active offer already exists for this buyer, asset, and licence type.')
   }
 
   // Amount validation
   const amountCheck = validateOfferAmount(input.offerAmount, input.listedPrice)
   if (!amountCheck.eligible) {
-    throw new DirectOfferError('INVALID_AMOUNT', amountCheck.reason!)
+    throw new SpecialOfferError('INVALID_AMOUNT', amountCheck.reason!)
   }
 
   // Response window
   const responseMinutes = input.responseWindowMinutes ?? DIRECT_OFFER_DEFAULT_RESPONSE_MINUTES
   const windowCheck = validateResponseWindow(responseMinutes)
   if (!windowCheck.eligible) {
-    throw new DirectOfferError('INVALID_WINDOW', windowCheck.reason!)
+    throw new SpecialOfferError('INVALID_WINDOW', windowCheck.reason!)
   }
 
   const now = new Date()
@@ -191,26 +191,26 @@ export function creatorCounter(
   events: DirectOfferEvent[],
 ): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
   if (!isThreadCreator(thread, input.actorId)) {
-    throw new DirectOfferError('NOT_CREATOR', 'Only the asset creator can counter.')
+    throw new SpecialOfferError('NOT_CREATOR', 'Only the asset creator can counter.')
   }
 
   if (!canCreatorCounter(thread)) {
     if (isTerminal(thread.status)) {
-      throw new DirectOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
+      throw new SpecialOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
     }
     if (!isCreatorTurn(thread)) {
-      throw new DirectOfferError('NOT_YOUR_TURN', 'It is not the creator\'s turn to respond.')
+      throw new SpecialOfferError('NOT_YOUR_TURN', 'It is not the creator\'s turn to respond.')
     }
-    throw new DirectOfferError('MAX_ROUNDS', `Maximum ${DIRECT_OFFER_MAX_ROUNDS} counter rounds reached.`)
+    throw new SpecialOfferError('MAX_ROUNDS', `Maximum ${DIRECT_OFFER_MAX_ROUNDS} counter rounds reached.`)
   }
 
   if (isOfferExpired(thread)) {
-    throw new DirectOfferError('OFFER_EXPIRED', 'The current offer has expired.')
+    throw new SpecialOfferError('OFFER_EXPIRED', 'The current offer has expired.')
   }
 
   const amountCheck = validateCounterAmount(input.amount, thread)
   if (!amountCheck.eligible) {
-    throw new DirectOfferError('INVALID_AMOUNT', amountCheck.reason!)
+    throw new SpecialOfferError('INVALID_AMOUNT', amountCheck.reason!)
   }
 
   const now = new Date()
@@ -239,26 +239,26 @@ export function buyerCounter(
   events: DirectOfferEvent[],
 ): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
   if (!isThreadBuyer(thread, input.actorId)) {
-    throw new DirectOfferError('NOT_BUYER', 'Only the buyer can counter.')
+    throw new SpecialOfferError('NOT_BUYER', 'Only the buyer can counter.')
   }
 
   if (!canBuyerCounter(thread)) {
     if (isTerminal(thread.status)) {
-      throw new DirectOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
+      throw new SpecialOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
     }
     if (!isBuyerTurn(thread)) {
-      throw new DirectOfferError('NOT_YOUR_TURN', 'It is not the buyer\'s turn to respond.')
+      throw new SpecialOfferError('NOT_YOUR_TURN', 'It is not the buyer\'s turn to respond.')
     }
-    throw new DirectOfferError('MAX_ROUNDS', `Maximum ${DIRECT_OFFER_MAX_ROUNDS} counter rounds reached.`)
+    throw new SpecialOfferError('MAX_ROUNDS', `Maximum ${DIRECT_OFFER_MAX_ROUNDS} counter rounds reached.`)
   }
 
   if (isOfferExpired(thread)) {
-    throw new DirectOfferError('OFFER_EXPIRED', 'The current offer has expired.')
+    throw new SpecialOfferError('OFFER_EXPIRED', 'The current offer has expired.')
   }
 
   const amountCheck = validateCounterAmount(input.amount, thread)
   if (!amountCheck.eligible) {
-    throw new DirectOfferError('INVALID_AMOUNT', amountCheck.reason!)
+    throw new SpecialOfferError('INVALID_AMOUNT', amountCheck.reason!)
   }
 
   const now = new Date()
@@ -287,18 +287,18 @@ export function creatorAccept(
   events: DirectOfferEvent[],
 ): { thread: DirectOfferThread; events: DirectOfferEvent[]; checkoutIntent: OfferCheckoutIntent } {
   if (!isThreadCreator(thread, input.actorId)) {
-    throw new DirectOfferError('NOT_CREATOR', 'Only the asset creator can accept.')
+    throw new SpecialOfferError('NOT_CREATOR', 'Only the asset creator can accept.')
   }
 
   if (!canCreatorAccept(thread)) {
     if (isTerminal(thread.status)) {
-      throw new DirectOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
+      throw new SpecialOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
     }
-    throw new DirectOfferError('NOT_YOUR_TURN', 'It is not the creator\'s turn to respond.')
+    throw new SpecialOfferError('NOT_YOUR_TURN', 'It is not the creator\'s turn to respond.')
   }
 
   if (isOfferExpired(thread)) {
-    throw new DirectOfferError('OFFER_EXPIRED', 'The current offer has expired.')
+    throw new SpecialOfferError('OFFER_EXPIRED', 'The current offer has expired.')
   }
 
   const now = new Date()
@@ -347,18 +347,18 @@ export function buyerAccept(
   events: DirectOfferEvent[],
 ): { thread: DirectOfferThread; events: DirectOfferEvent[]; checkoutIntent: OfferCheckoutIntent } {
   if (!isThreadBuyer(thread, input.actorId)) {
-    throw new DirectOfferError('NOT_BUYER', 'Only the buyer can accept.')
+    throw new SpecialOfferError('NOT_BUYER', 'Only the buyer can accept.')
   }
 
   if (!canBuyerAccept(thread)) {
     if (isTerminal(thread.status)) {
-      throw new DirectOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
+      throw new SpecialOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
     }
-    throw new DirectOfferError('NOT_YOUR_TURN', 'It is not the buyer\'s turn to respond.')
+    throw new SpecialOfferError('NOT_YOUR_TURN', 'It is not the buyer\'s turn to respond.')
   }
 
   if (isOfferExpired(thread)) {
-    throw new DirectOfferError('OFFER_EXPIRED', 'The current offer has expired.')
+    throw new SpecialOfferError('OFFER_EXPIRED', 'The current offer has expired.')
   }
 
   const now = new Date()
@@ -407,14 +407,14 @@ export function creatorDecline(
   events: DirectOfferEvent[],
 ): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
   if (!isThreadCreator(thread, input.actorId)) {
-    throw new DirectOfferError('NOT_CREATOR', 'Only the asset creator can decline.')
+    throw new SpecialOfferError('NOT_CREATOR', 'Only the asset creator can decline.')
   }
 
   if (!canCreatorDecline(thread)) {
     if (isTerminal(thread.status)) {
-      throw new DirectOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
+      throw new SpecialOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
     }
-    throw new DirectOfferError('NOT_YOUR_TURN', 'It is not the creator\'s turn to respond.')
+    throw new SpecialOfferError('NOT_YOUR_TURN', 'It is not the creator\'s turn to respond.')
   }
 
   const now = new Date()
@@ -439,11 +439,11 @@ export function expireOffer(
   events: DirectOfferEvent[],
 ): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
   if (isTerminal(thread.status)) {
-    throw new DirectOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
+    throw new SpecialOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
   }
 
   if (!isOfferExpired(thread)) {
-    throw new DirectOfferError('NOT_EXPIRED', 'The current offer has not expired yet.')
+    throw new SpecialOfferError('NOT_EXPIRED', 'The current offer has not expired yet.')
   }
 
   const now = new Date()
@@ -542,7 +542,7 @@ export function completeOffer(
   events: DirectOfferEvent[],
 ): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
   if (thread.status !== 'accepted_pending_checkout') {
-    throw new DirectOfferError('INVALID_STATE', 'Can only complete an accepted offer pending checkout.')
+    throw new SpecialOfferError('INVALID_STATE', 'Can only complete an accepted offer pending checkout.')
   }
 
   const now = new Date()

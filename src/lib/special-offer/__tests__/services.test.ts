@@ -10,7 +10,7 @@ import {
   autoCancelOffer,
   autoCancelAllForAsset,
   completeOffer,
-  DirectOfferError,
+  SpecialOfferError,
 } from '../services'
 import { makeAsset, makeThread, makeEvent, resetSequences } from './helpers'
 import type { DirectOfferThread, DirectOfferEvent } from '@/lib/types'
@@ -80,7 +80,7 @@ describe('createOffer', () => {
         asset,
         [],
       ),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects offer on PRIVATE asset', () => {
@@ -98,7 +98,7 @@ describe('createOffer', () => {
         asset,
         [],
       ),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects offer at listed price', () => {
@@ -116,7 +116,7 @@ describe('createOffer', () => {
         asset,
         [],
       ),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects duplicate active thread', () => {
@@ -140,7 +140,7 @@ describe('createOffer', () => {
         asset,
         [existingThread],
       ),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('allows same buyer different licence type', () => {
@@ -181,7 +181,7 @@ describe('createOffer', () => {
         asset,
         [],
       ),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects exclusive-locked asset', () => {
@@ -201,7 +201,7 @@ describe('createOffer', () => {
         asset,
         [],
       ),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 })
 
@@ -228,21 +228,21 @@ describe('creatorCounter', () => {
     const thread = makeThread({ status: 'buyer_offer_pending_creator' })
     expect(() =>
       creatorCounter({ threadId: thread.id, actorId: 'buyer-001', amount: 13000 }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects when not creator turn', () => {
     const thread = makeThread({ status: 'creator_counter_pending_buyer' })
     expect(() =>
       creatorCounter({ threadId: thread.id, actorId: 'creator-001', amount: 13000 }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects when max rounds reached', () => {
     const thread = makeThread({ status: 'buyer_offer_pending_creator', roundCount: 3 })
     expect(() =>
       creatorCounter({ threadId: thread.id, actorId: 'creator-001', amount: 13000 }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects expired offer', () => {
@@ -252,7 +252,7 @@ describe('creatorCounter', () => {
     })
     expect(() =>
       creatorCounter({ threadId: thread.id, actorId: 'creator-001', amount: 13000 }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 })
 
@@ -282,7 +282,7 @@ describe('buyerCounter', () => {
     const thread = makeThread({ status: 'creator_counter_pending_buyer' })
     expect(() =>
       buyerCounter({ threadId: thread.id, actorId: 'creator-001', amount: 12000 }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 })
 
@@ -306,14 +306,14 @@ describe('creatorAccept', () => {
     const thread = makeThread({ status: 'creator_counter_pending_buyer' })
     expect(() =>
       creatorAccept({ threadId: thread.id, actorId: 'creator-001' }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects non-creator actor', () => {
     const thread = makeThread({ status: 'buyer_offer_pending_creator' })
     expect(() =>
       creatorAccept({ threadId: thread.id, actorId: 'buyer-001' }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects on expired offer', () => {
@@ -324,7 +324,7 @@ describe('creatorAccept', () => {
     })
     expect(() =>
       creatorAccept({ threadId: thread.id, actorId: 'creator-001' }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 })
 
@@ -363,14 +363,14 @@ describe('creatorDecline', () => {
     const thread = makeThread({ status: 'buyer_offer_pending_creator' })
     expect(() =>
       creatorDecline({ threadId: thread.id, actorId: 'buyer-001' }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 
   it('rejects on already terminal', () => {
     const thread = makeThread({ status: 'completed' })
     expect(() =>
       creatorDecline({ threadId: thread.id, actorId: 'creator-001' }, thread, []),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
   })
 })
 
@@ -393,12 +393,12 @@ describe('expireOffer', () => {
       status: 'buyer_offer_pending_creator',
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     })
-    expect(() => expireOffer(thread, [])).toThrow(DirectOfferError)
+    expect(() => expireOffer(thread, [])).toThrow(SpecialOfferError)
   })
 
   it('rejects when already terminal', () => {
     const thread = makeThread({ status: 'completed' })
-    expect(() => expireOffer(thread, [])).toThrow(DirectOfferError)
+    expect(() => expireOffer(thread, [])).toThrow(SpecialOfferError)
   })
 })
 
@@ -451,7 +451,7 @@ describe('completeOffer', () => {
 
   it('rejects non-accepted threads', () => {
     const thread = makeThread({ status: 'buyer_offer_pending_creator' })
-    expect(() => completeOffer(thread, [])).toThrow(DirectOfferError)
+    expect(() => completeOffer(thread, [])).toThrow(SpecialOfferError)
   })
 })
 
@@ -543,7 +543,7 @@ describe('full negotiation flow', () => {
         step3.thread,
         step3.events,
       ),
-    ).toThrow(DirectOfferError)
+    ).toThrow(SpecialOfferError)
 
     // But can still accept or decline
     expect(() =>

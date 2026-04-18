@@ -5,9 +5,9 @@
  */
 
 import type { NextRequest } from 'next/server'
-import { creatorDecline } from '@/lib/direct-offer/services'
-import { getThread, putThread, getEvents, putEvents } from '@/lib/direct-offer/store'
-import { success, errorResponse, resolveThread, withOfferError } from '@/lib/direct-offer/api-helpers'
+import { creatorDecline } from '@/lib/special-offer/services'
+import { getThread, putThread, getEvents, putEvents } from '@/lib/special-offer/store'
+import { success, errorResponse, resolveThread, withOfferError } from '@/lib/special-offer/api-helpers'
 
 export async function POST(
   request: NextRequest,

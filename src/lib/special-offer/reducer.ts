@@ -6,14 +6,14 @@
  * Domain logic is in services.ts — this reducer delegates to services.
  */
 
-import type { DirectOfferEngineState, DirectOfferAction } from './types'
+import type { SpecialOfferEngineState, SpecialOfferAction } from './types'
 import type { DirectOfferThread, DirectOfferEvent } from '@/lib/types'
 
 // ══════════════════════════════════════════════
 // INITIAL STATE
 // ══════════════════════════════════════════════
 
-export const initialDirectOfferState: DirectOfferEngineState = {
+export const initialSpecialOfferState: SpecialOfferEngineState = {
   thread: null,
   events: [],
 }
@@ -22,10 +22,10 @@ export const initialDirectOfferState: DirectOfferEngineState = {
 // REDUCER
 // ══════════════════════════════════════════════
 
-export function directOfferReducer(
-  state: DirectOfferEngineState,
-  action: DirectOfferAction,
-): DirectOfferEngineState {
+export function specialOfferReducer(
+  state: SpecialOfferEngineState,
+  action: SpecialOfferAction,
+): SpecialOfferEngineState {
   switch (action.type) {
     case 'LOAD_THREAD':
       return {

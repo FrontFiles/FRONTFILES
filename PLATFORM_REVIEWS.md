@@ -291,7 +291,7 @@ Action: Area 6.C below produces a Claude Code agent specifically for Blue Protoc
 
 - Pages: `/vault/offers/page.tsx`
 - API: `/api/direct-offer/route.ts`, `/api/direct-offer/[id]/{accept,counter,decline}/route.ts`
-- Engine: `src/lib/direct-offer/` — `reducer`, `services`, `store`, `guards`, `types`, `api-helpers`
+- Engine: `src/lib/special-offer/` — `reducer`, `services`, `store`, `guards`, `types`, `api-helpers`
 - Schema: migrations `20260408230005..07`
 - Governance: `SPECIAL_OFFER_SPEC.md` at repo root (27KB — substantial canonical spec)
 - State machine: 6 states (per `PLATFORM_BUILD.md`) — `pending`, `countered`, `accepted`, `rejected`, `expired`, `cancelled`; 3-round max per spec
@@ -310,7 +310,7 @@ Action: Area 6.C below produces a Claude Code agent specifically for Blue Protoc
 
 ### Scope of review
 
-- Diff `SPECIAL_OFFER_SPEC.md` against current `src/lib/direct-offer/` and `/api/direct-offer/*` implementation. Identify drift.
+- Diff `SPECIAL_OFFER_SPEC.md` against current `src/lib/special-offer/` and `/api/direct-offer/*` implementation. Identify drift.
 - Accept path → Stripe payment → licence grant → delivery.
 - 3-round cap enforcement (UI + API + DB guard).
 - Offer expiry mechanism — pick one authoritative path.

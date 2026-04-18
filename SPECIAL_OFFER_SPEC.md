@@ -643,4 +643,4 @@ The implementation creates events for every state change. Notification delivery 
 
 ---
 
-*This spec defines the complete Special Offer product for Frontfiles. Implementation should follow the canonical types in `src/lib/types.ts`, the domain engine in `src/lib/direct-offer/`, and the API routes in `src/app/api/direct-offer/`. Design should follow the Frontfiles design system lock (black, blue-600, white, zero radius, Neue Haas Grotesk).*
+*This spec defines the complete Special Offer product for Frontfiles. Implementation should follow the canonical types in `src/lib/types.ts`, the domain engine in `src/lib/special-offer/`, and the API routes in `src/app/api/direct-offer/`. Design should follow the Frontfiles design system lock (black, blue-600, white, zero radius, Neue Haas Grotesk).*

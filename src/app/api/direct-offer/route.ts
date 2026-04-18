@@ -5,9 +5,9 @@
 
 import type { NextRequest } from 'next/server'
 import * as z from 'zod' // namespace import — see src/lib/env.ts comment
-import { createOffer } from '@/lib/direct-offer/services'
-import { listThreads, putThread, putEvents, getThread } from '@/lib/direct-offer/store'
-import { success, errorResponse, withOfferError } from '@/lib/direct-offer/api-helpers'
+import { createOffer } from '@/lib/special-offer/services'
+import { listThreads, putThread, putEvents, getThread } from '@/lib/special-offer/store'
+import { success, errorResponse, withOfferError } from '@/lib/special-offer/api-helpers'
 import { mockVaultAssets } from '@/lib/mock-data'
 import { requireGrant } from '@/lib/identity/guards'
 import { parseBody } from '@/lib/api/validation'

@@ -22,7 +22,7 @@ import type {
 // ENGINE STATE
 // ══════════════════════════════════════════════
 
-export interface DirectOfferEngineState {
+export interface SpecialOfferEngineState {
   thread: DirectOfferThread | null
   events: DirectOfferEvent[]
 }
@@ -31,7 +31,7 @@ export interface DirectOfferEngineState {
 // ACTIONS
 // ══════════════════════════════════════════════
 
-export type DirectOfferAction =
+export type SpecialOfferAction =
   | { type: 'LOAD_THREAD'; thread: DirectOfferThread; events: DirectOfferEvent[] }
   | { type: 'BUYER_SUBMIT_OFFER'; amount: number; buyerId: string }
   | { type: 'CREATOR_COUNTER'; amount: number; creatorId: string }
