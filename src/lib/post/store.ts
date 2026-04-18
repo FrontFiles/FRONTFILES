@@ -18,7 +18,7 @@
 // without any UI-side change.
 // ═══════════════════════════════════════════════════════════════
 
-import { isSupabaseConfigured } from '@/lib/db/client'
+import { env, isSupabaseEnvPresent } from '@/lib/env'
 import type { PostRow, PostAttachmentType } from '@/lib/db/schema'
 import type {
   HydratedPostResult,
@@ -27,6 +27,24 @@ import type {
 } from './types'
 import { hydratePost, hydratePosts } from './hydrate'
 import { validatePostInput } from './validation'
+
+// ─── Mode selector (CCP 4) ────────────────────────────────────
+//
+// Decided once at module load from the canonical
+// `isSupabaseEnvPresent` signal. Per-call `isSupabaseConfigured()`
+// branching is retired across the dual-mode stores.
+
+const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+
+let _modeLogged = false
+function logModeOnce(): void {
+  if (_modeLogged) return
+  _modeLogged = true
+  if (env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.info(`[ff:mode] post=${MODE}`)
+  }
+}
 
 // ─── In-memory store (dev/test mode) ──────────────────────────
 
@@ -58,7 +76,8 @@ export const DEFAULT_FEED_LIMIT = 100
  * Return the raw row for a post id, or null.
  */
 export async function getPostRow(postId: string): Promise<PostRow | null> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     await ensureSeedLoaded()
     return postStore.get(postId) ?? null
   }
@@ -85,7 +104,8 @@ export async function getPostRow(postId: string): Promise<PostRow | null> {
 export async function getAuthorPostRows(
   authorUserId: string,
 ): Promise<PostRow[]> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values())
       .filter(
@@ -128,7 +148,8 @@ export async function getAuthorFeed(
 export async function listRecentPostRows(
   limit: number = DEFAULT_FEED_LIMIT,
 ): Promise<PostRow[]> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values())
       .filter((p) => p.status === 'published')
@@ -158,7 +179,8 @@ export async function getPostsByAttachment(
   attachmentType: PostAttachmentType,
   attachmentId: string,
 ): Promise<PostRow[]> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values())
       .filter(
@@ -205,7 +227,8 @@ export async function getFeedForAttachment(
 export async function getRepostsOfRows(
   postId: string,
 ): Promise<PostRow[]> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values())
       .filter(
@@ -238,7 +261,8 @@ export async function getRepostsOfRows(
 export async function getAuthorRepostRows(
   authorUserId: string,
 ): Promise<PostRow[]> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values()).filter(
       (p) =>
@@ -318,6 +342,7 @@ export type CreatePostResult =
 export async function createPost(
   input: PostInput,
 ): Promise<CreatePostResult> {
+  logModeOnce()
   // Snapshot the author's existing repost history for the
   // duplicate-repost probe. Mock mode: in-memory pool. Supabase
   // mode: a one-shot SELECT against the partial-unique index.
@@ -356,7 +381,7 @@ export async function createPost(
     updated_at: now,
   }
 
-  if (!isSupabaseConfigured()) {
+  if (MODE === 'mock') {
     await ensureSeedLoaded()
     postStore.set(row.id, row)
     return { ok: true, row }
@@ -411,7 +436,8 @@ export async function createPost(
  * statuses, so the feed will skip this post on the next read.
  */
 export async function removePost(postId: string): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     await ensureSeedLoaded()
     const row = postStore.get(postId)
     if (!row) return

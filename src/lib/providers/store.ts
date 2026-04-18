@@ -16,7 +16,7 @@
 // SERVER-ONLY. Never import from a client component.
 // ═══════════════════════════════════════════════════════════════
 
-import { isSupabaseConfigured } from '@/lib/db/client'
+import { env, isSupabaseEnvPresent } from '@/lib/env'
 import type {
   ExternalConnectionRow,
   ExternalWebhookEventRow,
@@ -25,6 +25,23 @@ import type {
   ProviderWebhookProcessingStatus,
   ProviderWebhookSignatureStatus,
 } from '@/lib/db/schema'
+
+// ─── Mode selector (CCP 4) ──────────────────────────────────
+//
+// Decided once at module load from `isSupabaseEnvPresent`.
+// Per-call `isSupabaseConfigured()` branching is retired.
+
+const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+
+let _modeLogged = false
+function logModeOnce(): void {
+  if (_modeLogged) return
+  _modeLogged = true
+  if (env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.info(`[ff:mode] providers=${MODE}`)
+  }
+}
 
 // ─── In-memory store (dev/test mode) ────────────────────────
 
@@ -72,7 +89,8 @@ export interface ListConnectionsFilter {
 export async function listConnections(
   filter: ListConnectionsFilter,
 ): Promise<ExternalConnectionRow[]> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     return Array.from(connectionStore.values())
       .filter((row) => row.owner_type === filter.ownerType)
       .filter((row) => {
@@ -109,7 +127,8 @@ export async function listConnections(
 export async function getConnection(
   id: string,
 ): Promise<ExternalConnectionRow | null> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     return connectionStore.get(id) ?? null
   }
   const client = await db()
@@ -149,7 +168,8 @@ export async function findConnectionByExternalAccount(
   provider: string,
   externalAccountId: string,
 ): Promise<ExternalConnectionRow | null> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     return (
       Array.from(connectionStore.values())
         .filter(
@@ -198,6 +218,7 @@ export interface InsertConnectionInput {
 export async function insertConnection(
   input: InsertConnectionInput,
 ): Promise<ExternalConnectionRow> {
+  logModeOnce()
   // Enforce the platform-owner-id invariant in app land too —
   // the SQL CHECK is the ultimate guard but failing here gives
   // a clearer error than a constraint violation.
@@ -212,7 +233,7 @@ export async function insertConnection(
     )
   }
 
-  if (!isSupabaseConfigured()) {
+  if (MODE === 'mock') {
     const row: ExternalConnectionRow = {
       id: mockId('extconn'),
       provider: input.provider,
@@ -284,7 +305,8 @@ export async function updateConnectionStatus(
     metadata: Record<string, unknown>
   }>,
 ): Promise<ExternalConnectionRow | null> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     const row = connectionStore.get(id)
     if (!row) return null
     const updated: ExternalConnectionRow = {
@@ -347,9 +369,10 @@ export interface InsertWebhookEventResult {
 export async function insertWebhookEvent(
   input: InsertWebhookEventInput,
 ): Promise<InsertWebhookEventResult> {
+  logModeOnce()
   const key = dedupeKey(input.provider, input.external_event_id)
 
-  if (!isSupabaseConfigured()) {
+  if (MODE === 'mock') {
     const existingId = webhookDedupeIndex.get(key)
     if (existingId) {
       const existing = webhookEventStore.get(existingId)!
@@ -423,6 +446,7 @@ export async function updateWebhookEventStatus(
   status: ProviderWebhookProcessingStatus,
   patch?: Partial<{ error_message: string | null }>,
 ): Promise<ExternalWebhookEventRow | null> {
+  logModeOnce()
   // Shared transition rules — must produce identical writes for
   // mock and Supabase modes so the test suite (mock-only) actually
   // reflects production behaviour.
@@ -441,7 +465,7 @@ export async function updateWebhookEventStatus(
     status === 'succeeded' || status === 'failed' || status === 'dead_letter'
   const incrementsRetry = status === 'failed' || status === 'dead_letter'
 
-  if (!isSupabaseConfigured()) {
+  if (MODE === 'mock') {
     const row = webhookEventStore.get(id)
     if (!row) return null
     const updated: ExternalWebhookEventRow = {
@@ -501,7 +525,8 @@ export async function updateWebhookEventStatus(
 export async function getWebhookEvent(
   id: string,
 ): Promise<ExternalWebhookEventRow | null> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     return webhookEventStore.get(id) ?? null
   }
   const client = await db()
@@ -521,7 +546,8 @@ export async function getWebhookEvent(
 export async function listWebhookEvents(
   filter: { provider?: string; status?: ProviderWebhookProcessingStatus; limit?: number } = {},
 ): Promise<ExternalWebhookEventRow[]> {
-  if (!isSupabaseConfigured()) {
+  logModeOnce()
+  if (MODE === 'mock') {
     return Array.from(webhookEventStore.values())
       .filter((row) => !filter.provider || row.provider === filter.provider)
       .filter((row) => !filter.status || row.processing_status === filter.status)

@@ -66,8 +66,33 @@
  * reason — their real-mode behavior is a no-op.
  */
 
-import { isSupabaseConfigured } from '@/lib/db/client'
+import { env, isSupabaseEnvPresent } from '@/lib/env'
 import type { AuthUser, AuthSignUpOutcome } from './types'
+
+// ══════════════════════════════════════════════
+// MODE SELECTOR (CCP 4)
+//
+// The switch between real (Supabase) and mock (in-memory) is
+// decided exactly once, at module load, from the canonical
+// `isSupabaseEnvPresent` flag on `@/lib/env`. Per-call branching
+// via the old `isSupabaseConfigured()` shim is retired.
+//
+// `logModeOnce()` emits a single non-prod-only line on the first
+// call to any public export so operators can confirm which path
+// is live without grepping the wire. No secrets are logged.
+// ══════════════════════════════════════════════
+
+const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+
+let _modeLogged = false
+function logModeOnce(): void {
+  if (_modeLogged) return
+  _modeLogged = true
+  if (env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.info(`[ff:mode] auth=${MODE}`)
+  }
+}
 
 // ══════════════════════════════════════════════
 // MOCK STORE
@@ -138,6 +163,7 @@ export async function signUpOrAdoptAuthUser(input: {
   email: string
   password: string
 }): Promise<AuthSignUpOutcome> {
+  logModeOnce()
   if (!input.email || !input.email.includes('@')) {
     throw new Error('Invalid email address')
   }
@@ -145,7 +171,7 @@ export async function signUpOrAdoptAuthUser(input: {
     throw new Error('Password must be at least 8 characters')
   }
 
-  if (!isSupabaseConfigured()) {
+  if (MODE === 'mock') {
     return signUpOrAdoptMock(input)
   }
   return signUpOrAdoptSupabase(input)
@@ -189,11 +215,11 @@ async function signUpOrAdoptSupabase(input: {
   email: string
   password: string
 }): Promise<AuthSignUpOutcome> {
-  // Real-mode stub — runs when @supabase/supabase-js is
-  // installed and the env vars are present. This path is not
-  // exercised by the test suite (tests run with
-  // isSupabaseConfigured() === false); it is shaped to drop
-  // into production the moment the Supabase client ships.
+  // Real-mode path — runs when @supabase/supabase-js is
+  // installed and the env vars are present (MODE === 'real').
+  // Not exercised by the test suite while the suite runs with
+  // Supabase env vars unset; it is shaped to drop into
+  // production the moment the Supabase client ships.
   //
   // The shape mirrors the mock: call `auth.admin.createUser`
   // with `email_confirm: false`; on the "already registered"
@@ -282,9 +308,10 @@ async function signUpOrAdoptSupabase(input: {
 export async function getAuthUserEmailConfirmed(
   authUserId: string,
 ): Promise<boolean | null> {
+  logModeOnce()
   if (!authUserId) return null
 
-  if (!isSupabaseConfigured()) {
+  if (MODE === 'mock') {
     for (const row of mockAuthStore.values()) {
       if (row.id === authUserId) return row.emailConfirmed
     }
@@ -311,6 +338,7 @@ export async function getAuthUserEmailConfirmed(
 
 /** Clear the mock auth store and reset the verification flag. */
 export async function _resetAuthStore(): Promise<void> {
+  logModeOnce()
   mockAuthStore.clear()
   mockVerificationRequired = false
 }
@@ -324,20 +352,23 @@ export async function _resetAuthStore(): Promise<void> {
 export async function _setMockVerificationRequired(
   required: boolean,
 ): Promise<void> {
-  if (isSupabaseConfigured()) return
+  logModeOnce()
+  if (MODE === 'real') return
   mockVerificationRequired = required
 }
 
 /** Flip an existing mock auth row to confirmed. */
 export async function _markMockAuthVerified(email: string): Promise<void> {
-  if (isSupabaseConfigured()) return
+  logModeOnce()
+  if (MODE === 'real') return
   const row = mockAuthStore.get(email.toLowerCase())
   if (row) row.emailConfirmed = true
 }
 
 /** Flip an existing mock auth row to unconfirmed. */
 export async function _markMockAuthUnverified(email: string): Promise<void> {
-  if (isSupabaseConfigured()) return
+  logModeOnce()
+  if (MODE === 'real') return
   const row = mockAuthStore.get(email.toLowerCase())
   if (row) row.emailConfirmed = false
 }
