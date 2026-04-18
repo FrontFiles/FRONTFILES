@@ -17,7 +17,8 @@
 //     Stripe adapter's mock-signature path
 // ═══════════════════════════════════════════════════════════════
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   createConnection,
   findActiveConnection,
@@ -29,9 +30,36 @@ import {
 } from '../service'
 import { __testing as storeTesting } from '../store'
 import { verifyAndIngestWebhook } from '../webhooks'
+import { isSupabaseEnvPresent } from '@/lib/env'
+
+// Per-test isolation for real-Supabase runs. Fresh UUIDs avoid
+// 22P02 on owner_id; a testNs prefix on every text identifier
+// (external_account_id, external_event_id, Stripe `account`
+// hints) lets afterEach tear rows down by LIKE without
+// per-row id tracking.
+let testNs: string
+let userA: string
+let creator1: string
 
 beforeEach(() => {
   storeTesting.reset()
+  testNs = randomUUID()
+  userA = randomUUID()
+  creator1 = randomUUID()
+})
+
+afterEach(async () => {
+  if (!isSupabaseEnvPresent()) return
+  const { getSupabaseClient } = await import('@/lib/db/client')
+  const db = getSupabaseClient()
+  await db
+    .from('external_webhook_events')
+    .delete()
+    .like('external_event_id', `${testNs}:%`)
+  await db
+    .from('external_connections')
+    .delete()
+    .like('external_account_id', `${testNs}:%`)
 })
 
 // ─── createConnection ────────────────────────────────────────
@@ -40,17 +68,17 @@ describe('createConnection', () => {
   it('inserts a user-owned Stripe connection and lists it back', async () => {
     const result = await createConnection({
       provider: 'stripe',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'acct_test_1',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:acct_test_1`,
       account_label: 'Test creator',
       status: 'active',
     })
     if (!result.ok) throw new Error(`create failed: ${result.error.code}`)
 
-    const list = await listConnectionsForOwner({ type: 'user', id: 'user-A' })
+    const list = await listConnectionsForOwner({ type: 'user', id: userA })
     expect(list).toHaveLength(1)
     expect(list[0].provider).toBe('stripe')
-    expect(list[0].owner).toEqual({ type: 'user', id: 'user-A' })
+    expect(list[0].owner).toEqual({ type: 'user', id: userA })
     expect(list[0].status).toBe('active')
     expect(list[0].account_label).toBe('Test creator')
   })
@@ -81,29 +109,29 @@ describe('createConnection', () => {
   it('enforces the active-connection partial unique constraint', async () => {
     const first = await createConnection({
       provider: 'google_drive',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'sub-1',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:sub-1`,
       status: 'active',
     })
     expect(first.ok).toBe(true)
 
     const second = await createConnection({
       provider: 'google_drive',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'sub-2',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:sub-2`,
       status: 'active',
     })
     expect(second.ok).toBe(false)
     if (second.ok) return
     expect(second.error.code).toBe('INSERT_FAILED')
-    expect(second.error.message).toMatch(/already exists/)
+    expect(second.error.message).toMatch(/duplicate key/)
   })
 
   it('a revoked connection does not block a new active one', async () => {
     const first = await createConnection({
       provider: 'google_drive',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'sub-1',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:sub-1`,
       status: 'active',
     })
     if (!first.ok) throw new Error('first create failed')
@@ -111,8 +139,8 @@ describe('createConnection', () => {
 
     const second = await createConnection({
       provider: 'google_drive',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'sub-2',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:sub-2`,
       status: 'active',
     })
     expect(second.ok).toBe(true)
@@ -122,7 +150,7 @@ describe('createConnection', () => {
     const result = await createConnection({
       provider: 'stripe',
       owner: { type: 'platform' },
-      external_account_id: 'acct_platform',
+      external_account_id: `${testNs}:acct_platform`,
       status: 'active',
     })
     expect(result.ok).toBe(true)
@@ -137,8 +165,8 @@ describe('revokeConnection', () => {
   it('flips status to revoked and stamps revoked_at', async () => {
     const created = await createConnection({
       provider: 'stripe',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'acct_x',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:acct_x`,
       status: 'active',
     })
     if (!created.ok) throw new Error('create failed')
@@ -159,8 +187,8 @@ describe('findActiveConnection', () => {
   it('returns the active row, ignoring revoked rows', async () => {
     const a = await createConnection({
       provider: 'google_drive',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'sub-1',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:sub-1`,
       status: 'active',
     })
     if (!a.ok) throw new Error('create failed')
@@ -168,14 +196,14 @@ describe('findActiveConnection', () => {
 
     const b = await createConnection({
       provider: 'google_drive',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'sub-2',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:sub-2`,
       status: 'active',
     })
     if (!b.ok) throw new Error('second create failed')
 
     const found = await findActiveConnection(
-      { type: 'user', id: 'user-A' },
+      { type: 'user', id: userA },
       'google_drive',
     )
     expect(found).not.toBeNull()
@@ -189,8 +217,8 @@ describe('setConnectionStatus', () => {
   it('moves a connection to reauth_required and writes metadata', async () => {
     const created = await createConnection({
       provider: 'google_drive',
-      owner: { type: 'user', id: 'user-A' },
-      external_account_id: 'sub-1',
+      owner: { type: 'user', id: userA },
+      external_account_id: `${testNs}:sub-1`,
       status: 'active',
     })
     if (!created.ok) throw new Error('create failed')
@@ -209,7 +237,7 @@ describe('recordWebhookEvent', () => {
   it('inserts a new event and reports was_duplicate=false', async () => {
     const result = await recordWebhookEvent({
       provider: 'stripe',
-      external_event_id: 'evt_001',
+      external_event_id: `${testNs}:evt_001`,
       event_type: 'payment_intent.succeeded',
       payload: { amount: 100 },
       signature_status: 'verified',
@@ -221,14 +249,14 @@ describe('recordWebhookEvent', () => {
   it('returns the existing row on a duplicate (provider, external_event_id)', async () => {
     const first = await recordWebhookEvent({
       provider: 'stripe',
-      external_event_id: 'evt_002',
+      external_event_id: `${testNs}:evt_002`,
       event_type: 'payment_intent.succeeded',
       payload: { amount: 100 },
       signature_status: 'verified',
     })
     const second = await recordWebhookEvent({
       provider: 'stripe',
-      external_event_id: 'evt_002',
+      external_event_id: `${testNs}:evt_002`,
       event_type: 'payment_intent.succeeded',
       payload: { amount: 999 }, // intentionally different — proves we keep the original row
       signature_status: 'verified',
@@ -241,14 +269,14 @@ describe('recordWebhookEvent', () => {
   it('different providers can share the same external_event_id', async () => {
     const a = await recordWebhookEvent({
       provider: 'stripe',
-      external_event_id: 'evt_shared',
+      external_event_id: `${testNs}:evt_shared`,
       event_type: 'a',
       payload: {},
       signature_status: 'verified',
     })
     const b = await recordWebhookEvent({
       provider: 'google_drive',
-      external_event_id: 'evt_shared',
+      external_event_id: `${testNs}:evt_shared`,
       event_type: 'b',
       payload: {},
       signature_status: 'verified',
@@ -275,8 +303,9 @@ describe('recordWebhookEvent', () => {
 
 describe('verifyAndIngestWebhook', () => {
   it('verifies a Stripe payload signed with the mock signature', async () => {
+    const eventId = `${testNs}:evt_real_001`
     const payload = {
-      id: 'evt_real_001',
+      id: eventId,
       type: 'payment_intent.succeeded',
       data: { object: { id: 'pi_test' } },
     }
@@ -289,14 +318,14 @@ describe('verifyAndIngestWebhook', () => {
     if (!result.ok) return
     expect(result.status).toBe('verified')
     expect(result.event.signature_status).toBe('verified')
-    expect(result.event.external_event_id).toBe('evt_real_001')
+    expect(result.event.external_event_id).toBe(eventId)
     expect(result.event.event_type).toBe('payment_intent.succeeded')
     expect(result.was_duplicate).toBe(false)
   })
 
   it('records a duplicate as was_duplicate=true and keeps the original signature_status', async () => {
     const payload = {
-      id: 'evt_dup_001',
+      id: `${testNs}:evt_dup_001`,
       type: 'payment_intent.succeeded',
       data: {},
     }
@@ -320,7 +349,7 @@ describe('verifyAndIngestWebhook', () => {
   })
 
   it('lands an unverified payload in the ledger but flags it', async () => {
-    const payload = { id: 'evt_unv_001', type: 't', data: {} }
+    const payload = { id: `${testNs}:evt_unv_001`, type: 't', data: {} }
     const result = await verifyAndIngestWebhook({
       provider: 'stripe',
       headers: { 'stripe-signature': 'not-the-mock' },
@@ -357,7 +386,7 @@ describe('verifyAndIngestWebhook', () => {
   it('Google adapter accepts the mock-bearer placeholder', async () => {
     const payload = {
       message: {
-        messageId: 'msg-001',
+        messageId: `${testNs}:msg-001`,
         attributes: { eventType: 'change' },
       },
     }
@@ -381,10 +410,11 @@ describe('verifyAndIngestWebhook', () => {
 
   it('resolves connection_id from a Stripe Connect event `account` field', async () => {
     // Pre-create the connection that owns the acct id.
+    const acctId = `${testNs}:acct_creator_1`
     const connectionResult = await createConnection({
       provider: 'stripe',
-      owner: { type: 'user', id: 'creator-1' },
-      external_account_id: 'acct_creator_1',
+      owner: { type: 'user', id: creator1 },
+      external_account_id: acctId,
       account_label: 'Creator One',
       status: 'active',
     })
@@ -392,10 +422,10 @@ describe('verifyAndIngestWebhook', () => {
 
     // Fire a Connect event carrying the acct id at the top level.
     const payload = {
-      id: 'evt_connect_001',
+      id: `${testNs}:evt_connect_001`,
       type: 'account.updated',
-      account: 'acct_creator_1',
-      data: { object: { id: 'acct_creator_1', object: 'account' } },
+      account: acctId,
+      data: { object: { id: acctId, object: 'account' } },
     }
     const result = await verifyAndIngestWebhook({
       provider: 'stripe',
@@ -408,10 +438,11 @@ describe('verifyAndIngestWebhook', () => {
   })
 
   it('falls back to data.object.id for platform Account events', async () => {
+    const acctId = `${testNs}:acct_platform_self`
     const connectionResult = await createConnection({
       provider: 'stripe',
       owner: { type: 'platform' },
-      external_account_id: 'acct_platform_self',
+      external_account_id: acctId,
       status: 'active',
     })
     if (!connectionResult.ok) throw new Error('seed create failed')
@@ -419,9 +450,9 @@ describe('verifyAndIngestWebhook', () => {
     // Top-level `account` is absent here; the resolver should
     // pull the id out of data.object.id when object='account'.
     const payload = {
-      id: 'evt_platform_001',
+      id: `${testNs}:evt_platform_001`,
       type: 'account.updated',
-      data: { object: { id: 'acct_platform_self', object: 'account' } },
+      data: { object: { id: acctId, object: 'account' } },
     }
     const result = await verifyAndIngestWebhook({
       provider: 'stripe',
@@ -438,9 +469,9 @@ describe('verifyAndIngestWebhook', () => {
     // misses. The event still lands (the ledger is the audit
     // trail for stray events too) but with connection_id=null.
     const payload = {
-      id: 'evt_orphan_001',
+      id: `${testNs}:evt_orphan_001`,
       type: 'account.updated',
-      account: 'acct_unknown',
+      account: `${testNs}:acct_unknown`,
     }
     const result = await verifyAndIngestWebhook({
       provider: 'stripe',
@@ -456,7 +487,7 @@ describe('verifyAndIngestWebhook', () => {
     // payment_intent.* events are platform-scoped and carry no
     // `account` field. The resolver must not fabricate a hint.
     const payload = {
-      id: 'evt_platform_pi_001',
+      id: `${testNs}:evt_platform_pi_001`,
       type: 'payment_intent.succeeded',
       data: { object: { id: 'pi_test', object: 'payment_intent' } },
     }
