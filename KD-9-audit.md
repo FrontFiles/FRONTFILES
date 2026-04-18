@@ -449,6 +449,8 @@ Exit:
 - Global pass count rises by exactly 12 vs the post-Pattern-a baseline.
 - No regression elsewhere.
 
+**One-time dev-DB hygiene at KD-9.0 merge (2026-04-18).** 11 pre-fix test debris rows removed from dev Supabase — 1 from external_connections (id f02dae67-ee10-49a1-9068-fcc6ff089092) + 10 from external_webhook_events (literal un-namespaced event ids: evt_001, evt_002, evt_shared ×2, evt_real_001, evt_dup_001, evt_unv_001, msg-001, evt_orphan_001, evt_platform_pi_001). Executed manually by founder via Supabase Studio SQL Editor. Post-fix test runs use per-test UUID namespace — no recurrence possible. Other sub-CCPs (KD-9.3, KD-9.2, KD-9.1) should adopt the same namespace pattern; a shared helper may emerge if reuse confirms the shape.
+
 **KD-9.3:**
 - `bun x vitest run src/lib/entitlement/__tests__/services.test.ts`: 16 / 16 pass.
 - `bun x vitest run src/lib/entitlement/__tests__/authorization-invariants.test.ts`: 3 / 3 pass.
