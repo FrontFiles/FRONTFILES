@@ -84,6 +84,8 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 
 ### A.0 — Terminology lock *(blocks A.1 through A.10)*
 
+**Estimated sessions:** 4–6 (P0–P6).
+
 **Purpose.** Before any feature gate runs, canonical names must be locked across the doc set to prevent approval on ambiguous identifiers.
 
 **Work:**
@@ -140,6 +142,20 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 - Deferred to P6 consolidated sweep: developer-facing prose strings (~14 — JSDoc file headers in `src/lib/special-offer/*.ts` (7 files), inline/JSX comments in `src/app/checkout/[assetId]/page.tsx`), `'direct-offer.create'` rate-limit namespace key in `route.ts:65`, stale `D-DO lock decisions` code comment in `route.ts:24`.
 - Still pending under A.0: DB schema rename (P5), canonical terminology registry `TERMINOLOGY_LOCK.md` + consolidated pre-P6 prose/string-literal sweep + post-rename checkpoint tag (P6).
 - Commit SHA: see `git log --grep="P4 rename"` (self-referential fill deferred per P2 convention).
+
+**P5 scope lock (2026-04-18, pre-resume):**
+P5 is now defined as "DB rename + code-DB seam flip, atomic." The migration file and the code-side legacy-name flip land in the same commit and deploy together. Code-side hit list:
+- `src/lib/db/schema.ts` lines 415-416 — `TABLES` map values `direct_offer_threads` / `direct_offer_events` flip to `special_offer_threads` / `special_offer_events`.
+- `src/lib/types.ts` line 1002 — union member `'direct_offer'` flips to `'special_offer'`.
+- `src/lib/entitlement/__tests__/helpers.ts` line 45 — test fixture string flips.
+Rationale: migration applied without the code flip would leave the running app pointing at tables that no longer exist.
+
+**P6 decomposition (2026-04-18, pre-resume):**
+P6 breaks into four sub-phases, sequenced:
+- P6.1 — Developer-facing prose sweep (~14 strings: JSDoc file headers in `src/lib/special-offer/*.ts`, inline/JSX comments in `src/app/checkout/[assetId]/page.tsx`, stale "D-DO lock decisions" code comment in `src/app/api/special-offer/route.ts:24`).
+- P6.2 — Rate-limit namespace key rename: `actionType` `'direct-offer.create'` at `src/app/api/special-offer/route.ts:65` flips to `'special-offer.create'`. Operational note: rename resets any rate-limit counters keyed under the old namespace. Acceptable pre-launch; must be logged in the deploy changelog.
+- P6.3 — Produce `TERMINOLOGY_LOCK.md` v1 (canonical name registry, one row per renamed concept, versioned).
+- P6.4 — Checkpoint git tag `checkpoint/terminology-lock-A.0` on the final commit; add `ROADMAP.md` Changes-this-update row.
 
 ---
 
