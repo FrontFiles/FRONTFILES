@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { env } from '@/lib/env'
 import { getSharePreviewMetadataPayload } from '@/lib/share/metadata'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+const APP_URL = env.NEXT_PUBLIC_APP_URL
 
 export async function generateMetadata({
   params,

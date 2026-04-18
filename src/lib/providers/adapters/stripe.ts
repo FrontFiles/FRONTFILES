@@ -36,6 +36,7 @@
 // Stripe SDK.
 // ═══════════════════════════════════════════════════════════════
 
+import { env } from '@/lib/env'
 import type {
   NormalizedWebhookEvent,
   ProviderAdapter,
@@ -82,7 +83,7 @@ export const stripeAdapter: ProviderAdapter = {
     // ingest backdoor. In production we return 'rejected' with
     // a loud reason so the canonical webhook route returns 400
     // and an operator notices the misconfiguration.
-    const isProd = process.env.NODE_ENV === 'production'
+    const isProd = env.NODE_ENV === 'production'
     if (!isProd && sig === 'mock-signature') {
       return { status: 'verified' }
     }
@@ -183,8 +184,8 @@ export const stripeAdapter: ProviderAdapter = {
     // which is a degraded UX and makes any rollout look broken.
     // Returning null here forces the route handler to surface a
     // 503 so the operator notices the missing env var.
-    const isProd = process.env.NODE_ENV === 'production'
-    const clientId = process.env.STRIPE_CONNECT_CLIENT_ID
+    const isProd = env.NODE_ENV === 'production'
+    const clientId = env.STRIPE_CONNECT_CLIENT_ID
     if (isProd && !clientId) return null
     const url = new URL('https://connect.stripe.com/oauth/authorize')
     url.searchParams.set('response_type', 'code')

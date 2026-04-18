@@ -1,37 +1,30 @@
 // ═══════════════════════════════════════════════════════════════
 // Frontfiles — Feature flags
 //
-// Tiny env-var-backed flag layer. One module, one read function,
-// no runtime overhead. Flags are public (NEXT_PUBLIC_*) so they
-// can be evaluated at build time on both the server and the
-// client — no hydration mismatches because both sides see the
-// same bundled value.
+// Thin function layer over the `flags` object exported from
+// `@/lib/env`. Keep this file as the public API surface callers
+// already depend on (isFffSharingEnabled / isRealUploadEnabled),
+// with env.ts providing the single parsing point.
 //
 // Flag conventions:
 //
 //   - All flags are NEXT_PUBLIC_FFF_* prefixed for FFF Sharing,
 //     and NEXT_PUBLIC_FF_* for any other future feature.
 //   - The DEFAULT for a flag is "off" until the env var is
-//     explicitly set to a truthy value. This keeps a fresh
-//     deploy in a known-safe state.
-//   - "Truthy" = "1" | "true" | "TRUE" | "on" | "yes". Case
-//     and whitespace insensitive. Any other value (including
-//     empty / unset) is false.
+//     explicitly set. This keeps a fresh deploy in a known-safe
+//     state.
+//   - Accepted values are exactly `"true"` and `"false"` — the
+//     Zod schema in src/lib/env.ts enforces the enum. Anything
+//     else fails fast at module load with a clear error.
 //
 // Adding a new flag:
 //
-//   1. Pick the env var name. NEXT_PUBLIC_ prefix is required
-//      so it's available to client-rendered components.
-//   2. Add a getter here.
-//   3. Use the getter wherever the flag matters. Do NOT read
-//      `process.env` directly outside this module.
+//   1. Add a NEXT_PUBLIC_FFF_* or FFF_* entry to src/lib/env.ts.
+//   2. Extend `flags` in env.ts with a boolean coercion.
+//   3. Add a getter here that returns `flags.yourFlag`.
 // ═══════════════════════════════════════════════════════════════
 
-function readBoolean(envValue: string | undefined): boolean {
-  if (!envValue) return false
-  const v = envValue.trim().toLowerCase()
-  return v === '1' || v === 'true' || v === 'on' || v === 'yes'
-}
+import { flags } from '@/lib/env'
 
 /**
  * FFF Sharing — global on/off switch.
@@ -46,7 +39,7 @@ function readBoolean(envValue: string | undefined): boolean {
  * limited beta → general availability.
  */
 export function isFffSharingEnabled(): boolean {
-  return readBoolean(process.env.NEXT_PUBLIC_FFF_SHARING_ENABLED)
+  return flags.fffSharing
 }
 
 /**
@@ -63,5 +56,5 @@ export function isFffSharingEnabled(): boolean {
  * client component. Flip happens in PR 5.
  */
 export function isRealUploadEnabled(): boolean {
-  return readBoolean(process.env.FFF_REAL_UPLOAD)
+  return flags.realUpload
 }

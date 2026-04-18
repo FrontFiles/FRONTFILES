@@ -24,6 +24,7 @@
 
 import * as path from 'node:path'
 
+import { env } from '@/lib/env'
 import { FilesystemStorageAdapter } from './fs-adapter'
 import { SupabaseStorageAdapter } from './supabase-adapter'
 import type { StorageAdapter } from './types'
@@ -47,14 +48,13 @@ export type StorageDriver = 'fs' | 'supabase'
 /**
  * Resolve the configured storage driver. Unset env → `'fs'` (does
  * not throw) per plan exit criterion §5.
+ *
+ * env.ts Zod schema enforces the `'fs' | 'supabase'` enum at module
+ * load time with a `'fs'` default, so by the time this function runs
+ * the value is already validated and narrowed.
  */
 export function resolveStorageDriver(): StorageDriver {
-  const raw = (process.env.FFF_STORAGE_DRIVER ?? '').trim().toLowerCase()
-  if (raw === '' || raw === 'fs') return 'fs'
-  if (raw === 'supabase') return 'supabase'
-  throw new Error(
-    `Unknown FFF_STORAGE_DRIVER value: "${raw}". Expected "fs" or "supabase".`,
-  )
+  return env.FFF_STORAGE_DRIVER
 }
 
 /**
@@ -65,12 +65,12 @@ export function getStorageAdapter(): StorageAdapter {
   const driver = resolveStorageDriver()
   if (driver === 'fs') {
     const root =
-      process.env.FFF_STORAGE_FS_ROOT?.trim() ||
+      env.FFF_STORAGE_FS_ROOT?.trim() ||
       path.join(process.cwd(), '.storage')
     return new FilesystemStorageAdapter(root)
   }
   // driver === 'supabase'
-  const bucket = process.env.FFF_STORAGE_SUPABASE_BUCKET?.trim()
+  const bucket = env.FFF_STORAGE_SUPABASE_BUCKET?.trim()
   if (!bucket) {
     throw new Error(
       'FFF_STORAGE_DRIVER=supabase but FFF_STORAGE_SUPABASE_BUCKET is not set',

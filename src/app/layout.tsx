@@ -4,10 +4,11 @@ import { UserProvider } from "@/lib/user-context";
 import { TransactionProvider } from "@/lib/transaction/context";
 import { DraftStoreProvider } from "@/lib/post/draft-store";
 import { GlobalShareComposer } from "@/components/composer-share/GlobalShareComposer";
+import { env } from "@/lib/env";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL),
   title: "Frontfiles",
   description: "A provenance-first marketplace for editorial work.",
 };

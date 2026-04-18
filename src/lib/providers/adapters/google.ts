@@ -25,6 +25,7 @@
 //   same way the Stripe adapter accepts `mock-signature`.
 // ═══════════════════════════════════════════════════════════════
 
+import { env } from '@/lib/env'
 import type {
   NormalizedWebhookEvent,
   ProviderAdapter,
@@ -88,7 +89,7 @@ export function createGoogleAdapter(
           reason: 'missing Authorization header',
         }
       }
-      const isProd = process.env.NODE_ENV === 'production'
+      const isProd = env.NODE_ENV === 'production'
       if (!isProd && auth === 'Bearer mock-bearer') {
         return { status: 'verified' }
       }
@@ -177,8 +178,8 @@ export function createGoogleAdapter(
       // generic Google error page. Returning null forces the route
       // handler to surface a 503 so the operator notices the
       // missing env var.
-      const isProd = process.env.NODE_ENV === 'production'
-      const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
+      const isProd = env.NODE_ENV === 'production'
+      const clientId = env.GOOGLE_OAUTH_CLIENT_ID
       if (isProd && !clientId) return null
       const scopes = (input.scopes ?? defaultScopes).join(' ')
       const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')

@@ -5,8 +5,16 @@
  * config based on the runtime (Node.js vs Edge). Sentry gracefully
  * no-ops if NEXT_PUBLIC_SENTRY_DSN is not set.
  *
+ * NOTE on env reads: this file intentionally reads `process.env.NEXT_RUNTIME`
+ * directly. `NEXT_RUNTIME` is a runtime signal injected by Next.js itself
+ * (not a configuration variable) and is therefore not part of the Zod
+ * schema in `src/lib/env.ts`. All *configuration* env reads (like
+ * NEXT_PUBLIC_SENTRY_DSN) do go through `@/lib/env`.
+ *
  * See: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
+
+import { env } from '@/lib/env'
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
@@ -32,7 +40,7 @@ export async function onRequestError(
     routeType: 'render' | 'route' | 'action' | 'middleware'
   },
 ) {
-  if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  if (env.NEXT_PUBLIC_SENTRY_DSN) {
     const Sentry = await import('@sentry/nextjs')
     Sentry.captureRequestError(err, request, context)
   }

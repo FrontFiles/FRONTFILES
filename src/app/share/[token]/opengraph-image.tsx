@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og'
+import { env } from '@/lib/env'
 import { getSharePreviewMetadataPayload } from '@/lib/share/metadata'
 import { OgWatermark, OG_WATERMARK_BAR_HEIGHT } from '@/lib/watermark/og-watermark'
 import { isWatermarkEnabled } from '@/lib/watermark/policy'
@@ -6,7 +7,7 @@ import { isWatermarkEnabled } from '@/lib/watermark/policy'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+const APP_URL = env.NEXT_PUBLIC_APP_URL
 
 // Wordmark element — reused in both card variants
 function Wordmark() {
