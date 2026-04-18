@@ -3,6 +3,19 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { POST } from '../route'
 import { __testing as storeTesting } from '@/lib/upload/batch-store'
 import { createBatch } from '@/lib/upload/batch-service'
+import { scopeEnvVars } from '@/lib/test/env-scope'
+
+// Force mock mode: unset the 3 Supabase env vars so Pattern-a's
+// live-read isSupabaseConfigured() returns false. The route still
+// gates on FFF_REAL_UPLOAD (toggled per-test via local withEnv),
+// but downstream batch-store calls (via createBatch setup + the
+// route itself) route through the in-memory Map branches.
+// See KD-9-audit.md §Phase 4.A §KD-9.1.
+scopeEnvVars([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+])
 
 const CREATOR_A = '11111111-1111-4111-8111-111111111111'
 const CREATOR_B = '22222222-2222-4222-8222-222222222222'

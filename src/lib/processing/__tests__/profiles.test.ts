@@ -6,6 +6,18 @@ import {
   getMissingApprovedProfiles,
 } from '../profiles'
 import type { WatermarkIntrusionLevel, TemplateFamily } from '../types'
+import { scopeEnvVars } from '@/lib/test/env-scope'
+
+// Force mock mode: unset the 3 Supabase env vars so Pattern-a's
+// live-read isSupabaseEnvPresent() returns false. profiles.ts's
+// getMode() routes through the SEED_PROFILES in-memory branch so
+// this suite exercises the hand-written seed data rather than a
+// live watermark_profiles SELECT. See KD-9-audit.md §Phase 4.A §KD-9.1.
+scopeEnvVars([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+])
 
 describe('getApprovedProfile', () => {
   it('returns a profile for each valid (level, family) pair', async () => {

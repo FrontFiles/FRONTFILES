@@ -9,6 +9,19 @@ import {
 } from '../commit-service'
 import { __testing as storeTesting } from '../upload-store'
 import { sha256Hex } from './test-helpers'
+import { scopeEnvVars } from '@/lib/test/env-scope'
+
+// Force mock mode: unset the 3 Supabase env vars so Pattern-a's
+// live-read isSupabaseConfigured() returns false. upload-store's
+// findExistingByToken / insertDraftAndOriginal then route through
+// their in-memory Map branches, honouring storeTesting.reset() and
+// the single-shot failure-injection helpers that the suite drives.
+// See KD-9-audit.md §Phase 4.A §KD-9.1.
+scopeEnvVars([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+])
 
 // ── Minimal valid JPEG fixture ────────────────────────────
 // Header only — the sniff accepts it; sharp would throw on

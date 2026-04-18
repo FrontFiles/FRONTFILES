@@ -3,6 +3,19 @@ import { processDerivative } from '../pipeline'
 import type { StorageAdapter, MediaRowAdapter } from '../pipeline'
 import type { ProcessingJob } from '../types'
 import { IMAGE_DERIVATIVE_SPECS } from '../types'
+import { scopeEnvVars } from '@/lib/test/env-scope'
+
+// Force mock mode: unset the 3 Supabase env vars so Pattern-a's
+// live-read isSupabaseEnvPresent() returns false. profiles.ts's
+// getMode() then routes through the SEED_PROFILES in-memory branch,
+// giving getApprovedProfile() the seeded draft rows that
+// processDerivative() needs for its watermark path. See
+// KD-9-audit.md §Phase 4.A §KD-9.1.
+scopeEnvVars([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+])
 
 // ══════════════════════════════════════════════
 // Mock Sharp — avoids real image processing in unit tests.

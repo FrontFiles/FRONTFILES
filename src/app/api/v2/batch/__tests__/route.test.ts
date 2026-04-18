@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach } from 'vitest'
 
 import { POST } from '../route'
 import { __testing as storeTesting } from '@/lib/upload/batch-store'
+import { scopeEnvVars } from '@/lib/test/env-scope'
+
+// Force mock mode: unset the 3 Supabase env vars so Pattern-a's
+// live-read isSupabaseConfigured() returns false. The route still
+// gates on FFF_REAL_UPLOAD (toggled per-test via local withEnv),
+// but downstream batch-store calls route through the in-memory Map
+// branches. See KD-9-audit.md §Phase 4.A §KD-9.1.
+scopeEnvVars([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+])
 
 const CREATOR_A = '11111111-1111-4111-8111-111111111111'
 
@@ -86,7 +98,8 @@ describe('POST /api/v2/batch — body validation', () => {
       )
       expect(res.status).toBe(400)
       const body = await res.json()
-      expect(body.code).toBe('bad_request')
+      expect(body.error.code).toBe('VALIDATION_ERROR')
+      expect(body.error.message).toMatch(/not valid JSON/i)
     })
   })
 
@@ -100,7 +113,13 @@ describe('POST /api/v2/batch — body validation', () => {
       )
       expect(res.status).toBe(400)
       const body = await res.json()
-      expect(body.detail).toMatch(/object/i)
+      // Top-level type mismatch (array vs object). parseBody strips Zod's
+      // formErrors before responding, so the literal "expected object"
+      // message doesn't reach the body — empty `fields` is the remaining
+      // signal distinguishing a top-level rejection from a per-field one.
+      expect(body.error.code).toBe('VALIDATION_ERROR')
+      expect(body.error.message).toMatch(/failed validation/i)
+      expect(Object.keys(body.error.fields)).toHaveLength(0)
     })
   })
 
@@ -114,7 +133,8 @@ describe('POST /api/v2/batch — body validation', () => {
       )
       expect(res.status).toBe(400)
       const body = await res.json()
-      expect(body.detail).toMatch(/boolean/)
+      expect(body.error.code).toBe('VALIDATION_ERROR')
+      expect(body.error.fields.newsroom_mode?.[0]).toMatch(/boolean/i)
     })
   })
 })

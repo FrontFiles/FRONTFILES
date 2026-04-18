@@ -5,6 +5,18 @@ import * as path from 'node:path'
 
 import { POST } from '../route'
 import { __testing as storeTesting } from '@/lib/upload/upload-store'
+import { scopeEnvVars } from '@/lib/test/env-scope'
+
+// Force mock mode: unset the 3 Supabase env vars so Pattern-a's
+// live-read isSupabaseConfigured() returns false. The route still
+// gates on FFF_REAL_UPLOAD (toggled per-test via local withEnv),
+// but downstream upload-store calls route through their in-memory
+// Map branches. See KD-9-audit.md §Phase 4.A §KD-9.1.
+scopeEnvVars([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+])
 
 // Minimal JPEG header — enough for the magic-byte sniff.
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x01, 0x02, 0x03])
