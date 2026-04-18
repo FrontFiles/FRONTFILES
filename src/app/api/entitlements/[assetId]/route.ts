@@ -35,7 +35,7 @@ export async function GET(
 
   // ── 2. Asset existence ────────────────────────────────────
 
-  const governance = getAssetGovernance(assetId)
+  const governance = await getAssetGovernance(assetId)
   if (!governance) {
     return NextResponse.json(
       { error: 'Asset not found' },

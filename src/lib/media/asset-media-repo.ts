@@ -9,16 +9,23 @@
  *   2. getReadyMedia — does the requested derivative exist?
  *   3. hasActiveGrant — is this user entitled to the original?
  *
- * Mock implementations read from current in-memory data.
- * Production implementations will query vault_assets, asset_media,
- * and licence_grants via Supabase.
+ * Dual-mode:
+ *   mock (in-memory): reads current `assetMap` + `mockVaultAssets`.
+ *   real (Supabase):  SELECTs from `vault_assets` and `asset_media`.
+ *
+ * The mode is decided once at module load from `isSupabaseEnvPresent`.
+ * The public async contract is identical across modes — callers
+ * never branch on mode.
  *
  * PRINCIPLE: file existence != access right. access right != file existence.
  * This module answers existence questions. Authorization decisions
  * are made by the route handler using these answers.
+ *
+ * SERVER-ONLY. Never import from a client component.
  */
 
-import { assetMap, type AssetData } from '@/data/assets'
+import { env, isSupabaseEnvPresent } from '@/lib/env'
+import { assetMap } from '@/data/assets'
 import { mockVaultAssets } from '@/lib/mock-data'
 
 // ══════════════════════════════════════════════
@@ -51,8 +58,32 @@ export type MediaRole =
   | 'video_stream'
   | 'audio_stream'
 
+// ─── Mode selector (CCP 4) ──────────────────────────────────
+//
+// Decided once at module load from `isSupabaseEnvPresent`.
+// No per-call branching beyond `MODE === 'mock'`.
+
+const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+
+let _modeLogged = false
+function logModeOnce(): void {
+  if (_modeLogged) return
+  _modeLogged = true
+  if (env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.info(`[ff:mode] asset-media=${MODE}`)
+  }
+}
+
+// ─── Lazy Supabase client accessor ──────────────────────────
+
+async function db() {
+  const { getSupabaseClient } = await import('@/lib/db/client')
+  return getSupabaseClient()
+}
+
 // ══════════════════════════════════════════════
-// CONTEXT → ROLE MAPPING
+// CONTEXT → ROLE MAPPING (pure, sync — unchanged)
 // ══════════════════════════════════════════════
 
 const CONTEXT_ROLE_MAP: Record<string, MediaRole> = {
@@ -93,7 +124,7 @@ export function resolveMediaRole(
 }
 
 // ══════════════════════════════════════════════
-// CONTENT TYPE RESOLUTION
+// CONTENT TYPE RESOLUTION (used by mock path only)
 // ══════════════════════════════════════════════
 
 const EXT_CONTENT_TYPES: Record<string, string> = {
@@ -111,84 +142,151 @@ function resolveContentType(filePath: string): string {
 }
 
 // ══════════════════════════════════════════════
-// MOCK IMPLEMENTATIONS
-//
-// In production, these query vault_assets, asset_media,
-// and licence_grants via Supabase. In mock phase, they
-// read from in-memory data arrays.
+// PUBLIC — governance
 // ══════════════════════════════════════════════
 
 /**
  * Get asset governance state for delivery decisions.
  * Returns null if asset does not exist.
+ *
+ * Real path: SELECT from `vault_assets` (one row).
+ * Mock path: scan `assetMap` then `mockVaultAssets`.
  */
-export function getAssetGovernance(assetId: string): AssetGovernance | null {
-  // Check discovery model first
-  const asset = assetMap[assetId]
-  if (asset) {
-    return {
-      creatorId: asset.creatorId,
-      privacyState: asset.privacyLevel,
-      publicationState: 'PUBLISHED', // discovery assets are implicitly published
-      declarationState: asset.validationDeclaration ?? null,
+export async function getAssetGovernance(
+  assetId: string,
+): Promise<AssetGovernance | null> {
+  logModeOnce()
+
+  if (MODE === 'mock') {
+    // Check discovery model first
+    const asset = assetMap[assetId]
+    if (asset) {
+      return {
+        creatorId: asset.creatorId,
+        privacyState: asset.privacyLevel,
+        publicationState: 'PUBLISHED', // discovery assets are implicitly published
+        declarationState: asset.validationDeclaration ?? null,
+      }
     }
+
+    // Check vault model
+    const vaultAsset = mockVaultAssets.find((a) => a.id === assetId)
+    if (vaultAsset) {
+      return {
+        creatorId: 'creator-010', // mock: all vault assets belong to session user
+        privacyState: vaultAsset.privacy,
+        publicationState: vaultAsset.publication,
+        declarationState: vaultAsset.declarationState ?? null,
+      }
+    }
+
+    return null
   }
 
-  // Check vault model
-  const vaultAsset = mockVaultAssets.find(a => a.id === assetId)
-  if (vaultAsset) {
-    return {
-      creatorId: 'creator-010', // mock: all vault assets belong to session user
-      privacyState: vaultAsset.privacy,
-      publicationState: vaultAsset.publication,
-      declarationState: vaultAsset.declarationState ?? null,
-    }
-  }
+  // Real path — one SELECT on vault_assets
+  const client = await db()
+  const { data, error } = await client
+    .from('vault_assets')
+    .select(
+      'creator_id, privacy_state, publication_state, declaration_state',
+    )
+    .eq('id', assetId)
+    .maybeSingle()
 
-  return null
+  if (error) {
+    throw new Error(
+      `asset-media-repo: getAssetGovernance failed (${error.message})`,
+    )
+  }
+  if (!data) return null
+
+  return {
+    creatorId: data.creator_id as string,
+    privacyState: data.privacy_state as AssetGovernance['privacyState'],
+    publicationState:
+      data.publication_state as AssetGovernance['publicationState'],
+    declarationState: (data.declaration_state as string | null) ?? null,
+  }
 }
+
+// ══════════════════════════════════════════════
+// PUBLIC — media derivatives
+// ══════════════════════════════════════════════
 
 /**
  * Get a ready media derivative for an asset by role.
  * Returns null if the derivative does not exist or is not ready.
  *
- * MOCK: Maps current asset fields to the repository interface.
- * In production, queries: asset_media WHERE asset_id = ? AND media_role = ? AND generation_status = 'ready'
+ * Real path:
+ *   SELECT storage_ref, content_type, file_size_bytes
+ *   FROM asset_media
+ *   WHERE asset_id = ? AND media_role = ? AND generation_status = 'ready'
+ *
+ * Mock path:
+ *   In-memory mapping — all derivatives point at the same source file.
+ *   The mock does NOT fall back to original when a derivative is missing;
+ *   it treats the mock file AS the derivative.
  */
-export function getReadyMedia(assetId: string, role: MediaRole): MediaRecord | null {
-  // In mock phase, all derivatives map to the same source files.
-  // The mock does NOT fall back to original when a derivative is missing —
-  // it treats the mock file AS the derivative.
+export async function getReadyMedia(
+  assetId: string,
+  role: MediaRole,
+): Promise<MediaRecord | null> {
+  logModeOnce()
 
-  const asset = assetMap[assetId]
-  const vaultAsset = mockVaultAssets.find(a => a.id === assetId)
+  if (MODE === 'mock') {
+    const asset = assetMap[assetId]
+    const vaultAsset = mockVaultAssets.find((a) => a.id === assetId)
 
-  // Resolve the storage ref based on role
-  let storageRef: string | null = null
+    // Resolve the storage ref based on role
+    let storageRef: string | null = null
 
-  switch (role) {
-    case 'original':
-    case 'thumbnail':
-    case 'watermarked_preview':
-    case 'detail_preview':
-    case 'og_image':
-      // All visual roles resolve to the thumbnail/image file in mock
-      storageRef = asset?.thumbnailRef ?? vaultAsset?.thumbnailUrl ?? null
-      break
-    case 'video_stream':
-      storageRef = asset?.videoUrl ?? vaultAsset?.videoUrl ?? null
-      break
-    case 'audio_stream':
-      storageRef = asset?.audioUrl ?? vaultAsset?.audioUrl ?? null
-      break
+    switch (role) {
+      case 'original':
+      case 'thumbnail':
+      case 'watermarked_preview':
+      case 'detail_preview':
+      case 'og_image':
+        // All visual roles resolve to the thumbnail/image file in mock
+        storageRef = asset?.thumbnailRef ?? vaultAsset?.thumbnailUrl ?? null
+        break
+      case 'video_stream':
+        storageRef = asset?.videoUrl ?? vaultAsset?.videoUrl ?? null
+        break
+      case 'audio_stream':
+        storageRef = asset?.audioUrl ?? vaultAsset?.audioUrl ?? null
+        break
+    }
+
+    if (!storageRef) return null
+
+    return {
+      storageRef,
+      contentType: resolveContentType(storageRef),
+      fileSizeBytes: null,
+    }
   }
 
-  if (!storageRef) return null
+  // Real path — single SELECT on asset_media
+  const client = await db()
+  const { data, error } = await client
+    .from('asset_media')
+    .select('storage_ref, content_type, file_size_bytes')
+    .eq('asset_id', assetId)
+    .eq('media_role', role)
+    .eq('generation_status', 'ready')
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(
+      `asset-media-repo: getReadyMedia failed (${error.message})`,
+    )
+  }
+  if (!data) return null
 
   return {
-    storageRef,
-    contentType: resolveContentType(storageRef),
-    fileSizeBytes: null,
+    storageRef: data.storage_ref as string,
+    contentType: data.content_type as string,
+    fileSizeBytes: (data.file_size_bytes as number | null) ?? null,
   }
 }
 
@@ -202,8 +300,17 @@ export function getReadyMedia(assetId: string, role: MediaRole): MediaRecord | n
  * For the full structured decision (grant type, deny reason, media
  * resolution), use resolveDownloadAuthorization() from @/lib/entitlement.
  * This function is a convenience boolean for the delivery route.
+ *
+ * This function was already async and mode-agnostic (it delegates
+ * to the entitlement module, which handles its own dual-mode). We
+ * still call `logModeOnce()` so operators see the asset-media mode
+ * when the delivery route enters here first.
  */
-export async function hasActiveGrant(assetId: string, buyerId: string): Promise<boolean> {
+export async function hasActiveGrant(
+  assetId: string,
+  buyerId: string,
+): Promise<boolean> {
+  logModeOnce()
   const { resolveDownloadAuthorization } = await import('@/lib/entitlement')
   const decision = await resolveDownloadAuthorization(buyerId, assetId)
   return decision.allowed

@@ -55,7 +55,7 @@ export async function GET(
 
   // ── 1. Asset governance check ─────────────────────────────
 
-  const governance = getAssetGovernance(id)
+  const governance = await getAssetGovernance(id)
 
   if (!governance) {
     return NextResponse.json({ error: 'Asset not found' }, { status: 404 })
@@ -174,7 +174,7 @@ export async function GET(
   // ── 4. Non-original path (previews/derivatives) ───────────
   // No entitlement check. No audit logging.
 
-  const media = getReadyMedia(id, mediaRole)
+  const media = await getReadyMedia(id, mediaRole)
 
   if (!media) {
     return NextResponse.json(
@@ -201,7 +201,7 @@ async function serveOriginal(
   ctx: string,
   auditCtx: Omit<DownloadEventInsert, 'outcome' | 'deny_reason' | 'http_status'>,
 ): Promise<NextResponse> {
-  const media = getReadyMedia(assetId, mediaRole)
+  const media = await getReadyMedia(assetId, mediaRole)
 
   if (!media) {
     void logDownloadEvent({

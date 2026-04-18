@@ -193,7 +193,7 @@ export async function GET(
     }
 
     // Governance check
-    const governance = getAssetGovernance(assetId)
+    const governance = await getAssetGovernance(assetId)
     if (!governance || governance.privacyState === 'PRIVATE'
       || governance.publicationState === 'UNPUBLISHED'
       || governance.declarationState === 'invalidated') {
@@ -333,7 +333,7 @@ async function serveOriginalInline(
   assetId: string,
   auditCtx: Omit<DownloadEventInsert, 'outcome' | 'deny_reason' | 'http_status'>,
 ): Promise<NextResponse> {
-  const media = getReadyMedia(assetId, 'original')
+  const media = await getReadyMedia(assetId, 'original')
 
   if (!media) {
     void logDownloadEvent({
