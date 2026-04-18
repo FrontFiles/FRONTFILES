@@ -81,11 +81,11 @@ export const NON_TRANSACTABLE_DECLARATION_STATES: ValidationDeclarationState[] =
 ]
 
 // ══════════════════════════════════════════════
-// DIRECT OFFER STATE (Spec §10.4)
+// SPECIAL OFFER STATE (Spec §10.4)
 // Turn-aware statuses for server-authoritative negotiation
 // ══════════════════════════════════════════════
 
-export type DirectOfferStatus =
+export type SpecialOfferStatus =
   | 'buyer_offer_pending_creator'
   | 'creator_counter_pending_buyer'
   | 'buyer_counter_pending_creator'
@@ -95,7 +95,7 @@ export type DirectOfferStatus =
   | 'auto_cancelled'
   | 'completed'
 
-export const DIRECT_OFFER_STATUS_LABELS: Record<DirectOfferStatus, string> = {
+export const SPECIAL_OFFER_STATUS_LABELS: Record<SpecialOfferStatus, string> = {
   buyer_offer_pending_creator: 'Awaiting Creator',
   creator_counter_pending_buyer: 'Counter-offer',
   buyer_counter_pending_creator: 'Awaiting Creator',
@@ -106,7 +106,7 @@ export const DIRECT_OFFER_STATUS_LABELS: Record<DirectOfferStatus, string> = {
   completed: 'Completed',
 }
 
-export const TERMINAL_OFFER_STATUSES: DirectOfferStatus[] = [
+export const TERMINAL_OFFER_STATUSES: SpecialOfferStatus[] = [
   'declined', 'expired', 'auto_cancelled', 'completed',
 ]
 
@@ -646,16 +646,16 @@ export interface CertificationEvent {
 }
 
 // ══════════════════════════════════════════════
-// DIRECT OFFER THREAD (Spec §10.4)
+// SPECIAL OFFER THREAD (Spec §10.4)
 // Server-authoritative negotiation for PUBLIC assets
 // ══════════════════════════════════════════════
 
-export const DIRECT_OFFER_MAX_ROUNDS = 3
-export const DIRECT_OFFER_DEFAULT_RESPONSE_MINUTES = 240 // 4 hours
-export const DIRECT_OFFER_MIN_RESPONSE_MINUTES = 30
-export const DIRECT_OFFER_MAX_RESPONSE_MINUTES = 1440 // 24 hours
+export const SPECIAL_OFFER_MAX_ROUNDS = 3
+export const SPECIAL_OFFER_DEFAULT_RESPONSE_MINUTES = 240 // 4 hours
+export const SPECIAL_OFFER_MIN_RESPONSE_MINUTES = 30
+export const SPECIAL_OFFER_MAX_RESPONSE_MINUTES = 1440 // 24 hours
 
-export interface DirectOfferThread {
+export interface SpecialOfferThread {
   id: string
   assetId: string
   buyerId: string
@@ -664,25 +664,25 @@ export interface DirectOfferThread {
   listedPriceAtOpen: number // EUR cents — snapshot at thread creation
   currentOfferAmount: number // EUR cents — latest live offer
   currentOfferBy: 'buyer' | 'creator'
-  roundCount: number // 1-based, max DIRECT_OFFER_MAX_ROUNDS (starts at 1 on initial offer)
+  roundCount: number // 1-based, max SPECIAL_OFFER_MAX_ROUNDS (starts at 1 on initial offer)
   creatorResponseWindowMinutes: number
   expiresAt: string // ISO — current offer expiry
-  status: DirectOfferStatus
+  status: SpecialOfferStatus
   acceptedAmount: number | null // EUR cents — locked on acceptance
   checkoutIntentId: string | null // links to checkout flow
   createdAt: string
   updatedAt: string
   resolvedAt: string | null
-  autoCancelReason: DirectOfferAutoCancelReason | null
+  autoCancelReason: SpecialOfferAutoCancelReason | null
 }
 
-export type DirectOfferAutoCancelReason =
+export type SpecialOfferAutoCancelReason =
   | 'privacy_changed'
   | 'declaration_non_transactable'
   | 'exclusive_activated'
   | 'asset_delisted'
 
-export type DirectOfferEventType =
+export type SpecialOfferEventType =
   | 'buyer_offer'
   | 'creator_counter'
   | 'buyer_counter'
@@ -694,10 +694,10 @@ export type DirectOfferEventType =
   | 'checkout_started'
   | 'completed'
 
-export interface DirectOfferEvent {
+export interface SpecialOfferEvent {
   id: string
   threadId: string
-  type: DirectOfferEventType
+  type: SpecialOfferEventType
   actorId: string
   amount: number | null // EUR cents — null for non-price events
   message: string | null // negotiation note — licensing context, rationale, usage

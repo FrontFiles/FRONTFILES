@@ -37,7 +37,7 @@ const LICENCE_TYPE_VALUES = [
   'merchandise',
 ] as const
 
-const CreateDirectOfferBody = z.object({
+const CreateSpecialOfferBody = z.object({
   assetId: z.string().min(1),
   buyerId: z.string().min(1),
   creatorId: z.string().min(1).optional(),
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     // 1. Zod validation — types, presence, ranges.
     const [body, parseErr] = await parseBody(
       request,
-      CreateDirectOfferBody,
+      CreateSpecialOfferBody,
       'POST /api/special-offer',
     )
     if (parseErr) return parseErr

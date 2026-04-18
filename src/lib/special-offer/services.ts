@@ -9,15 +9,15 @@
  */
 
 import type {
-  DirectOfferThread,
-  DirectOfferEvent,
-  DirectOfferAutoCancelReason,
+  SpecialOfferThread,
+  SpecialOfferEvent,
+  SpecialOfferAutoCancelReason,
   VaultAsset,
   LicenceType,
 } from '@/lib/types'
 import {
-  DIRECT_OFFER_MAX_ROUNDS,
-  DIRECT_OFFER_DEFAULT_RESPONSE_MINUTES,
+  SPECIAL_OFFER_MAX_ROUNDS,
+  SPECIAL_OFFER_DEFAULT_RESPONSE_MINUTES,
 } from '@/lib/types'
 import type {
   CreateOfferInput,
@@ -74,15 +74,15 @@ function computeExpiresAt(responseWindowMinutes: number, from: Date = new Date()
 }
 
 function appendEvent(
-  events: DirectOfferEvent[],
+  events: SpecialOfferEvent[],
   threadId: string,
-  type: DirectOfferEvent['type'],
+  type: SpecialOfferEvent['type'],
   actorId: string,
   amount: number | null = null,
   message: string | null = null,
   metadata: Record<string, unknown> | null = null,
-): DirectOfferEvent[] {
-  const event: DirectOfferEvent = {
+): SpecialOfferEvent[] {
+  const event: SpecialOfferEvent = {
     id: nextEventId(),
     threadId,
     type,
@@ -116,8 +116,8 @@ export class SpecialOfferError extends Error {
 export function createOffer(
   input: CreateOfferInput,
   asset: VaultAsset,
-  existingThreads: DirectOfferThread[],
-): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
+  existingThreads: SpecialOfferThread[],
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[] } {
   // Self-offer check
   if (isSelfOffer(input.buyerId, input.creatorId)) {
     throw new SpecialOfferError('SELF_OFFER', 'Cannot make an offer on your own asset.')
@@ -146,7 +146,7 @@ export function createOffer(
   }
 
   // Response window
-  const responseMinutes = input.responseWindowMinutes ?? DIRECT_OFFER_DEFAULT_RESPONSE_MINUTES
+  const responseMinutes = input.responseWindowMinutes ?? SPECIAL_OFFER_DEFAULT_RESPONSE_MINUTES
   const windowCheck = validateResponseWindow(responseMinutes)
   if (!windowCheck.eligible) {
     throw new SpecialOfferError('INVALID_WINDOW', windowCheck.reason!)
@@ -155,7 +155,7 @@ export function createOffer(
   const now = new Date()
   const threadId = nextThreadId()
 
-  const thread: DirectOfferThread = {
+  const thread: SpecialOfferThread = {
     id: threadId,
     assetId: input.assetId,
     buyerId: input.buyerId,
@@ -187,9 +187,9 @@ export function createOffer(
 
 export function creatorCounter(
   input: CounterOfferInput,
-  thread: DirectOfferThread,
-  events: DirectOfferEvent[],
-): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
+  thread: SpecialOfferThread,
+  events: SpecialOfferEvent[],
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[] } {
   if (!isThreadCreator(thread, input.actorId)) {
     throw new SpecialOfferError('NOT_CREATOR', 'Only the asset creator can counter.')
   }
@@ -201,7 +201,7 @@ export function creatorCounter(
     if (!isCreatorTurn(thread)) {
       throw new SpecialOfferError('NOT_YOUR_TURN', 'It is not the creator\'s turn to respond.')
     }
-    throw new SpecialOfferError('MAX_ROUNDS', `Maximum ${DIRECT_OFFER_MAX_ROUNDS} counter rounds reached.`)
+    throw new SpecialOfferError('MAX_ROUNDS', `Maximum ${SPECIAL_OFFER_MAX_ROUNDS} counter rounds reached.`)
   }
 
   if (isOfferExpired(thread)) {
@@ -214,7 +214,7 @@ export function creatorCounter(
   }
 
   const now = new Date()
-  const updatedThread: DirectOfferThread = {
+  const updatedThread: SpecialOfferThread = {
     ...thread,
     currentOfferAmount: input.amount,
     currentOfferBy: 'creator',
@@ -235,9 +235,9 @@ export function creatorCounter(
 
 export function buyerCounter(
   input: CounterOfferInput,
-  thread: DirectOfferThread,
-  events: DirectOfferEvent[],
-): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
+  thread: SpecialOfferThread,
+  events: SpecialOfferEvent[],
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[] } {
   if (!isThreadBuyer(thread, input.actorId)) {
     throw new SpecialOfferError('NOT_BUYER', 'Only the buyer can counter.')
   }
@@ -249,7 +249,7 @@ export function buyerCounter(
     if (!isBuyerTurn(thread)) {
       throw new SpecialOfferError('NOT_YOUR_TURN', 'It is not the buyer\'s turn to respond.')
     }
-    throw new SpecialOfferError('MAX_ROUNDS', `Maximum ${DIRECT_OFFER_MAX_ROUNDS} counter rounds reached.`)
+    throw new SpecialOfferError('MAX_ROUNDS', `Maximum ${SPECIAL_OFFER_MAX_ROUNDS} counter rounds reached.`)
   }
 
   if (isOfferExpired(thread)) {
@@ -262,7 +262,7 @@ export function buyerCounter(
   }
 
   const now = new Date()
-  const updatedThread: DirectOfferThread = {
+  const updatedThread: SpecialOfferThread = {
     ...thread,
     currentOfferAmount: input.amount,
     currentOfferBy: 'buyer',
@@ -283,9 +283,9 @@ export function buyerCounter(
 
 export function creatorAccept(
   input: AcceptOfferInput,
-  thread: DirectOfferThread,
-  events: DirectOfferEvent[],
-): { thread: DirectOfferThread; events: DirectOfferEvent[]; checkoutIntent: OfferCheckoutIntent } {
+  thread: SpecialOfferThread,
+  events: SpecialOfferEvent[],
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[]; checkoutIntent: OfferCheckoutIntent } {
   if (!isThreadCreator(thread, input.actorId)) {
     throw new SpecialOfferError('NOT_CREATOR', 'Only the asset creator can accept.')
   }
@@ -315,7 +315,7 @@ export function creatorAccept(
     createdAt: now.toISOString(),
   }
 
-  const updatedThread: DirectOfferThread = {
+  const updatedThread: SpecialOfferThread = {
     ...thread,
     status: 'accepted_pending_checkout',
     acceptedAmount: thread.currentOfferAmount,
@@ -343,9 +343,9 @@ export function creatorAccept(
 
 export function buyerAccept(
   input: AcceptOfferInput,
-  thread: DirectOfferThread,
-  events: DirectOfferEvent[],
-): { thread: DirectOfferThread; events: DirectOfferEvent[]; checkoutIntent: OfferCheckoutIntent } {
+  thread: SpecialOfferThread,
+  events: SpecialOfferEvent[],
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[]; checkoutIntent: OfferCheckoutIntent } {
   if (!isThreadBuyer(thread, input.actorId)) {
     throw new SpecialOfferError('NOT_BUYER', 'Only the buyer can accept.')
   }
@@ -375,7 +375,7 @@ export function buyerAccept(
     createdAt: now.toISOString(),
   }
 
-  const updatedThread: DirectOfferThread = {
+  const updatedThread: SpecialOfferThread = {
     ...thread,
     status: 'accepted_pending_checkout',
     acceptedAmount: thread.currentOfferAmount,
@@ -403,9 +403,9 @@ export function buyerAccept(
 
 export function creatorDecline(
   input: DeclineOfferInput,
-  thread: DirectOfferThread,
-  events: DirectOfferEvent[],
-): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
+  thread: SpecialOfferThread,
+  events: SpecialOfferEvent[],
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[] } {
   if (!isThreadCreator(thread, input.actorId)) {
     throw new SpecialOfferError('NOT_CREATOR', 'Only the asset creator can decline.')
   }
@@ -418,7 +418,7 @@ export function creatorDecline(
   }
 
   const now = new Date()
-  const updatedThread: DirectOfferThread = {
+  const updatedThread: SpecialOfferThread = {
     ...thread,
     status: 'declined',
     updatedAt: now.toISOString(),
@@ -435,9 +435,9 @@ export function creatorDecline(
 // ══════════════════════════════════════════════
 
 export function expireOffer(
-  thread: DirectOfferThread,
-  events: DirectOfferEvent[],
-): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
+  thread: SpecialOfferThread,
+  events: SpecialOfferEvent[],
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[] } {
   if (isTerminal(thread.status)) {
     throw new SpecialOfferError('THREAD_RESOLVED', 'This offer thread is already resolved.')
   }
@@ -447,7 +447,7 @@ export function expireOffer(
   }
 
   const now = new Date()
-  const updatedThread: DirectOfferThread = {
+  const updatedThread: SpecialOfferThread = {
     ...thread,
     status: 'expired',
     updatedAt: now.toISOString(),
@@ -468,16 +468,16 @@ export function expireOffer(
  * Called centrally when asset state changes.
  */
 export function autoCancelOffer(
-  thread: DirectOfferThread,
-  events: DirectOfferEvent[],
-  reason: DirectOfferAutoCancelReason,
-): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
+  thread: SpecialOfferThread,
+  events: SpecialOfferEvent[],
+  reason: SpecialOfferAutoCancelReason,
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[] } {
   if (isTerminal(thread.status)) {
     return { thread, events } // Already terminal — no-op
   }
 
   const now = new Date()
-  const updatedThread: DirectOfferThread = {
+  const updatedThread: SpecialOfferThread = {
     ...thread,
     status: 'auto_cancelled',
     autoCancelReason: reason,
@@ -507,11 +507,11 @@ export function autoCancelOffer(
  * Called when asset state changes make it non-transactable.
  */
 export function autoCancelAllForAsset(
-  threads: DirectOfferThread[],
-  eventsMap: Map<string, DirectOfferEvent[]>,
+  threads: SpecialOfferThread[],
+  eventsMap: Map<string, SpecialOfferEvent[]>,
   asset: VaultAsset,
-): { threads: DirectOfferThread[]; eventsMap: Map<string, DirectOfferEvent[]> } {
-  const updatedThreads: DirectOfferThread[] = []
+): { threads: SpecialOfferThread[]; eventsMap: Map<string, SpecialOfferEvent[]> } {
+  const updatedThreads: SpecialOfferThread[] = []
   const updatedEventsMap = new Map(eventsMap)
 
   for (const thread of threads) {
@@ -538,15 +538,15 @@ export function autoCancelAllForAsset(
 // ══════════════════════════════════════════════
 
 export function completeOffer(
-  thread: DirectOfferThread,
-  events: DirectOfferEvent[],
-): { thread: DirectOfferThread; events: DirectOfferEvent[] } {
+  thread: SpecialOfferThread,
+  events: SpecialOfferEvent[],
+): { thread: SpecialOfferThread; events: SpecialOfferEvent[] } {
   if (thread.status !== 'accepted_pending_checkout') {
     throw new SpecialOfferError('INVALID_STATE', 'Can only complete an accepted offer pending checkout.')
   }
 
   const now = new Date()
-  const updatedThread: DirectOfferThread = {
+  const updatedThread: SpecialOfferThread = {
     ...thread,
     status: 'completed',
     updatedAt: now.toISOString(),

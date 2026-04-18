@@ -13,7 +13,7 @@ import {
   SpecialOfferError,
 } from '../services'
 import { makeAsset, makeThread, makeEvent, resetSequences } from './helpers'
-import type { DirectOfferThread, DirectOfferEvent } from '@/lib/types'
+import type { SpecialOfferThread, SpecialOfferEvent } from '@/lib/types'
 
 beforeEach(() => resetSequences())
 
@@ -427,7 +427,7 @@ describe('autoCancelAllForAsset', () => {
     const t2 = makeThread({ assetId: 'a1', status: 'creator_counter_pending_buyer' })
     const t3 = makeThread({ assetId: 'a2', status: 'buyer_offer_pending_creator' }) // different asset
 
-    const eventsMap = new Map<string, DirectOfferEvent[]>()
+    const eventsMap = new Map<string, SpecialOfferEvent[]>()
     const asset = makeAsset({ id: 'a1', privacy: 'PRIVATE' })
 
     const result = autoCancelAllForAsset([t1, t2, t3], eventsMap, asset)

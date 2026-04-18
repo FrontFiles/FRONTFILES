@@ -633,7 +633,7 @@ Scope:
      - PayoutNotification
      - RefundIssued
      - CreatorKycStatus
-     - DirectOfferMade / Countered / Accepted / Rejected / Expired
+     - SpecialOfferMade / Countered / Accepted / Rejected / Expired
      (15 templates — combine into shared subcomponents where possible)
   5. Domain setup in Resend: transactional (mail.frontfiles.news) + marketing
      (news.frontfiles.news). Two API keys per D12 lock.

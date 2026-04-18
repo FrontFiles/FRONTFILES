@@ -4,7 +4,7 @@
 
 import { SpecialOfferError } from './services'
 import { getThread } from './store'
-import type { DirectOfferThread } from '@/lib/types'
+import type { SpecialOfferThread } from '@/lib/types'
 
 export function success<T>(data: T, status = 200): Response {
   return Response.json({ data }, { status })
@@ -19,7 +19,7 @@ export function errorResponse(code: string, message: string, status = 400): Resp
 
 export function resolveThread(
   id: string,
-): [DirectOfferThread, null] | [null, Response] {
+): [SpecialOfferThread, null] | [null, Response] {
   const thread = getThread(id)
   if (!thread) {
     return [null, errorResponse('THREAD_NOT_FOUND', `Offer thread ${id} not found`, 404)]

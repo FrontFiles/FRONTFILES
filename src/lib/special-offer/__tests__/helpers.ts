@@ -4,7 +4,7 @@
  * Factory functions for creating test data.
  */
 
-import type { DirectOfferThread, DirectOfferEvent, VaultAsset, LicenceType, DirectOfferStatus } from '@/lib/types'
+import type { SpecialOfferThread, SpecialOfferEvent, VaultAsset, LicenceType, SpecialOfferStatus } from '@/lib/types'
 
 let threadSeq = 0
 let eventSeq = 0
@@ -31,7 +31,7 @@ export function makeAsset(overrides: Partial<VaultAsset> = {}): VaultAsset {
   }
 }
 
-export function makeThread(overrides: Partial<DirectOfferThread> = {}): DirectOfferThread {
+export function makeThread(overrides: Partial<SpecialOfferThread> = {}): SpecialOfferThread {
   const id = `test-thread-${String(++threadSeq).padStart(4, '0')}`
   const now = new Date()
   return {
@@ -57,7 +57,7 @@ export function makeThread(overrides: Partial<DirectOfferThread> = {}): DirectOf
   }
 }
 
-export function makeEvent(overrides: Partial<DirectOfferEvent> = {}): DirectOfferEvent {
+export function makeEvent(overrides: Partial<SpecialOfferEvent> = {}): SpecialOfferEvent {
   return {
     id: `test-event-${String(++eventSeq).padStart(6, '0')}`,
     threadId: 'test-thread-0001',

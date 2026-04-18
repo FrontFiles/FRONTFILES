@@ -298,7 +298,7 @@ Each active thread renders as a **ThreadCard** — a bordered, expandable card.
 
 | Element | Position | Detail |
 |---|---|---|
-| Status badge | Top-left | DIRECT_OFFER_STATUS_LABELS, styled per status |
+| Status badge | Top-left | SPECIAL_OFFER_STATUS_LABELS, styled per status |
 | Round indicator | Next to badge | "Round X/3" — 10px slate-400 |
 | Time remaining | Next to round | "Xh Ym remaining" or "Expired" — font-mono 10px |
 | Asset title | Below badges | Bold, truncated |
@@ -620,9 +620,9 @@ The implementation creates events for every state change. Notification delivery 
 
 ### H.7 Data model
 
-**DirectOfferThread**: id, assetId, buyerId, creatorId, licenceType, listedPriceAtOpen, currentOfferAmount, currentOfferBy, roundCount, creatorResponseWindowMinutes, expiresAt, status, acceptedAmount, checkoutIntentId, autoCancelReason, createdAt, updatedAt, resolvedAt.
+**SpecialOfferThread**: id, assetId, buyerId, creatorId, licenceType, listedPriceAtOpen, currentOfferAmount, currentOfferBy, roundCount, creatorResponseWindowMinutes, expiresAt, status, acceptedAmount, checkoutIntentId, autoCancelReason, createdAt, updatedAt, resolvedAt.
 
-**DirectOfferEvent**: id, threadId, type, actorId, amount, metadata, createdAt.
+**SpecialOfferEvent**: id, threadId, type, actorId, amount, metadata, createdAt.
 
 **OfferCheckoutIntent**: id, threadId, assetId, buyerId, creatorId, licenceType, negotiatedAmount, createdAt.
 

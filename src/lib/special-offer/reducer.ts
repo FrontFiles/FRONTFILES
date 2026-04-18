@@ -7,7 +7,7 @@
  */
 
 import type { SpecialOfferEngineState, SpecialOfferAction } from './types'
-import type { DirectOfferThread, DirectOfferEvent } from '@/lib/types'
+import type { SpecialOfferThread, SpecialOfferEvent } from '@/lib/types'
 
 // ══════════════════════════════════════════════
 // INITIAL STATE

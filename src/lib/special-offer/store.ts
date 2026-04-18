@@ -5,26 +5,26 @@
  * Will be replaced by Supabase queries when codegen is wired.
  */
 
-import type { DirectOfferThread, DirectOfferEvent } from '@/lib/types'
+import type { SpecialOfferThread, SpecialOfferEvent } from '@/lib/types'
 import type { OfferCheckoutIntent } from './types'
 
 // ══════════════════════════════════════════════
 // IN-MEMORY STORES
 // ══════════════════════════════════════════════
 
-const threads = new Map<string, DirectOfferThread>()
-const events = new Map<string, DirectOfferEvent[]>()
+const threads = new Map<string, SpecialOfferThread>()
+const events = new Map<string, SpecialOfferEvent[]>()
 const checkoutIntents = new Map<string, OfferCheckoutIntent>()
 
 // ══════════════════════════════════════════════
 // THREAD OPERATIONS
 // ══════════════════════════════════════════════
 
-export function getThread(id: string): DirectOfferThread | undefined {
+export function getThread(id: string): SpecialOfferThread | undefined {
   return threads.get(id)
 }
 
-export function putThread(thread: DirectOfferThread): void {
+export function putThread(thread: SpecialOfferThread): void {
   threads.set(thread.id, thread)
 }
 
@@ -32,7 +32,7 @@ export function listThreads(filter?: {
   buyerId?: string
   creatorId?: string
   assetId?: string
-}): DirectOfferThread[] {
+}): SpecialOfferThread[] {
   let result = Array.from(threads.values())
 
   if (filter?.buyerId) {
@@ -52,11 +52,11 @@ export function listThreads(filter?: {
 // EVENT OPERATIONS
 // ══════════════════════════════════════════════
 
-export function getEvents(threadId: string): DirectOfferEvent[] {
+export function getEvents(threadId: string): SpecialOfferEvent[] {
   return events.get(threadId) ?? []
 }
 
-export function putEvents(threadId: string, threadEvents: DirectOfferEvent[]): void {
+export function putEvents(threadId: string, threadEvents: SpecialOfferEvent[]): void {
   events.set(threadId, threadEvents)
 }
 

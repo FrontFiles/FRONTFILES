@@ -349,10 +349,10 @@ export interface AssignmentEventRow {
 }
 
 // ══════════════════════════════════════════════
-// DIRECT OFFER THREAD ROW (Spec §10.4)
+// SPECIAL OFFER THREAD ROW (Spec §10.4)
 // ══════════════════════════════════════════════
 
-export interface DirectOfferThreadRow {
+export interface SpecialOfferThreadRow {
   id: string
   asset_id: string
   buyer_id: string
@@ -364,19 +364,19 @@ export interface DirectOfferThreadRow {
   round_count: number
   creator_response_window_minutes: number
   expires_at: string
-  status: string // DirectOfferStatus
+  status: string // SpecialOfferStatus
   accepted_amount: number | null
   checkout_intent_id: string | null
-  auto_cancel_reason: string | null // DirectOfferAutoCancelReason
+  auto_cancel_reason: string | null // SpecialOfferAutoCancelReason
   created_at: string
   updated_at: string
   resolved_at: string | null
 }
 
-export interface DirectOfferEventRow {
+export interface SpecialOfferEventRow {
   id: string
   thread_id: string
-  event_type: string // DirectOfferEventType
+  event_type: string // SpecialOfferEventType
   actor_id: string
   amount: number | null // EUR cents
   message: string | null // negotiation note

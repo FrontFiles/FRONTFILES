@@ -9,11 +9,11 @@
  */
 
 import type {
-  DirectOfferThread,
-  DirectOfferEvent,
-  DirectOfferStatus,
-  DirectOfferEventType,
-  DirectOfferAutoCancelReason,
+  SpecialOfferThread,
+  SpecialOfferEvent,
+  SpecialOfferStatus,
+  SpecialOfferEventType,
+  SpecialOfferAutoCancelReason,
   LicenceType,
   VaultAsset,
 } from '@/lib/types'
@@ -23,8 +23,8 @@ import type {
 // ══════════════════════════════════════════════
 
 export interface SpecialOfferEngineState {
-  thread: DirectOfferThread | null
-  events: DirectOfferEvent[]
+  thread: SpecialOfferThread | null
+  events: SpecialOfferEvent[]
 }
 
 // ══════════════════════════════════════════════
@@ -32,7 +32,7 @@ export interface SpecialOfferEngineState {
 // ══════════════════════════════════════════════
 
 export type SpecialOfferAction =
-  | { type: 'LOAD_THREAD'; thread: DirectOfferThread; events: DirectOfferEvent[] }
+  | { type: 'LOAD_THREAD'; thread: SpecialOfferThread; events: SpecialOfferEvent[] }
   | { type: 'BUYER_SUBMIT_OFFER'; amount: number; buyerId: string }
   | { type: 'CREATOR_COUNTER'; amount: number; creatorId: string }
   | { type: 'BUYER_COUNTER'; amount: number; buyerId: string }
@@ -40,7 +40,7 @@ export type SpecialOfferAction =
   | { type: 'BUYER_ACCEPT'; buyerId: string }
   | { type: 'CREATOR_DECLINE'; creatorId: string }
   | { type: 'EXPIRE' }
-  | { type: 'AUTO_CANCEL'; reason: DirectOfferAutoCancelReason }
+  | { type: 'AUTO_CANCEL'; reason: SpecialOfferAutoCancelReason }
   | { type: 'CHECKOUT_STARTED'; checkoutIntentId: string }
   | { type: 'COMPLETE' }
 
@@ -48,7 +48,7 @@ export type SpecialOfferAction =
 // VALID TRANSITIONS
 // ══════════════════════════════════════════════
 
-export const VALID_OFFER_TRANSITIONS: Record<DirectOfferStatus, DirectOfferStatus[]> = {
+export const VALID_OFFER_TRANSITIONS: Record<SpecialOfferStatus, SpecialOfferStatus[]> = {
   buyer_offer_pending_creator: [
     'creator_counter_pending_buyer',
     'accepted_pending_checkout',

@@ -127,6 +127,20 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 - Still pending under A.0: shared types in `src/lib/types.ts` + `src/lib/schema.ts` (`DirectOfferThread`, `DirectOfferEvent`, `DirectOfferStatus`, `DIRECT_OFFER_MAX_ROUNDS`, etc.) (P4), DB schema `direct_offer_*` (P5), canonical terminology registry `TERMINOLOGY_LOCK.md` (P6).
 - Commit SHA: see `git log --grep="P3 rename"` (self-referential fill deferred per P2 convention).
 
+**P4 status (landed 2026-04-18):**
+- Shared types renamed in `src/lib/types.ts` (10): `DirectOfferStatus`, `DirectOfferThread`, `DirectOfferEvent`, `DirectOfferEventType`, `DirectOfferAutoCancelReason`, `DIRECT_OFFER_STATUS_LABELS`, `DIRECT_OFFER_MAX_ROUNDS`, `DIRECT_OFFER_DEFAULT_RESPONSE_MINUTES`, `DIRECT_OFFER_MIN_RESPONSE_MINUTES`, `DIRECT_OFFER_MAX_RESPONSE_MINUTES` → `SpecialOffer*` / `SPECIAL_OFFER_*` equivalents.
+- Shared schemas renamed in `src/lib/db/schema.ts` (2): `DirectOfferThreadRow`, `DirectOfferEventRow` → `SpecialOffer*Row` equivalents.
+- Route-local Zod schemas renamed (1): `CreateDirectOfferBody` → `CreateSpecialOfferBody` in `src/app/api/special-offer/route.ts`.
+- User-visible UI copy updated: 2 strings across 2 files — `<h1>Direct Offers</h1>` in `src/app/vault/offers/page.tsx:178`; `'Direct Offers are only available for PUBLIC assets.'` error `reason` in `src/lib/special-offer/guards.ts:28` (flows to API response body via `errorResponse`).
+- Test files updated: 2 (`__tests__/services.test.ts`, `__tests__/helpers.ts`) — identifier imports follow P4 rename; no copy-string assertions required.
+- Consumers updated across `src/**`: 12 files — the 2 source-of-truth files (`types.ts`, `db/schema.ts`) + `route.ts` + `page.tsx` + all 8 files under `src/lib/special-offer/`.
+- Stale doc refs updated (4): `SPECIAL_OFFER_SPEC.md` lines 301 (`DIRECT_OFFER_STATUS_LABELS`), 623 (`DirectOfferThread` data-model name), 625 (`DirectOfferEvent` data-model name); `CLAUDE_CODE_PROMPT_SEQUENCE.md` line 636 (`DirectOfferMade` email-template name).
+- Type-annotation comments and section headers that reference the renamed identifier travel with the identifier rename (P4 scope). Narrative comments (behavior descriptions, rationale) remain deferred to P6 sweep.
+- Deferred to P5 (DB rename): DB identifier literals `direct_offer`, `direct_offer_*` in code (4 hits — `db/schema.ts:415-416` `TABLES` keys+values, `types.ts:1002` union-member string, `entitlement/__tests__/helpers.ts:45` test data), plus snake_case property names on `SpecialOfferThreadRow`/`SpecialOfferEventRow` interfaces (they mirror DB columns).
+- Deferred to P6 consolidated sweep: developer-facing prose strings (~14 — JSDoc file headers in `src/lib/special-offer/*.ts` (7 files), inline/JSX comments in `src/app/checkout/[assetId]/page.tsx`), `'direct-offer.create'` rate-limit namespace key in `route.ts:65`, stale `D-DO lock decisions` code comment in `route.ts:24`.
+- Still pending under A.0: DB schema rename (P5), canonical terminology registry `TERMINOLOGY_LOCK.md` + consolidated pre-P6 prose/string-literal sweep + post-rename checkpoint tag (P6).
+- Commit SHA: see `git log --grep="P4 rename"` (self-referential fill deferred per P2 convention).
+
 ---
 
 ### Track 1 — approval gates

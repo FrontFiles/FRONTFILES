@@ -4,17 +4,17 @@ import { useState } from 'react'
 import { VaultLeftRail, type VaultSection } from '@/components/platform/VaultLeftRail'
 import { EmptyPanel } from '@/components/platform/Panel'
 import {
-  DIRECT_OFFER_STATUS_LABELS,
+  SPECIAL_OFFER_STATUS_LABELS,
   LICENCE_TYPE_LABELS,
-  DIRECT_OFFER_MAX_ROUNDS,
+  SPECIAL_OFFER_MAX_ROUNDS,
   TERMINAL_OFFER_STATUSES,
 } from '@/lib/types'
 import type {
   PrivacyState,
-  DirectOfferThread,
-  DirectOfferStatus,
-  DirectOfferEvent,
-  DirectOfferEventType,
+  SpecialOfferThread,
+  SpecialOfferStatus,
+  SpecialOfferEvent,
+  SpecialOfferEventType,
 } from '@/lib/types'
 import { mockVaultAssets } from '@/lib/mock-data'
 
@@ -22,7 +22,7 @@ import { mockVaultAssets } from '@/lib/mock-data'
 // MOCK DATA — with negotiation messages
 // ══════════════════════════════════════════════
 
-const mockThreads: DirectOfferThread[] = [
+const mockThreads: SpecialOfferThread[] = [
   {
     id: 'offer-thread-0001',
     assetId: 'asset-001',
@@ -85,7 +85,7 @@ const mockThreads: DirectOfferThread[] = [
   },
 ]
 
-const mockEvents: DirectOfferEvent[] = [
+const mockEvents: SpecialOfferEvent[] = [
   { id: 'evt-001', threadId: 'offer-thread-0001', type: 'buyer_offer', actorId: 'buyer-001', amount: 11000, message: 'Planning a feature on flooding in Southeast Asia for our Q3 print issue. Would use this as the lead image. Single print run, 50k circulation.', metadata: null, createdAt: '2026-04-10T09:00:00Z' },
   { id: 'evt-002', threadId: 'offer-thread-0002', type: 'buyer_offer', actorId: 'buyer-002', amount: 18000, message: 'For a commercial campaign — regional digital only, 6-month usage window. Happy to discuss terms.', metadata: null, createdAt: '2026-04-09T14:00:00Z' },
   { id: 'evt-003', threadId: 'offer-thread-0002', type: 'creator_counter', actorId: 'sarahchen', amount: 20000, message: 'Appreciate the context. For commercial digital usage at this scope I can do €200. This accounts for the exclusivity premium in this geography.', metadata: null, createdAt: '2026-04-10T08:30:00Z' },
@@ -98,7 +98,7 @@ const mockEvents: DirectOfferEvent[] = [
 // CONSTANTS
 // ══════════════════════════════════════════════
 
-const STATUS_STYLES: Record<DirectOfferStatus, string> = {
+const STATUS_STYLES: Record<SpecialOfferStatus, string> = {
   buyer_offer_pending_creator: 'border-[#0000ff] text-[#0000ff]',
   creator_counter_pending_buyer: 'border-slate-400 text-slate-500',
   buyer_counter_pending_creator: 'border-[#0000ff] text-[#0000ff]',
@@ -109,7 +109,7 @@ const STATUS_STYLES: Record<DirectOfferStatus, string> = {
   completed: 'bg-black text-white border-black',
 }
 
-const EVENT_LABELS: Record<DirectOfferEventType, string> = {
+const EVENT_LABELS: Record<SpecialOfferEventType, string> = {
   buyer_offer: 'Buyer offer',
   creator_counter: 'Creator counter',
   buyer_counter: 'Buyer counter',
@@ -132,10 +132,10 @@ export default function OffersPage() {
   const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null)
 
   // Live thread + event state (seeded from mock, updated by API responses)
-  const [threads, setThreads] = useState<DirectOfferThread[]>(mockThreads)
-  const [allEvents, setAllEvents] = useState<DirectOfferEvent[]>(mockEvents)
+  const [threads, setThreads] = useState<SpecialOfferThread[]>(mockThreads)
+  const [allEvents, setAllEvents] = useState<SpecialOfferEvent[]>(mockEvents)
 
-  const handleThreadUpdate = (updated: DirectOfferThread, updatedEvents: DirectOfferEvent[]) => {
+  const handleThreadUpdate = (updated: SpecialOfferThread, updatedEvents: SpecialOfferEvent[]) => {
     setThreads(prev => prev.map(t => t.id === updated.id ? updated : t))
     setAllEvents(prev => {
       const other = prev.filter(e => e.threadId !== updated.id)
@@ -175,7 +175,7 @@ export default function OffersPage() {
         />
         <div className="flex-1 overflow-y-auto px-8 py-8">
           <div className="max-w-3xl flex flex-col gap-8">
-            <h1 className="text-2xl font-bold text-black tracking-tight">Direct Offers</h1>
+            <h1 className="text-2xl font-bold text-black tracking-tight">Special Offers</h1>
 
             {/* Active */}
             {activeThreads.length > 0 && (
@@ -240,13 +240,13 @@ function ThreadCard({
   timeRemaining,
   onThreadUpdate,
 }: {
-  thread: DirectOfferThread
+  thread: SpecialOfferThread
   assetTitle: string
-  events: DirectOfferEvent[]
+  events: SpecialOfferEvent[]
   expanded: boolean
   onToggle: () => void
   timeRemaining: string | null
-  onThreadUpdate: (thread: DirectOfferThread, events: DirectOfferEvent[]) => void
+  onThreadUpdate: (thread: SpecialOfferThread, events: SpecialOfferEvent[]) => void
 }) {
   const [counterAmount, setCounterAmount] = useState('')
   const [counterMessage, setCounterMessage] = useState('')
@@ -257,7 +257,7 @@ function ThreadCard({
   const isCreatorTurn =
     thread.status === 'buyer_offer_pending_creator' ||
     thread.status === 'buyer_counter_pending_creator'
-  const canCounter = isCreatorTurn && thread.roundCount < DIRECT_OFFER_MAX_ROUNDS
+  const canCounter = isCreatorTurn && thread.roundCount < SPECIAL_OFFER_MAX_ROUNDS
 
   // Find the latest message from the counterparty (buyer message for creator view)
   const latestCounterpartyEvent = [...events]
@@ -272,10 +272,10 @@ function ThreadCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <span className={`inline-flex items-center text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 border ${STATUS_STYLES[thread.status]}`}>
-                {DIRECT_OFFER_STATUS_LABELS[thread.status]}
+                {SPECIAL_OFFER_STATUS_LABELS[thread.status]}
               </span>
               <span className="text-[10px] text-slate-400">
-                Round {thread.roundCount}/{DIRECT_OFFER_MAX_ROUNDS}
+                Round {thread.roundCount}/{SPECIAL_OFFER_MAX_ROUNDS}
               </span>
               {timeRemaining && (
                 <span className={`text-[10px] font-mono ${timeRemaining === 'Expired' ? 'text-red-500' : 'text-slate-400'}`}>
@@ -408,9 +408,9 @@ function ThreadCard({
                 </div>
               )}
 
-              {!canCounter && thread.roundCount >= DIRECT_OFFER_MAX_ROUNDS && (
+              {!canCounter && thread.roundCount >= SPECIAL_OFFER_MAX_ROUNDS && (
                 <p className="text-[10px] text-slate-400 mt-3">
-                  Maximum {DIRECT_OFFER_MAX_ROUNDS} negotiation rounds reached. Accept or decline.
+                  Maximum {SPECIAL_OFFER_MAX_ROUNDS} negotiation rounds reached. Accept or decline.
                 </p>
               )}
 
@@ -529,7 +529,7 @@ function ThreadCard({
 // NEGOTIATION EVENT — timeline row with message
 // ══════════════════════════════════════════════
 
-function NegotiationEvent({ event }: { event: DirectOfferEvent }) {
+function NegotiationEvent({ event }: { event: SpecialOfferEvent }) {
   const isPriceEvent = event.amount != null
   const isSystemEvent = event.actorId === 'system'
 
