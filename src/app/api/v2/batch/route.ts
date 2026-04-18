@@ -21,7 +21,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
+import * as z from 'zod' // namespace import — see src/lib/env.ts comment
 
 import { isRealUploadEnabled } from '@/lib/flags'
 import { createBatch } from '@/lib/upload/batch-service'

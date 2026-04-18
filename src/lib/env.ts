@@ -28,7 +28,12 @@
  *     `STRIPE_SECRET_KEY` MUST never appear in client code.
  */
 
-import { z } from 'zod'
+// Namespace import (not `import { z }`) — bundler- and runtime-safe across
+// Next.js/Turbopack, Vitest 4/rolldown, and Bun. Zod 3.25.x ships as a
+// dual-package (v3 default + v4 subpath) with an `exports` map that makes
+// the named `z` re-export resolve unreliably under some runtimes' CJS↔ESM
+// interop. The namespace form has identical runtime semantics and types.
+import * as z from 'zod'
 
 // ─── Schema definition ──────────────────────────────────────────
 

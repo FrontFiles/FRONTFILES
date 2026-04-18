@@ -1,7 +1,7 @@
 # Frontfiles — Pre-Integration Roadmap
 
 **View:** Now / Next / Later · **Source of truth for detail:** `INTEGRATION_READINESS.md` v2 (2026-04-17) + `CLAUDE_CODE_PROMPT_SEQUENCE.md`
-**Owner:** João Nuno Martins · **Last updated:** 2026-04-17 (post-CCP 4 closeout — Phase 1 Foundation complete, G2 passed)
+**Owner:** João Nuno Martins · **Last updated:** 2026-04-17 (post-KD-8 closeout — test signal restored, KD-9 opened)
 
 > This document is the communication-altitude view of the pre-integration work. It is deliberately thin. For phase-item granularity, size, and rationale, read `INTEGRATION_READINESS.md`. Do not duplicate detail here.
 
@@ -51,12 +51,12 @@ Commit-grade work, high-confidence scope and sequence.
 
 | Item | Why it's Now | Ref |
 |---|---|---|
-| **KD-8 micro-CCP — `bun test` env loading** | Promoted to top of Now. CCP 4 landed without reliable test signal because `bun test` does not load `.env.local`; the `tsc --noEmit` + `bun run build` pair carried verification. Phase 2/3 work will be safer with tests restored first. Quick win (`bunfig.toml` preload). | INTEGRATION_READINESS §Known debt KD-8 |
-| Waterdog repo audit — answer Q1–Q7 (H6) | Blocks Phase 6 from concretising. Cheap to start; parallel-safe. | INTEGRATION_READINESS §Open questions |
+| **KD-9 micro-CCP — Restore the 16 newly-visible suites to green** | Top of Now. KD-8 closure surfaced 99 real test failures across 16 suites (90.8% overall pass rate). Pattern is mostly CCP-3-era env-flag caching + CCP-4-era `MODE`-at-module-load colliding with existing test helpers. Needs a test-only env-stubbing helper + real-path fixture reshaping. Likely splits into 3 sub-tickets (upload / onboarding / entitlement). Blocks any "all green" claim but does not block Phase 2/3 design work. | INTEGRATION_READINESS §Known debt KD-9 |
+| Waterdog repo audit — answer Q1–Q7 (H6) | Blocks Phase 6 from concretising. Cheap to start; parallel-safe with KD-9. | INTEGRATION_READINESS §Open questions |
 | Vercel env wiring (preview + prod scopes) | Parallel human task. Required before Phase 4/5 integration goes live, not before Phase 2/3 design work. Install `vercel` CLI or use dashboard. | INTEGRATION_READINESS §Phase 1 item 1.1 |
 | KD-7 micro-CCP — `force-dynamic` → `connection()` on `/search` + `/checkout/[assetId]` | Low severity. Build is green with the Suspense fix; the `force-dynamic` directive is only soft-deprecated. Queue between CCPs when appetite exists. | INTEGRATION_READINESS §Known debt KD-7 |
 
-**Concrete next action:** Paste KD-8 prompt to restore `bun test` env loading, then move into Phase 2 (Sentry + structured logging) or Phase 3 (Resend hardening, given `5e652df` already started it). G2 has passed; the order between Phase 2 and Phase 3 is a capacity call, not an architectural one.
+**Concrete next action:** Paste KD-9 prompt. Expect it to run as 3 sub-CCPs scoped by affected domain (upload / onboarding / entitlement), each small. In parallel, Phase 2 (Sentry + structured logging) or Phase 3 (Resend hardening) can start — both unblocked by G2.
 
 ---
 
@@ -123,8 +123,10 @@ New scope items from today's decision locks (already listed in INTEGRATION_READI
 | **Route-count baseline corrected** (2026-04-17) | Prior closeouts cited "47 routes" as the `bun run build` output. Actual post-CCP-3 baseline is **81 routes**. Nothing regressed between CCPs; the earlier figure was stale. All historical "47 routes" references in `INTEGRATION_READINESS.md` and this file are annotated as superseded. |
 | **CCP 4 closed** (2026-04-17) | Phase 1 item 1.3 delivered across 3 commits: `a89c9a4` (auth/post/providers), `3468008` (asset-media), `5755d02` (watermark profiles). Mode contract honoured: `MODE` decided once at load from `isSupabaseEnvPresent`, single `[ff:mode]` log per module on first use gated to non-prod, public TS types identical across paths. Modules 4 and 5 promoted sync→async (Q1 signoff) with all downstream call-sites awaited (`/api/media/[id]`, `/api/packages/[packageId]/artifacts/[artifactId]`, `/api/entitlements/[assetId]`, `src/lib/processing/pipeline.ts`, vitest suite). `getAllSeedProfiles` reinterpreted in real mode as "list all rows" (Q2 signoff). `tsc --noEmit` clean per module (5×), `bun run build` exit 0 (81 routes). `bun test` skipped — KD-8 is the pre-existing blocker. No new KD entries opened. |
 | **G2 passed** (2026-04-17) | Phase 1 (Foundation) closed. Only parallel human task remaining is 1.1 Vercel preview/prod env wiring; it does not block Phase 2/3/4/5 design work, only live deploys. |
+| **KD-8 closed** (2026-04-17) | Test signal restored. Three-part fix: (a) `"test": "vitest run"` script added to `package.json` so `bun run test` hits vitest instead of bun's built-in runner; (b) `vitest.setup.ts` registered via `test.setupFiles`, calling `@next/env`'s `loadEnvConfig(process.cwd())` before any test module imports `src/lib/env.ts`; (c) repaired a piggyback bug — `import { z } from 'zod'` in 4 files (env.ts + 3 API routes) tripped a dual-package interop issue under `bun run test` + vitest 4 / rolldown where `z.object` resolved to `undefined`; switched to `import * as z from 'zod'`, tsc clean. Suites executing jumped 30 → 46; tests 885 → 1,081; pass rate 90.8%. No regressions in previously-green suites. |
+| **KD-9 opened** (2026-04-17) | 99 test failures across 16 previously-dark suites, surfaced by KD-8's structural fix. Two dominant patterns: env-flag caching (CCP 3 design; `flags.*` + `MODE` frozen at module load, test `withEnv(...)` mutations have no effect) and real-Supabase-path fixtures (CCP 4 design; dual-mode modules pick real path under `isSupabaseEnvPresent === true`; fixtures written for mock contract fail against real-DB constraints). Medium severity. Fix is test-side (env-stubbing helper + fixture reshaping). Top of Now. |
 
-No timeline moves, no reprioritisation of later phases. Phase 0 closed; CCP 2/3/4 closed; Phase 1 closed; G2 passed. KD-8 now sits at the top of Now because CCP 4 landed without a live test suite — Phase 2/3 work should restore that signal first.
+No timeline moves, no reprioritisation of later phases. Phase 0 closed; CCP 2/3/4 closed; Phase 1 closed; G2 passed; KD-8 closed. KD-9 is the expected surface-area expansion that comes with restored test signal — not a regression.
 
 ---
 

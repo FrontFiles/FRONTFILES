@@ -4,7 +4,7 @@
  */
 
 import type { NextRequest } from 'next/server'
-import { z } from 'zod'
+import * as z from 'zod' // namespace import — see src/lib/env.ts comment
 import { createOffer } from '@/lib/direct-offer/services'
 import { listThreads, putThread, putEvents, getThread } from '@/lib/direct-offer/store'
 import { success, errorResponse, withOfferError } from '@/lib/direct-offer/api-helpers'

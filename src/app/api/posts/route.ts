@@ -11,7 +11,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { NextRequest } from 'next/server'
-import { z } from 'zod'
+import * as z from 'zod' // namespace import — see src/lib/env.ts comment
 import {
   createPost,
   getAuthorPostRows,
