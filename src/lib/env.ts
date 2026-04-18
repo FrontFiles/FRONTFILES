@@ -130,8 +130,78 @@ const envSchema = z.object({
 })
 
 // ─── Parse + fail-fast ──────────────────────────────────────────
+//
+// Two structural rules Next.js (Turbopack + Webpack) enforces on client
+// bundles that the prior `envSchema.safeParse(process.env)` call violated:
+//
+//   1. `NEXT_PUBLIC_*` vars are only inlined into the client bundle when
+//      read via an *explicit static path* like `process.env.NEXT_PUBLIC_X`.
+//      Passing `process.env` as a whole object defeats the static-replacement
+//      pass — the client sees `{}` and every required field fails Zod.
+//   2. Server-only vars (e.g. `SUPABASE_SERVICE_ROLE_KEY`) are never shipped
+//      to the client bundle by design. A schema that marks them required and
+//      runs in the client bundle will always fail.
+//
+// Fix: build `rawEnv` from explicit per-key reads (satisfies rule 1), and
+// branch the schema by runtime — full schema on the server, public-only
+// subset on the client (satisfies rule 2). See KD-15 for the incident.
 
-const parsed = envSchema.safeParse(process.env)
+const rawEnv = {
+  // Public — safe to read in the client bundle.
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  NEXT_PUBLIC_FFF_SHARING_ENABLED: process.env.NEXT_PUBLIC_FFF_SHARING_ENABLED,
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+  NEXT_PUBLIC_GOOGLE_PLACES_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY,
+  NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+  NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+
+  // Server-only — undefined in the client bundle by design.
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  FFF_REAL_UPLOAD: process.env.FFF_REAL_UPLOAD,
+  FFF_STORAGE_DRIVER: process.env.FFF_STORAGE_DRIVER,
+  FFF_STORAGE_FS_ROOT: process.env.FFF_STORAGE_FS_ROOT,
+  FFF_STORAGE_SUPABASE_BUCKET: process.env.FFF_STORAGE_SUPABASE_BUCKET,
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_CONNECT_CLIENT_ID: process.env.STRIPE_CONNECT_CLIENT_ID,
+  GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID,
+  GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+  GOOGLE_CLOUD_PROJECT_ID: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  VERTEX_AI_LOCATION: process.env.VERTEX_AI_LOCATION,
+  APPLE_SIGN_IN_TEAM_ID: process.env.APPLE_SIGN_IN_TEAM_ID,
+  APPLE_SIGN_IN_CLIENT_ID: process.env.APPLE_SIGN_IN_CLIENT_ID,
+  APPLE_SIGN_IN_KEY_ID: process.env.APPLE_SIGN_IN_KEY_ID,
+  APPLE_SIGN_IN_PRIVATE_KEY: process.env.APPLE_SIGN_IN_PRIVATE_KEY,
+  RESEND_API_KEY_TRANSACTIONAL: process.env.RESEND_API_KEY_TRANSACTIONAL,
+  RESEND_API_KEY_MARKETING: process.env.RESEND_API_KEY_MARKETING,
+  RESEND_FROM_TRANSACTIONAL: process.env.RESEND_FROM_TRANSACTIONAL,
+  RESEND_FROM_MARKETING: process.env.RESEND_FROM_MARKETING,
+  SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN,
+
+  NODE_ENV: process.env.NODE_ENV,
+}
+
+const clientSchema = envSchema.pick({
+  NEXT_PUBLIC_SUPABASE_URL: true,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: true,
+  NEXT_PUBLIC_APP_URL: true,
+  NEXT_PUBLIC_FFF_SHARING_ENABLED: true,
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: true,
+  NEXT_PUBLIC_GOOGLE_PLACES_API_KEY: true,
+  NEXT_PUBLIC_SENTRY_DSN: true,
+  NEXT_PUBLIC_POSTHOG_KEY: true,
+  NEXT_PUBLIC_POSTHOG_HOST: true,
+  NODE_ENV: true,
+})
+
+const isServer = typeof window === 'undefined'
+const parsed = isServer
+  ? envSchema.safeParse(rawEnv)
+  : clientSchema.safeParse(rawEnv)
 
 if (!parsed.success) {
   /* eslint-disable no-console */
@@ -152,8 +222,14 @@ if (!parsed.success) {
 }
 
 // ─── Typed export ───────────────────────────────────────────────
+//
+// Type the export as the full server schema. On the server this matches
+// runtime exactly. On the client, server-only fields are `undefined` at
+// runtime, but client code must never read them — that access would
+// indicate a server-only module was imported into a client component,
+// which Next.js normally blocks via the server/client module graph.
 
-export const env = parsed.data
+export const env = parsed.data as z.infer<typeof envSchema>
 
 export type Env = typeof env
 
