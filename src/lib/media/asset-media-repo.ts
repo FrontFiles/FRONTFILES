@@ -58,13 +58,31 @@ export type MediaRole =
   | 'video_stream'
   | 'audio_stream'
 
-// ─── Mode selector (CCP 4) ──────────────────────────────────
+// ─── Mode selector (CCP 4, KD-16 amendment) ─────────────────
 //
-// Decided once at module load from `isSupabaseEnvPresent`.
-// No per-call branching beyond `MODE === 'mock'`.
+// Global MODE is decided from `isSupabaseEnvPresent()` on every call (no
+// module-load cache — CCP Pattern-a Option 2b).
+//
+// KD-16 adds a per-asset-ID override: `vault_assets.id` is `uuid`, so any
+// non-UUID asset ID cannot exist in real Supabase. For those, fall through
+// to the mock path even when global MODE is `real`. This keeps seeded dev
+// surfaces (landing SPOTLIGHT grid, /asset/[id]/page.tsx, story cards, etc.)
+// rendering while `.env.local` is loaded. Real UUIDs always hit Supabase.
+//
+// The override is safe wrt the CCP 4 test contract because mock fixtures
+// use non-UUID IDs by convention — their route through the mock path is
+// already what every test expects.
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function getMode(): 'real' | 'mock' {
   return isSupabaseEnvPresent() ? 'real' : 'mock'
+}
+
+function getEffectiveMode(assetId: string): 'real' | 'mock' {
+  if (!isSupabaseEnvPresent()) return 'mock'
+  return UUID_REGEX.test(assetId) ? 'real' : 'mock'
 }
 
 let _modeLogged = false
@@ -159,7 +177,7 @@ export async function getAssetGovernance(
 ): Promise<AssetGovernance | null> {
   logModeOnce()
 
-  if (getMode() === 'mock') {
+  if (getEffectiveMode(assetId) === 'mock') {
     // Check discovery model first
     const asset = assetMap[assetId]
     if (asset) {
@@ -235,7 +253,7 @@ export async function getReadyMedia(
 ): Promise<MediaRecord | null> {
   logModeOnce()
 
-  if (getMode() === 'mock') {
+  if (getEffectiveMode(assetId) === 'mock') {
     const asset = assetMap[assetId]
     const vaultAsset = mockVaultAssets.find((a) => a.id === assetId)
 
