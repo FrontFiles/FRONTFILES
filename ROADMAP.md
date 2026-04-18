@@ -1,7 +1,7 @@
 # Frontfiles — Pre-Integration Roadmap
 
 **View:** Now / Next / Later · **Source of truth for detail:** `INTEGRATION_READINESS.md` v2 (2026-04-17) + `CLAUDE_CODE_PROMPT_SEQUENCE.md`
-**Owner:** João Nuno Martins · **Last updated:** 2026-04-17 (post-KD-8 closeout — test signal restored, KD-9 opened)
+**Owner:** João Nuno Martins · **Last updated:** 2026-04-18 (post-KD-9 closeout — 16 newly-visible suites green, KD-11..KD-14 opened as P3/P4 follow-ups, KD-10 reserved, not opened)
 
 > This document is the communication-altitude view of the pre-integration work. It is deliberately thin. For phase-item granularity, size, and rationale, read `INTEGRATION_READINESS.md`. Do not duplicate detail here.
 
@@ -144,12 +144,16 @@ Do not commit external dates (to creators, investors, or partners) off this docu
 
 ## Exact next step
 
-1. **Governance commit landed** (2026-04-17) — `INTEGRATION_READINESS.md` + `ROADMAP.md` reconciled to reflect CCP 4 closure and G2 passage. Push `main` to origin, tag `checkpoint/ccp4-green-20260417-<hhmm>`.
-2. **Paste KD-8 prompt** — fix `bun test` env loading (`bunfig.toml` preload of `.env.local`, or equivalent). Promoted to top of Now because CCP 4 landed without live test signal; Phase 2/3 work is safer once tests are restored.
-3. **Then choose Phase 2 or Phase 3** — both unblocked by G2. Phase 3 is partially started (`5e652df`); finishing it first reduces ahead-of-sequence drift. Phase 2 (Sentry + structured logging) is the more conservative pre-Stripe move. Capacity call.
-4. **In parallel (low priority, discretionary)** — KD-7 micro-CCP (`force-dynamic` → `connection()`).
-5. **In parallel (long tail)** — execute H6 (Waterdog clone + mount) so CCP 16 is unblocked when the main chain reaches it.
-6. **In parallel (human task)** — wire Vercel preview + prod env vars (install `vercel` CLI or use dashboard). Required before Phase 4/5 ships to a live URL, not before they're built.
+1. **KD-9 closure landed** (2026-04-18; code closure `4e65176`, governance-doc flip `585c8de`, follow-up tickets KD-11..KD-14 at `b7e45b5`). Tag `checkpoint/kd9-green-20260418-1158` → `585c8de` anchors the green state. Working tree clean; `main` in sync with `origin/main`.
+2. **Founder names next scope.** Candidates, not ranked:
+   - Phase 2 (Sentry + structured logging) — most conservative pre-Stripe move.
+   - Phase 3 (Resend hardening) — partial at `5e652df`; finishing retires ahead-of-sequence drift.
+   - Process retro → CCP playbook / test-conventions doc extracted from KD-8+9 lessons.
+   - Waterdog Q1–Q7 audit (H6) — unblocks Phase 6 from staying abstract.
+   - Other.
+3. **In parallel (discretionary, low priority)** — micro-queue: KD-7 (`force-dynamic` → `connection()`), KD-11 (`parseBody` formErrors), KD-12 (vitest env-load policy — audit-first), KD-13 (route-test assertion sweep), KD-14 (`scopeEnvVars` README).
+4. **In parallel (human task)** — wire Vercel preview + prod env vars (install `vercel` CLI or use dashboard). Required before Phase 4/5 ships to a live URL, not before they're built.
+5. **Deferred** — KD-10 stays reserved in `KD-9-audit.md §Run provenance`. Do not open unless real-Supabase auth coverage enters scope.
 
 Note for the next session: CCP 4 deliberately did not touch entitlement-check hardening on the previously-mocked asset-media paths. That work belongs in Phase 5 (Stripe fulfilment) and should not be re-scoped into Phase 2/3.
 
