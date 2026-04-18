@@ -15,6 +15,18 @@ import {
   _markMockAuthVerified,
 } from '@/lib/auth/provider'
 import type { OnboardingFlowState } from '../types'
+import { scopeEnvVars } from '@/lib/test/env-scope'
+
+// Force mock mode: unset the 3 Supabase env vars so Pattern-a's
+// live-read isSupabaseEnvPresent() returns false. Identity store and
+// auth provider route through their mock branches, honouring
+// _setMockVerificationRequired() / _markMockAuthVerified() helpers
+// that the suite seeds with.
+scopeEnvVars([
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+])
 
 /**
  * Resume reconciliation tests.
