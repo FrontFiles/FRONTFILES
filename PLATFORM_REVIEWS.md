@@ -19,7 +19,7 @@ All 12 product-area decisions resolved. Body of document retains reasoning; the 
 | D-S2 | Signed URL lifetime | **60s view / 5min download** (conservative) |
 | D-F1 | FFF role | **Broadcast in v1, social in v2** — architectural boundaries must support both |
 | D-F2 | Repost semantics | **Quote-repost only** (new post references original with commentary) |
-| D-DO1 | Offer expiry authority | **Supabase `pg_cron` job** transitions expired offers |
+| D-SO1 | Offer expiry authority | **Supabase `pg_cron` job** transitions expired offers |
 | D-6.1 | Agent invocation | **Explicit summon only** (engineers @mention agent by name) |
 | D-6.2 | Agent handoffs | **Forbidden without explicit orchestrator** (each agent stays in scope) |
 | D-6.3 | Agent model assignment | **Context-agent + Blue-Protocol-agent = Opus**; **Onboarding + Upload + Discovery = Sonnet** |
@@ -46,7 +46,7 @@ Enumerate the product-area reviews and improvements that must land before the th
 2. Assignment + UI
 3. Storage, previews, watermark
 4. FFF UI (Frontfiles Sharing)
-5. Direct Offer (Special Offer)
+5. Special Offer
 6. Claude Code sub-agents for onboarding / upload / Blue Protocol / discovery / context
 
 **Out of scope:** infrastructure, auth, payments, observability, legal pages, email (see `INTEGRATION_READINESS.md`).
@@ -285,7 +285,7 @@ Action: Area 6.C below produces a Claude Code agent specifically for Blue Protoc
 
 ---
 
-## Area 5 — Direct Offer (Special Offer)
+## Area 5 — Special Offer
 
 ### Current-state read
 
@@ -293,7 +293,7 @@ Action: Area 6.C below produces a Claude Code agent specifically for Blue Protoc
 - API: `/api/direct-offer/route.ts`, `/api/direct-offer/[id]/{accept,counter,decline}/route.ts`
 - Engine: `src/lib/direct-offer/` — `reducer`, `services`, `store`, `guards`, `types`, `api-helpers`
 - Schema: migrations `20260408230005..07`
-- Governance: `DIRECT_OFFER_SPEC.md` at repo root (27KB — substantial canonical spec)
+- Governance: `SPECIAL_OFFER_SPEC.md` at repo root (27KB — substantial canonical spec)
 - State machine: 6 states (per `PLATFORM_BUILD.md`) — `pending`, `countered`, `accepted`, `rejected`, `expired`, `cancelled`; 3-round max per spec
 
 ### Known debt
@@ -306,11 +306,11 @@ Action: Area 6.C below produces a Claude Code agent specifically for Blue Protoc
 | 4 | Expiry enforcement — is it DB-timed, cron-timed, or check-on-read? Not clear |
 | 5 | No email notifications on offer events (made, countered, accepted, rejected, expired) |
 | 6 | No audit log of offer rounds visible to both parties |
-| 7 | `DIRECT_OFFER_SPEC.md` may itself need review against current code (haven't diffed) |
+| 7 | `SPECIAL_OFFER_SPEC.md` may itself need review against current code (haven't diffed) |
 
 ### Scope of review
 
-- Diff `DIRECT_OFFER_SPEC.md` against current `src/lib/direct-offer/` and `/api/direct-offer/*` implementation. Identify drift.
+- Diff `SPECIAL_OFFER_SPEC.md` against current `src/lib/direct-offer/` and `/api/direct-offer/*` implementation. Identify drift.
 - Accept path → Stripe payment → licence grant → delivery.
 - 3-round cap enforcement (UI + API + DB guard).
 - Offer expiry mechanism — pick one authoritative path.
@@ -320,7 +320,7 @@ Action: Area 6.C below produces a Claude Code agent specifically for Blue Protoc
 
 | Item | Cat | Size | Notes |
 |---|---|---|---|
-| DO.1 Diff `DIRECT_OFFER_SPEC.md` vs. implementation; produce drift report | FIX | S | Align truth |
+| DO.1 Diff `SPECIAL_OFFER_SPEC.md` vs. implementation; produce drift report | FIX | S | Align truth |
 | DO.2 Replace mock data in `/vault/offers/page.tsx` with real store reads | FIX | S | |
 | DO.3 Accept → Payment Intent → licence grant flow (depends on Phase 5.B) | FIX | M | |
 | DO.4 3-round cap enforcement at API + DB check constraint | HARDEN | S | Defensive |
@@ -330,7 +330,7 @@ Action: Area 6.C below produces a Claude Code agent specifically for Blue Protoc
 
 ### Decisions pending
 
-- D-DO1: Expiry authority — DB-level timestamp with read-time check, or cron job that actually transitions state? I default to cron for determinism.
+- D-SO1: Expiry authority — DB-level timestamp with read-time check, or cron job that actually transitions state? I default to cron for determinism.
 
 ---
 
@@ -477,7 +477,7 @@ Priority depends on which integration switch you flip first. Default sequence:
 [Area 1 Upload] ── [Area 3 Storage/Preview/Watermark] ── gate for beta import + buyer checkout
        │                    │
        ▼                    ▼
-[Area 2 Assignment] ──── [Area 5 Direct Offer] ────────── gate for Stripe confidence
+[Area 2 Assignment] ──── [Area 5 Special Offer] ────────── gate for Stripe confidence
        │
        ▼
 [Area 4 FFF]   (optional — flip-able flag, can defer past launch)
@@ -519,7 +519,7 @@ Priority depends on which integration switch you flip first. Default sequence:
 ## Next step (for author)
 
 1. Confirm or revise the scope of each of the 6 areas (prune, expand, split).
-2. Resolve the 12 decisions pending across the doc (`D-U*`, `D-A*`, `D-S*`, `D-F*`, `D-DO*`, `D-6.*`).
+2. Resolve the 12 decisions pending across the doc (`D-U*`, `D-A*`, `D-S*`, `D-F*`, `D-SO*`, `D-6.*`).
 3. Approve Area 6 agent specs in principle so I can begin drafting the individual `.claude/agents/*.md` files.
 4. Decide ordering priority across Areas 1–5 if the default sequence doesn't match your preference.
 

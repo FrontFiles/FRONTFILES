@@ -1165,7 +1165,7 @@ Summon appropriate agent:
     linkage)
   - Area 3 (Storage/Preview/Watermark): @frontfiles-context + @frontfiles-upload
   - Area 4 (FFF Broadcast v1): @frontfiles-context + @frontfiles-discovery
-  - Area 5 (Direct Offer): @frontfiles-context
+  - Area 5 (Special Offer): @frontfiles-context
 
 Read: PLATFORM_REVIEWS.md for the specific Area you're working on
 

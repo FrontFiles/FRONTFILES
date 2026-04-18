@@ -28,7 +28,7 @@
 | `/vault/upload` | Upload workflow | Pre-existing |
 | `/vault/pricing` | Creator pricing & licence config | Phase 3 |
 | `/vault/settlements` | Settlement history & earnings | Phase 3 |
-| `/vault/offers` | Direct offer management | Phase 4 |
+| `/vault/offers` | Special offer management | Phase 4 |
 | `/vault/assignments` | Assignment management | Phase 4 |
 | `/vault/disputes` | Dispute resolution | Phase 4 |
 | `/vault/composer` | Article composer (FCS L4) | Phase 5 |

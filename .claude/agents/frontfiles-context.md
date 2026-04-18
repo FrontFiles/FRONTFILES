@@ -178,8 +178,8 @@ Immediately surface — do not silently resolve:
 - `CLAUDE.md` (root) — founder standing preferences
 - `PLATFORM_BUILD.md` — state machines + economics + design canon (current authority within git)
 - `INTEGRATION_READINESS.md` — locked integration decisions (D1–D12)
-- `PLATFORM_REVIEWS.md` — locked product-area decisions (D-U*, D-A*, D-S*, D-F*, D-DO*, D-6.*)
-- `DIRECT_OFFER_SPEC.md` — Direct Offer spec (to be audited for drift per task #31)
+- `PLATFORM_REVIEWS.md` — locked product-area decisions (D-U*, D-A*, D-S*, D-F*, D-SO*, D-6.*)
+- `SPECIAL_OFFER_SPEC.md` — Special Offer spec (to be audited for drift per task #31)
 - `ASSIGNMENT_DISPUTE_TAXONOMY.md` — dispute taxonomy (draft v1, locks at v2 after T1–T4 resolved)
 - `src/lib/processing/{ARCHITECTURE-BRIEF,IMPLEMENTATION-PLAN,PR-2-PLAN}.md` — processing pipeline authority
 - `src/lib/upload/PR-1.1-PLAN.md` — upload substrate PR notes

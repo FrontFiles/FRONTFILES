@@ -1,4 +1,4 @@
-# Frontfiles Direct Offer — PM/UX Product Specification
+# Frontfiles Special Offer — PM/UX Product Specification
 
 **Version**: 1.0
 **Authority**: Canonical Specification v1.1 — Spec 6.5, 6.6, 7.4, 8.7, 9.6, 10.1, 10.4, 10.5
@@ -9,21 +9,21 @@
 
 ## A. Product Summary
 
-Direct Offer is a tightly bounded pricing decision flow for editorial licensing on Frontfiles.
+Special Offer is a tightly bounded pricing decision flow for editorial licensing on Frontfiles.
 
 It is **not** messaging. It is **not** open-ended bargaining. It is a structured mechanism that lets a buyer propose a below-listing price for a public asset, and lets the creator decide — accept, decline, or counter — within a fixed number of rounds and a fixed time window.
 
 The entire interaction produces exactly one outcome: a negotiated price that feeds directly into the standard checkout flow, or a clean terminal state (declined, expired, cancelled).
 
-**One sentence**: Direct Offer lets a buyer and creator agree on a price in three rounds or fewer, then complete the transaction through checkout.
+**One sentence**: Special Offer lets a buyer and creator agree on a price in three rounds or fewer, then complete the transaction through checkout.
 
-### What Direct Offer is
+### What Special Offer is
 
 - A price decision tool adjacent to the transaction
 - A compact negotiation with hard limits
 - A feature of the catalogue licensing flow
 
-### What Direct Offer is not
+### What Special Offer is not
 
 - A chat thread (Talk To Me exists for that)
 - A generic inbox conversation
@@ -36,7 +36,7 @@ The entire interaction produces exactly one outcome: a negotiated price that fee
 
 ### B.1 One live number at a time
 
-At any point in a Direct Offer thread, there is exactly one price on the table. The UI must make this number dominant — large, unambiguous, and clearly attributed to whoever proposed it.
+At any point in a Special Offer thread, there is exactly one price on the table. The UI must make this number dominant — large, unambiguous, and clearly attributed to whoever proposed it.
 
 The listed price appears as reference context. The live offer is the thing the user must act on.
 
@@ -48,7 +48,7 @@ There is never a state where both parties can act, or where the next step is unc
 
 ### B.3 No chat-first experience
 
-Direct Offer threads do not look like message threads. There is no text input for freeform messages, no "typing..." indicator, no profile pictures in a conversation layout.
+Special Offer threads do not look like message threads. There is no text input for freeform messages, no "typing..." indicator, no profile pictures in a conversation layout.
 
 The timeline is a compact audit log of price events — not a conversation history.
 
@@ -79,7 +79,7 @@ At all times, the user can see:
 
 ### C.1 Eligibility
 
-An asset is eligible for Direct Offer only when **all** conditions are true:
+An asset is eligible for Special Offer only when **all** conditions are true:
 
 | Condition | Source |
 |---|---|
@@ -94,7 +94,7 @@ If any condition is false, the "Make an Offer" entry point does not appear.
 
 ### C.2 Thread identity
 
-One active Direct Offer thread is permitted per unique combination of:
+One active Special Offer thread is permitted per unique combination of:
 
 - Buyer
 - Asset
@@ -152,7 +152,7 @@ Expiry is evaluated server-side. The UI shows a countdown but does not autonomou
 
 ### C.7 Auto-cancel behavior
 
-Active Direct Offer threads auto-cancel immediately when the underlying asset becomes non-transactable. Triggers:
+Active Special Offer threads auto-cancel immediately when the underlying asset becomes non-transactable. Triggers:
 
 | Trigger | Reason code |
 |---|---|
@@ -205,7 +205,7 @@ After successful payment:
 
 ### C.9 Transaction economics
 
-Direct Offer transactions use the same fee structure as direct catalogue purchases, applied to the **negotiated** amount:
+Special Offer transactions use the same fee structure as direct catalogue purchases, applied to the **negotiated** amount:
 
 | Line | Calculation |
 |---|---|
@@ -445,7 +445,7 @@ This links to:
 
 ### F.1 Tone
 
-Direct Offer copy should feel like professional price negotiation between media organizations — not marketplace haggling, not casual chat, not legalese.
+Special Offer copy should feel like professional price negotiation between media organizations — not marketplace haggling, not casual chat, not legalese.
 
 - **Direct**: "Accept €110.00" not "Would you like to accept this offer?"
 - **Precise**: Always show exact amounts with two decimal places
@@ -587,7 +587,7 @@ The checkout page detects these params and:
 
 ### H.4 Auto-cancel integration point
 
-When any service modifies an asset's privacy, declaration state, exclusive lock, or pricing, it must call `autoCancelAllForAsset` to cancel all active Direct Offer threads for that asset. This is a single centralized function — not per-feature logic.
+When any service modifies an asset's privacy, declaration state, exclusive lock, or pricing, it must call `autoCancelAllForAsset` to cancel all active Special Offer threads for that asset. This is a single centralized function — not per-feature logic.
 
 ### H.5 Notification hooks (future)
 
@@ -638,9 +638,9 @@ The implementation creates events for every state change. Notification delivery 
 | Expiry rate | Expired / all terminal threads | Lower = responsive users |
 | Auto-cancel rate | Auto-cancelled / all terminal threads | Monitor for asset churn |
 | Average discount | (listedPrice - acceptedAmount) / listedPrice | Understand pricing dynamics |
-| Offer-driven revenue | Total platform earnings from Direct Offer transactions | Growth metric |
+| Offer-driven revenue | Total platform earnings from Special Offer transactions | Growth metric |
 | Repeat offer buyers | Buyers who create 2+ threads | Retention signal |
 
 ---
 
-*This spec defines the complete Direct Offer product for Frontfiles. Implementation should follow the canonical types in `src/lib/types.ts`, the domain engine in `src/lib/direct-offer/`, and the API routes in `src/app/api/direct-offer/`. Design should follow the Frontfiles design system lock (black, blue-600, white, zero radius, Neue Haas Grotesk).*
+*This spec defines the complete Special Offer product for Frontfiles. Implementation should follow the canonical types in `src/lib/types.ts`, the domain engine in `src/lib/direct-offer/`, and the API routes in `src/app/api/direct-offer/`. Design should follow the Frontfiles design system lock (black, blue-600, white, zero radius, Neue Haas Grotesk).*
