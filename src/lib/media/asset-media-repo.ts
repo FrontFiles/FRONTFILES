@@ -63,7 +63,9 @@ export type MediaRole =
 // Decided once at module load from `isSupabaseEnvPresent`.
 // No per-call branching beyond `MODE === 'mock'`.
 
-const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+function getMode(): 'real' | 'mock' {
+  return isSupabaseEnvPresent() ? 'real' : 'mock'
+}
 
 let _modeLogged = false
 function logModeOnce(): void {
@@ -71,7 +73,7 @@ function logModeOnce(): void {
   _modeLogged = true
   if (env.NODE_ENV !== 'production') {
     // eslint-disable-next-line no-console
-    console.info(`[ff:mode] asset-media=${MODE}`)
+    console.info(`[ff:mode] asset-media=${getMode()}`)
   }
 }
 
@@ -157,7 +159,7 @@ export async function getAssetGovernance(
 ): Promise<AssetGovernance | null> {
   logModeOnce()
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     // Check discovery model first
     const asset = assetMap[assetId]
     if (asset) {
@@ -233,7 +235,7 @@ export async function getReadyMedia(
 ): Promise<MediaRecord | null> {
   logModeOnce()
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     const asset = assetMap[assetId]
     const vaultAsset = mockVaultAssets.find((a) => a.id === assetId)
 

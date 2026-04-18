@@ -66,7 +66,7 @@ export function getSupabaseClient(): SupabaseClient {
  * mock-fallback stores get converted to real dual-mode.
  */
 export function isSupabaseConfigured(): boolean {
-  return isSupabaseEnvPresent
+  return isSupabaseEnvPresent()
 }
 
 /**

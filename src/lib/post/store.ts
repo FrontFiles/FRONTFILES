@@ -34,7 +34,9 @@ import { validatePostInput } from './validation'
 // `isSupabaseEnvPresent` signal. Per-call `isSupabaseConfigured()`
 // branching is retired across the dual-mode stores.
 
-const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+function getMode(): 'real' | 'mock' {
+  return isSupabaseEnvPresent() ? 'real' : 'mock'
+}
 
 let _modeLogged = false
 function logModeOnce(): void {
@@ -42,7 +44,7 @@ function logModeOnce(): void {
   _modeLogged = true
   if (env.NODE_ENV !== 'production') {
     // eslint-disable-next-line no-console
-    console.info(`[ff:mode] post=${MODE}`)
+    console.info(`[ff:mode] post=${getMode()}`)
   }
 }
 
@@ -77,7 +79,7 @@ export const DEFAULT_FEED_LIMIT = 100
  */
 export async function getPostRow(postId: string): Promise<PostRow | null> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     await ensureSeedLoaded()
     return postStore.get(postId) ?? null
   }
@@ -105,7 +107,7 @@ export async function getAuthorPostRows(
   authorUserId: string,
 ): Promise<PostRow[]> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values())
       .filter(
@@ -149,7 +151,7 @@ export async function listRecentPostRows(
   limit: number = DEFAULT_FEED_LIMIT,
 ): Promise<PostRow[]> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values())
       .filter((p) => p.status === 'published')
@@ -180,7 +182,7 @@ export async function getPostsByAttachment(
   attachmentId: string,
 ): Promise<PostRow[]> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values())
       .filter(
@@ -228,7 +230,7 @@ export async function getRepostsOfRows(
   postId: string,
 ): Promise<PostRow[]> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values())
       .filter(
@@ -262,7 +264,7 @@ export async function getAuthorRepostRows(
   authorUserId: string,
 ): Promise<PostRow[]> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     await ensureSeedLoaded()
     return Array.from(postStore.values()).filter(
       (p) =>
@@ -381,7 +383,7 @@ export async function createPost(
     updated_at: now,
   }
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     await ensureSeedLoaded()
     postStore.set(row.id, row)
     return { ok: true, row }
@@ -437,7 +439,7 @@ export async function createPost(
  */
 export async function removePost(postId: string): Promise<void> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     await ensureSeedLoaded()
     const row = postStore.get(postId)
     if (!row) return

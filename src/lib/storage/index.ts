@@ -49,12 +49,20 @@ export type StorageDriver = 'fs' | 'supabase'
  * Resolve the configured storage driver. Unset env → `'fs'` (does
  * not throw) per plan exit criterion §5.
  *
- * env.ts Zod schema enforces the `'fs' | 'supabase'` enum at module
- * load time with a `'fs'` default, so by the time this function runs
- * the value is already validated and narrowed.
+ * Reads `process.env.FFF_STORAGE_DRIVER` live on every call (CCP
+ * Pattern-a Option 2b — no module-load cache). Zod still validates at
+ * boot for fail-fast on malformed deploys; this function applies
+ * trim + lowercase + enum-check at read time so a test's `withEnv`
+ * mutation is honoured.
  */
 export function resolveStorageDriver(): StorageDriver {
-  return env.FFF_STORAGE_DRIVER
+  const raw = process.env.FFF_STORAGE_DRIVER?.trim().toLowerCase() || 'fs'
+  if (raw !== 'fs' && raw !== 'supabase') {
+    throw new Error(
+      `FFF_STORAGE_DRIVER must be 'fs' or 'supabase', got '${raw}'`,
+    )
+  }
+  return raw
 }
 
 /**

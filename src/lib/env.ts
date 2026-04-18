@@ -159,17 +159,40 @@ export type Env = typeof env
 
 // ─── Derived helpers ────────────────────────────────────────────
 
-/** True when Supabase env vars are set — used by isSupabaseConfigured() shims. */
-export const isSupabaseEnvPresent =
-  Boolean(env.NEXT_PUBLIC_SUPABASE_URL) &&
-  Boolean(env.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
-  Boolean(env.SUPABASE_SERVICE_ROLE_KEY)
+/**
+ * True when Supabase env vars are set — used by isSupabaseConfigured() shims.
+ * Reads live process.env on every call (CCP Pattern-a Option 2b — no
+ * module-load cache). The Zod parse at module load still gates boot on these
+ * vars; this function exists so tests that scope env per-suite see the live
+ * value and dual-mode stores re-derive MODE on demand.
+ */
+export function isSupabaseEnvPresent(): boolean {
+  return (
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
+    Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+  )
+}
 
-/** Convenience booleans for env-gated features. */
+/**
+ * Convenience booleans for env-gated features.
+ *
+ * Each field is a getter that reads live process.env on every access — no
+ * module-load cache (CCP Pattern-a Option 2b). Destructuring footgun: the
+ * idiom `const { realUpload } = flags` captures the value at destructure
+ * time, defeating liveness. Read fields by path (`flags.realUpload`) at
+ * each call site.
+ */
 export const flags = {
-  fffSharing: env.NEXT_PUBLIC_FFF_SHARING_ENABLED === 'true',
-  realUpload: env.FFF_REAL_UPLOAD === 'true',
-  storageSupabase: env.FFF_STORAGE_DRIVER === 'supabase',
+  get fffSharing(): boolean {
+    return process.env.NEXT_PUBLIC_FFF_SHARING_ENABLED === 'true'
+  },
+  get realUpload(): boolean {
+    return process.env.FFF_REAL_UPLOAD === 'true'
+  },
+  get storageSupabase(): boolean {
+    return process.env.FFF_STORAGE_DRIVER === 'supabase'
+  },
 }
 
 /** True when running in a production build. */

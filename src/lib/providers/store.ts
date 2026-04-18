@@ -31,7 +31,9 @@ import type {
 // Decided once at module load from `isSupabaseEnvPresent`.
 // Per-call `isSupabaseConfigured()` branching is retired.
 
-const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+function getMode(): 'real' | 'mock' {
+  return isSupabaseEnvPresent() ? 'real' : 'mock'
+}
 
 let _modeLogged = false
 function logModeOnce(): void {
@@ -39,7 +41,7 @@ function logModeOnce(): void {
   _modeLogged = true
   if (env.NODE_ENV !== 'production') {
     // eslint-disable-next-line no-console
-    console.info(`[ff:mode] providers=${MODE}`)
+    console.info(`[ff:mode] providers=${getMode()}`)
   }
 }
 
@@ -90,7 +92,7 @@ export async function listConnections(
   filter: ListConnectionsFilter,
 ): Promise<ExternalConnectionRow[]> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     return Array.from(connectionStore.values())
       .filter((row) => row.owner_type === filter.ownerType)
       .filter((row) => {
@@ -128,7 +130,7 @@ export async function getConnection(
   id: string,
 ): Promise<ExternalConnectionRow | null> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     return connectionStore.get(id) ?? null
   }
   const client = await db()
@@ -169,7 +171,7 @@ export async function findConnectionByExternalAccount(
   externalAccountId: string,
 ): Promise<ExternalConnectionRow | null> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     return (
       Array.from(connectionStore.values())
         .filter(
@@ -233,7 +235,7 @@ export async function insertConnection(
     )
   }
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     const row: ExternalConnectionRow = {
       id: mockId('extconn'),
       provider: input.provider,
@@ -306,7 +308,7 @@ export async function updateConnectionStatus(
   }>,
 ): Promise<ExternalConnectionRow | null> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     const row = connectionStore.get(id)
     if (!row) return null
     const updated: ExternalConnectionRow = {
@@ -372,7 +374,7 @@ export async function insertWebhookEvent(
   logModeOnce()
   const key = dedupeKey(input.provider, input.external_event_id)
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     const existingId = webhookDedupeIndex.get(key)
     if (existingId) {
       const existing = webhookEventStore.get(existingId)!
@@ -465,7 +467,7 @@ export async function updateWebhookEventStatus(
     status === 'succeeded' || status === 'failed' || status === 'dead_letter'
   const incrementsRetry = status === 'failed' || status === 'dead_letter'
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     const row = webhookEventStore.get(id)
     if (!row) return null
     const updated: ExternalWebhookEventRow = {
@@ -526,7 +528,7 @@ export async function getWebhookEvent(
   id: string,
 ): Promise<ExternalWebhookEventRow | null> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     return webhookEventStore.get(id) ?? null
   }
   const client = await db()
@@ -547,7 +549,7 @@ export async function listWebhookEvents(
   filter: { provider?: string; status?: ProviderWebhookProcessingStatus; limit?: number } = {},
 ): Promise<ExternalWebhookEventRow[]> {
   logModeOnce()
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     return Array.from(webhookEventStore.values())
       .filter((row) => !filter.provider || row.provider === filter.provider)
       .filter((row) => !filter.status || row.processing_status === filter.status)

@@ -36,7 +36,9 @@ import type {
 // Mode selector (CCP 4)
 // ═══════════════════════════════════════════════════════════════
 
-const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+function getMode(): 'real' | 'mock' {
+  return isSupabaseEnvPresent() ? 'real' : 'mock'
+}
 
 let _modeLogged = false
 function logModeOnce(): void {
@@ -44,7 +46,7 @@ function logModeOnce(): void {
   _modeLogged = true
   if (env.NODE_ENV !== 'production') {
     // eslint-disable-next-line no-console
-    console.info(`[ff:mode] profiles=${MODE}`)
+    console.info(`[ff:mode] profiles=${getMode()}`)
   }
 }
 
@@ -265,7 +267,7 @@ export async function getApprovedProfile(
 ): Promise<WatermarkProfile | null> {
   logModeOnce()
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     const match = SEED_PROFILES.find(
       (p) => p.intrusionLevel === level && p.templateFamily === family,
     )
@@ -305,7 +307,7 @@ export async function getProfilesForLevel(
 ): Promise<WatermarkProfile[]> {
   logModeOnce()
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     return SEED_PROFILES.filter((p) => p.intrusionLevel === level)
   }
 
@@ -342,7 +344,7 @@ export async function getProfilesForLevel(
 export async function getAllSeedProfiles(): Promise<WatermarkProfile[]> {
   logModeOnce()
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     return [...SEED_PROFILES]
   }
 

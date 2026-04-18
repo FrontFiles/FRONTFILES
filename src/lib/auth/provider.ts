@@ -82,7 +82,9 @@ import type { AuthUser, AuthSignUpOutcome } from './types'
 // is live without grepping the wire. No secrets are logged.
 // ══════════════════════════════════════════════
 
-const MODE: 'real' | 'mock' = isSupabaseEnvPresent ? 'real' : 'mock'
+function getMode(): 'real' | 'mock' {
+  return isSupabaseEnvPresent() ? 'real' : 'mock'
+}
 
 let _modeLogged = false
 function logModeOnce(): void {
@@ -90,7 +92,7 @@ function logModeOnce(): void {
   _modeLogged = true
   if (env.NODE_ENV !== 'production') {
     // eslint-disable-next-line no-console
-    console.info(`[ff:mode] auth=${MODE}`)
+    console.info(`[ff:mode] auth=${getMode()}`)
   }
 }
 
@@ -171,7 +173,7 @@ export async function signUpOrAdoptAuthUser(input: {
     throw new Error('Password must be at least 8 characters')
   }
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     return signUpOrAdoptMock(input)
   }
   return signUpOrAdoptSupabase(input)
@@ -311,7 +313,7 @@ export async function getAuthUserEmailConfirmed(
   logModeOnce()
   if (!authUserId) return null
 
-  if (MODE === 'mock') {
+  if (getMode() === 'mock') {
     for (const row of mockAuthStore.values()) {
       if (row.id === authUserId) return row.emailConfirmed
     }
@@ -353,14 +355,14 @@ export async function _setMockVerificationRequired(
   required: boolean,
 ): Promise<void> {
   logModeOnce()
-  if (MODE === 'real') return
+  if (getMode() === 'real') return
   mockVerificationRequired = required
 }
 
 /** Flip an existing mock auth row to confirmed. */
 export async function _markMockAuthVerified(email: string): Promise<void> {
   logModeOnce()
-  if (MODE === 'real') return
+  if (getMode() === 'real') return
   const row = mockAuthStore.get(email.toLowerCase())
   if (row) row.emailConfirmed = true
 }
@@ -368,7 +370,7 @@ export async function _markMockAuthVerified(email: string): Promise<void> {
 /** Flip an existing mock auth row to unconfirmed. */
 export async function _markMockAuthUnverified(email: string): Promise<void> {
   logModeOnce()
-  if (MODE === 'real') return
+  if (getMode() === 'real') return
   const row = mockAuthStore.get(email.toLowerCase())
   if (row) row.emailConfirmed = false
 }
