@@ -343,8 +343,198 @@ Revised per founder critique. One default with a non-reactive defense grounded i
 
 ## Phase 4 — Sub-CCP sequencing
 
-*Deferred.*
+### Mandate findings
+
+**M1 — `isSupabaseEnvPresent` is a module-load-cached `const` boolean** (`src/lib/env.ts:163-166`). Option 2b requires it to convert to a function that re-reads `process.env` on every call. `getMode()` in each store calls this helper; if it stays frozen, the whole rollout is a no-op. **Converted in the Pattern-a CCP scope below.**
+
+**M2 — The 5 dual-mode stores are confirmed** by grep of `^const MODE:` across `src/lib`: `src/lib/post/store.ts:37`, `src/lib/auth/provider.ts:85`, `src/lib/processing/profiles.ts:39`, `src/lib/providers/store.ts:34`, `src/lib/media/asset-media-repo.ts:66`. Matches the founder's enumeration. No sixth store.
+
+**M2 addendum — six additional per-call `isSupabaseConfigured()` consumers surface** that are NOT in the CCP-4-era `const MODE` set: `src/lib/identity/store.ts` (11 call sites), `src/lib/entitlement/store.ts` (4), `src/lib/upload/upload-store.ts` (2), `src/lib/upload/batch-store.ts` (≥1), `src/lib/download-events/logger.ts` (1), `src/lib/logger.ts` (1). These call `isSupabaseConfigured()` from `src/lib/db/client.ts`, which delegates to `isSupabaseEnvPresent`. Under Option 2b, once `isSupabaseEnvPresent` becomes a function, `isSupabaseConfigured()` automatically re-reads on every call — so these files need **zero code changes** as transitive beneficiaries. Surfaced for the record so the audit is honest about the full reach of the Pattern-a CCP.
+
+### A. Sub-CCP sequencing
+
+Five tickets, ordered:
+
+| # | Ticket | Rationale |
+|---|---|---|
+| 1 | **Pattern-a CCP** (Option 2b rollout) | Phase 3 gate lift. 54 (a) failures green on its merge; no other sub-CCP can fully close without it. Not part of KD-9.X — it is the architectural pre-requisite. |
+| 2 | **KD-9.0 — provider spine fixture reset** | Phase-3-independent (0 % (a)), smallest cluster (12 tests, 1 file), canonicalises the real-DB fixture-reshape pattern that KD-9.1 reuses at scale. Lands without waiting on Pattern-a's greening to settle. |
+| 3 | **KD-9.3 — entitlement verify + close** | After Pattern-a, the 19 tests in `entitlement/*` need only a small `beforeEach` hook that forces mock mode via env-scoping; the mock-data helpers (`putGrant`, `putMembership`) then work as originally intended. Smallest remaining fixture surface; closes an entire domain in one session. |
+| 4 | **KD-9.2 — onboarding** | 5 test files, 23 failures. Requires env-scoping hooks for the (a) failures + fixture reshape for the (b) failures. Overlaps with the KD-10 flakiness candidate (4 of 6 auth/provider (b) failures). Ahead of KD-9.1 because smaller blast radius. |
+| 5 | **KD-9.1 — upload** | Biggest cluster (8 files, 51 failures). Mixes storage-driver, processing pipeline, upload services, and three API-route suites. Reuses KD-9.0's fixture-reshape pattern. Last because biggest and relies on the three prior sub-CCPs to settle their respective concerns. |
+
+Sequence rationale in one line: **architecture first, then smallest Phase-3-independent cluster, then close out by ascending blast radius.**
+
+### B. Scope boundary per sub-CCP
+
+**Pattern-a CCP**
+- **In**: `src/lib/env.ts` — convert `isSupabaseEnvPresent` from `const` to `function isSupabaseEnvPresent()` reading live `process.env`; convert `flags` object from precomputed fields to property getters (`get realUpload() { return process.env.FFF_REAL_UPLOAD === 'true' }` etc.); retain the `safeParse` call at module load for its fail-fast side effect on required string vars. `src/lib/db/client.ts` — update the one-liner in `isSupabaseConfigured()` to invoke `isSupabaseEnvPresent()`. Five dual-mode stores — convert `const MODE = …` to `function getMode(): 'real' | 'mock'` and rewrite every `MODE ===` site; move `logModeOnce()` to call `getMode()`.
+- **Out**: any test file (no test seeding, no beforeEach additions — those ship inside KD-9.X); any route (routes only read `flags.X`, semantics preserved); the six per-call consumers listed in M2 addendum; the three non-store consumers (`download-events/logger`, `logger`, `db/client`) beyond the one-liner above.
+- **Tests written/modified**: ideally zero. If a micro-assertion on the new lazy shape is wanted, add one dedicated `env-lazy.test.ts` with 2–3 cases (`flags.realUpload` flips when process.env mutates; `getMode()` flips when SUPABASE_* unset). Not required for exit.
+
+**KD-9.0 — provider spine fixture reset**
+- **In**: `src/lib/providers/__tests__/service.test.ts` (12 tests). Reshape fixtures to real-Supabase constraints: use real UUIDs for `owner_id`, `connection_id`, `external_event_id`; align row shapes with the `external_connections` / `external_credentials` / `external_webhook_events` schema in migration `20260417000002_provider_tables.sql`; add per-test teardown to remove inserted rows so parallel runs do not collide; verify the native-error-shape expectations (23505 unique-violation decoding) match what the store surfaces.
+- **Out**: `src/lib/providers/store.ts` — already Pattern-a-canonical; no production change. Any route or other store. The KD-10 inter-run-state-leak candidate.
+
+**KD-9.3 — entitlement verify + close**
+- **In**: `src/lib/entitlement/__tests__/services.test.ts` (16 tests), `src/lib/entitlement/__tests__/authorization-invariants.test.ts` (3 tests). Add one `beforeEach` per file that forces mock mode by unsetting `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (or via a shared test helper — `forceMockModeForSuite()` — added to `src/lib/test/env-scope.ts` if one doesn't already exist). Existing mock-data helpers (`putGrant`, `putMembership`, `_resetStore`) stay untouched.
+- **Out**: `src/lib/entitlement/store.ts`, `src/lib/entitlement/services.ts` — no production code change. Fixture reshape for any real-DB entitlement scenario (none are in KD-9.3).
+
+**KD-9.2 — onboarding**
+- **In**: 5 test files — `src/lib/auth/__tests__/provider.test.ts` (8), `src/lib/onboarding/__tests__/resume.test.ts` (3), `src/lib/onboarding/__tests__/account-creation.test.ts` (6), `src/lib/onboarding/__tests__/integration.test.ts` (4), `src/lib/onboarding/__tests__/account-creation-verification.test.ts` (2). For (a) failures: add mock-mode-forcing `beforeEach` hooks. For (b) failures: reshape fixtures (UUIDs for auth.user id probes; real-Supabase-compatible input shapes; per-test unique email prefixes to side-step KD-10 state leak; map the Supabase native error shape to the expected `/already taken/i` form). Decide per-suite whether to force mock or reshape for real.
+- **Out**: all `src/lib/auth/*.ts` and `src/lib/onboarding/*.ts` production code. KD-10 (inter-run `auth.users` leak) is tracked separately in the audit doc and in `INTEGRATION_READINESS.md` when the founder opens it; this sub-CCP adds the per-suite cleanup that neutralises 4 overlapping failures but does not ship a systemic KD-10 resolution.
+
+**KD-9.1 — upload**
+- **In**: 8 test files — `src/lib/storage/__tests__/index.test.ts` (4), `src/lib/processing/__tests__/pipeline.test.ts` (3), `src/lib/processing/__tests__/profiles.test.ts` (5), `src/lib/upload/__tests__/commit-service.test.ts` (12), `src/lib/upload/__tests__/batch-service.test.ts` (7), `src/app/api/upload/__tests__/route.test.ts` (6), `src/app/api/v2/batch/__tests__/route.test.ts` (7), `src/app/api/v2/batch/[id]/commit/__tests__/route.test.ts` (7). For the (a) route-suite failures, existing `withEnv({FFF_REAL_UPLOAD: 'true'}, …)` calls just work under Pattern-a — no test edits needed. For (b) failures, reshape: UUIDs for `creator_id` / `batch_id` / `upload_token`; real watermark-profile seeding or mock-mode-forcing for `processing/*`; storage-adapter bucket config for the `storage/index` suite; real `createBatch` fixtures for the `commit` path. The mixed `[id]/commit` suite splits its 7 tests per the Phase-2 per-test map.
+- **Out**: production code in `src/lib/upload/**`, `src/lib/processing/**`, `src/app/api/upload/route.ts`, `src/app/api/v2/batch/**/route.ts`. storage-driver selection (Pattern-a lives there). Licence-grant persistence (Phase 5 Stripe).
+
+### C. Pattern-a resolution placement — pre-CCP (recommended), not rolled into KD-9.0
+
+**Pattern-a lands as a standalone pre-CCP, ahead of KD-9.0.** Three reasons:
+
+1. **Separation of concerns.** Pattern-a is an architectural refactor of env-derivation semantics; KD-9.0 is a fixture reshape against live Supabase. They have different review criteria (Pattern-a: lazy-read invariants + grep of removed caches; KD-9.0: real-DB fixture correctness + teardown). Bundling them forces reviewers to check both simultaneously and muddies the "what did this commit actually do" signal in git.
+2. **Risk isolation.** If Pattern-a regresses something subtle (e.g., a consumer that destructured `flags` without realising it captured the value), rollback is a single revert. Bundled with KD-9.0, rollback would either also revert fixture work or leave the repo in a half-reverted state. Per the founder's standing preference for tiny-and-safe inline fixes only.
+3. **Signalling leverage.** Pattern-a's merge is the single moment where **54 failures green simultaneously** (ignoring per-suite env-scoping hooks that KD-9.3 / 9.2 / 9.1 add). That signal is load-bearing evidence that the architecture was right; it should not be obscured by being bundled with a fixture reshape that greens a different 12 failures for different reasons. The `e853aa2`-style single-commit-flips-everything rhythm that CCP 4 set is the target shape here too.
+
+Counter-argument considered and rejected: "rolling Pattern-a into KD-9.0 keeps the ticket count low." Ticket count is cheap; commit discipline is load-bearing. Reject.
+
+### D. Entry criteria per sub-CCP
+
+**Pattern-a CCP:**
+- KD-9 audit doc approved as governing plan.
+- Working tree clean; repo on a known-good tag (e.g. `checkpoint/ccp4-green-*` or equivalent current baseline).
+- CCP 4 formally closed in `INTEGRATION_READINESS.md` (it is, per the current status paragraph).
+- No in-flight CCP occupying the 5 dual-mode stores.
+- Isolated worktree for the change; `bun run test` baseline captured for before/after diffing.
+
+**KD-9.0:**
+- Pattern-a CCP merged to `main`.
+- Post-Pattern-a `bun run test` baseline captured. The 12 providers/service failures expected to still be red (pure (b) — Pattern-a does not touch them).
+- Supabase dev project reachable; `bunx supabase migration list` clean.
+
+**KD-9.3:**
+- Pattern-a CCP merged.
+- `src/lib/test/env-scope.ts` (or equivalent shared test helper for `forceMockModeForSuite`) present in-tree — either pre-existing or written as the first artefact of this sub-CCP.
+
+**KD-9.2:**
+- Pattern-a CCP merged.
+- Founder decision on KD-10 candidate — four explicit options (not a default; correction 2 amendment 2026-04-18 replaces the prior scattered-`afterEach` option with two centralised variants):
+  - **(i)** Open KD-10 first and resolve it before KD-9.2 starts.
+  - **(ii)** Land a **centralised shared helper at `src/lib/test/helpers/auth-users-reset.ts`**, imported by the 4 overlapping suites, each calling it in their own `afterEach`. Pattern-enforced at the suite header rather than scattered inline. Still requires each affected suite to opt in explicitly, which is the residual discipline surface.
+  - **(ii')** Register a **global `afterEach` hook in `vitest.setup.ts`** that invokes the shared helper suite-wide. Applies automatically to every test in every suite; zero opt-in discipline needed. Trade-off: the blanket hook runs even where no `auth.users` rows were created (cheap no-op, but the cleanup behaviour becomes non-local — a debugger investigating an unexpected cleanup-related failure must look outside the test file).
+  - **(iii)** Defer the 4 overlapping tests with explicit `.skip` markers citing the KD-10 candidate; close KD-9.2 on the other 19 failures; KD-10 stays open as a separate ticket.
+
+**KD-9.1:**
+- Pattern-a CCP merged.
+- KD-9.0 merged (fixture-reshape pattern in-tree, reusable).
+- No in-flight Phase 5 (Stripe) work touching `checkout/*` or `licence_grants/*` — they border on the `/api/upload` + `/api/v2/batch` routes tangentially.
+
+### E. Exit criteria per sub-CCP (falsifiable)
+
+**Pattern-a CCP:**
+- `bun run test` baseline diff shows **all 54 (a)-bucket failures** from Phase 1's inventory green, OR failing with a non-(a) error signature (i.e., no `expected 503 to be N`, no `expected 'NO_ACTIVE_GRANT' to be 'GRANT_*'` on seed-via-mock-helper tests — after per-suite env-scoping which KD-9.X will ship, that is; here we measure: no (a)-style failures when the test file's current code runs against the new env.ts).
+- `grep -rn "^const MODE:" src/lib` returns zero matches.
+- `grep -nE "^export const isSupabaseEnvPresent" src/lib/env.ts` returns zero matches; `grep -nE "^export function isSupabaseEnvPresent" src/lib/env.ts` returns one.
+- `bun x tsc --noEmit` exits 0.
+- `bun run build` exits 0 with the same 81 routes.
+- No regression in the 30 previously-green suites (same-pass-count check).
+
+**KD-9.0:**
+- `bun x vitest run src/lib/providers/__tests__/service.test.ts`: 12 / 12 pass.
+- Global pass count rises by exactly 12 vs the post-Pattern-a baseline.
+- No regression elsewhere.
+
+**KD-9.3:**
+- `bun x vitest run src/lib/entitlement/__tests__/services.test.ts`: 16 / 16 pass.
+- `bun x vitest run src/lib/entitlement/__tests__/authorization-invariants.test.ts`: 3 / 3 pass.
+- Global pass count rises by exactly 19 vs the post-KD-9.0 baseline.
+
+**KD-9.2:**
+- Path chosen at entry (i / ii / iii on the KD-10 overlap) is documented in the sub-CCP's commit or closing note.
+- If path (i): 23 / 23 pass.
+- If path (ii): 23 / 23 pass with per-suite `afterEach` present; KD-10 remains open in `INTEGRATION_READINESS.md`.
+- If path (iii): 19 / 23 pass + 4 skipped with `.skip` markers citing KD-10; pass-count baseline updates accordingly.
+
+**KD-9.1:**
+- All 51 originally-failing tests in the 8 upload suites now pass.
+- Global pass count reaches the target set by KD-9's global exit criteria (below) minus any KD-10-deferred skips.
+
+### F. Global KD-9 exit criteria
+
+KD-9 is closed when **all** of the following hold:
+
+- `bun run test`: **46 / 46 suites executing · 0 failed · total skip count reflects only KD-2 plus any deliberate KD-10 deferrals · all non-skipped tests pass.** Decoupled from an absolute pass-count target so the exit criterion holds regardless of which KD-10 resolution path (i / ii / ii' / iii in KD-9.2's entry) the founder chooses. Every skip must be annotated with a line comment citing either KD-2 or the KD-10 candidate row in this audit doc.
+- **No previously-green suite transitions to failing across any KD-9 merge.** Verified by comparing suite-level pass/fail deltas at each merge point against the commit `93987c7` baseline (the audit phases 1-3 commit). A new failure in a previously-green suite is a regression, not in-scope for KD-9, and blocks close-out until resolved.
+- `bun x tsc --noEmit` exits 0.
+- `bun run build` exits 0 with 81 routes.
+- `bunx supabase migration list` clean (no unpushed migrations beyond what Phase 4/5 work introduces later).
+- `ROADMAP.md` Now-table: KD-9 row removed or moved to "Changes this update" with a closing commit SHA. *(Founder edit — per founder's governance-doc ownership; this sub-CCP flags, founder commits.)*
+- `INTEGRATION_READINESS.md` KD-9 row: status flipped to **Closed** with a summary of the 5 commits (Pattern-a + 4 sub-CCPs). *(Founder edit — same disclaimer.)*
+- If KD-10 was opened and resolved during KD-9.2, it shows Closed in the same table. If deferred, it remains Open and the KD-9 close-out explicitly notes the residual.
+- A post-KD-9 checkpoint tag on `main` — suggested form `checkpoint/kd9-green-YYYYMMDD-hhmm` — created by the founder after the final sub-CCP merge.
+
+### G. Agent-coverage mapping
+
+Added per founder correction 1, 2026-04-18. Each ticket scored for agent coverage against the current `.claude/agents/*.md` set: `frontfiles-context`, `frontfiles-upload`, `frontfiles-onboarding`, `frontfiles-blue-protocol`, `frontfiles-discovery`.
+
+**Pattern-a CCP.** No agent owns `src/lib/env.ts`; it is cross-cutting infrastructure. `frontfiles-upload` references the `FFF_REAL_UPLOAD` / `FFF_STORAGE_DRIVER` flags in its Hard Rules §4 but does not own their derivation site. Three of the five dual-mode stores Pattern-a touches (`post`, `providers`, `media/asset-media-repo`) are not under any agent either.
+- **Recommendation: engineer-directly, `frontfiles-context` summoned as the terminology + cross-cutting backstop.** Env-derivation semantics are not a domain; spinning up an agent for a single architectural refactor is premature investment.
+
+**KD-9.0 — providers/service.** No current agent owns `src/lib/providers/**`. Options per founder brief: (a) spin up `frontfiles-providers` agent spec, (b) engineer-directly with `frontfiles-context` as terminology backstop.
+- **Recommendation: (b) engineer-directly, `frontfiles-context` as backstop.** 12 failures in one test file with a bounded fixture-reshape pattern does not merit a new agent spec. Agent-file investment pays off when a domain sees recurring work; the provider spine will likely expand when Phase 5 Stripe/Connect work lands, at which point (a) becomes the right time. Not now. **Agent file is NOT spun up this session, per founder instruction.**
+
+**KD-9.1 — upload.** Maps primarily to `frontfiles-upload`. KD-9.1's 8 test files scored against the agent's "Scope — what you own" (`.claude/agents/frontfiles-upload.md:14-47`):
+
+| Test file | Agent coverage |
+|---|---|
+| `src/lib/upload/__tests__/commit-service.test.ts` | ✓ owned (`src/lib/upload/**`) |
+| `src/lib/upload/__tests__/batch-service.test.ts` | ✓ owned |
+| `src/app/api/upload/__tests__/route.test.ts` | ✓ owned |
+| `src/app/api/v2/batch/__tests__/route.test.ts` | ✓ owned |
+| `src/app/api/v2/batch/[id]/commit/__tests__/route.test.ts` | ✓ owned |
+| `src/lib/storage/__tests__/index.test.ts` | **✗ gap** — `src/lib/storage/**` not in agent scope; agent knows `FFF_STORAGE_DRIVER` semantics (Hard Rule §4) but does not own the `fs-adapter` / `supabase-adapter` implementation |
+| `src/lib/processing/__tests__/pipeline.test.ts` | **✗ gap** — agent routes this to "Area 3 / task #29 (watermark profile application)" under "Integrations owned elsewhere" (agent spec §"Integrations owned elsewhere") |
+| `src/lib/processing/__tests__/profiles.test.ts` | **✗ gap** — same as pipeline |
+
+- **Recommendation: summon `frontfiles-upload` for the 5 owned files; handle the 3 gap files engineer-directly with `frontfiles-context` as backstop.** Do NOT stretch the upload agent's scope to cover `storage/**` or `processing/**` — that is agent-scope drift and undermines the "single responsibility" discipline the agent set is built on. The 3 gap files are test-only work under Option 2b (no production code change), so the cost of engineer-direct handling is low.
+
+**KD-9.2 — onboarding + auth/provider.** Partial `frontfiles-onboarding` coverage with explicit exclusion. Agent frontmatter (`.claude/agents/frontfiles-onboarding.md:3`): *"Does NOT handle Google/Apple OAuth wiring — that belongs to INTEGRATION_READINESS.md Phase 4.A."* Body line 9: scope *"begins once Supabase Auth has produced an authenticated user"*. `src/lib/auth/provider.ts`'s `signUpOrAdoptAuthUser` / `getAuthUserEmailConfirmed` surface IS the handshake — it sits before that boundary.
+
+| Test file | Agent coverage |
+|---|---|
+| `src/lib/onboarding/__tests__/resume.test.ts` | ✓ owned by `frontfiles-onboarding` |
+| `src/lib/onboarding/__tests__/account-creation.test.ts` | ✓ owned |
+| `src/lib/onboarding/__tests__/integration.test.ts` | ✓ owned |
+| `src/lib/onboarding/__tests__/account-creation-verification.test.ts` | ✓ owned |
+| `src/lib/auth/__tests__/provider.test.ts` | **✗ explicitly excluded** |
+
+- **Recommendation: split the `auth/provider` slice off as a separate ticket KD-9.2.aux, handled engineer-directly with `frontfiles-context` as backstop.**
+  - Rationale: (a) respects the onboarding agent's stated exclusion without stretching it; (b) keeps KD-9.2 focused on the 15 failures in its actual scope; (c) `auth/provider.ts` is the deepest file Pattern-a touches at the MODE layer — isolating its test greening lets any residual auth-path semantics questions surface cleanly, not tangled in onboarding flow work; (d) 4 of the 8 auth/provider failures overlap with the KD-10 candidate, so the KD-9.2 entry-criterion choice (i / ii / ii' / iii) applies identically to KD-9.2.aux — make the decision once, apply it to both tickets.
+  - KD-9.2.aux sequences after Pattern-a. Relative to KD-9.2 it may run before, after, or in parallel; no blocking relation.
+  - 8 auth/provider failures split between buckets per Phase 2: 2 env-cache (tests #7, #8 — `_markMockAuth*` helpers) + 6 fixture-drift (tests #1–6). The KD-10 overlap lives inside the 6 fixture-drift failures (tests #1–4 probe first-contact behaviour that order-dependent `auth.users` persistence perturbs).
+
+**KD-9.3 — entitlement.** No current agent owns `src/lib/entitlement/**`. Options per founder brief: (a) spin up `frontfiles-entitlement` agent spec, (b) engineer-directly with `frontfiles-context` backstop.
+- **Recommendation: (b), same shape as KD-9.0.** 19 failures across 2 test files, all greened by env-scoping `beforeEach` hooks after Pattern-a merges; no production code change. New agent investment is premature; revisit when Phase 5 Stripe/checkout expands the entitlement surface (licence-grant minting, dispute routing, refund revocation). **Agent file is NOT spun up this session.**
+
+**Recap.**
+
+| Ticket | Primary agent | Backstop | New agent this session? |
+|---|---|---|---|
+| Pattern-a CCP | engineer-directly | `frontfiles-context` | no |
+| KD-9.0 | engineer-directly | `frontfiles-context` | no (option (a) deferred to Phase 5 timing) |
+| KD-9.1 | `frontfiles-upload` (5 of 8 files) + engineer-directly for 3 gap files (storage, processing×2) | `frontfiles-context` | no |
+| KD-9.2 | `frontfiles-onboarding` (4 files) | `frontfiles-context` | no |
+| KD-9.2.aux (auth/provider split-off) | engineer-directly | `frontfiles-context` | no |
+| KD-9.3 | engineer-directly | `frontfiles-context` | no (option (a) deferred to Phase 5 timing) |
+
+Total tickets after correction 1: **6** (Pattern-a, KD-9.0, KD-9.3, KD-9.2, KD-9.2.aux, KD-9.1). Sub-CCP domain sequencing from §A still holds — KD-9.2.aux slots alongside or after KD-9.2.
+
+### Phase 4 close
+
+**Six sequenced tickets** (Pattern-a + 4 KD-9.X + KD-9.2.aux, per correction 1): Pattern-a CCP → KD-9.0 → KD-9.3 → KD-9.2 + KD-9.2.aux → KD-9.1. Pattern-a as a standalone pre-CCP with stated rationale. Scope boundaries, entry criteria (four explicit KD-10 paths: i / ii / ii' / iii per correction 2), exit criteria per ticket. Global exit decoupled from an absolute pass-count target (correction 3) and gated on a no-regression-vs-`93987c7` suite-delta check at every merge (correction 4). Agent-coverage mapping in §G (correction 1) aligns each ticket with the current `.claude/agents/*.md` set without spinning up any new agent files this session. Mandate M1 (isSupabaseEnvPresent lazy conversion) folded into the Pattern-a scope. Mandate M2 addendum (six additional per-call `isSupabaseConfigured()` consumers) surfaced as transitive beneficiaries requiring zero code change.
+
+No code written. No vitest config touched. No test edits. No governance-doc edits. No agent-spec files written. The audit doc stands as a complete plan pending founder's final verdict.
 
 ---
 
-*Phase 3 revised 2026-04-18. Stop marker: no further sections drafted until founder responds approve / approve-with-corrections / revise / reject on the Option 2b default.*
+*Phase 4 closed 2026-04-18 · revised 2026-04-18 per founder corrections 1–4. Audit complete. Stop marker: awaiting founder's final verdict — approve as governing plan, approve-with-corrections, revise, or reject. Implementation opens only after approval, in separate sessions per ticket (Pattern-a CCP first).*
