@@ -126,7 +126,7 @@ Every user has exactly one **username** — the human-readable public identifier
 
 ## Phase 4 — Advanced Transactions
 
-- [x] Direct Offers (`/vault/offers`) — pending/resolved, accept/counter/reject actions, 3-round max
+- [x] Special Offers (`/vault/offers`) — pending/resolved, accept/counter/reject actions, 3-round max
 - [x] Assignments (`/vault/assignments`) — active/completed, brief/deliverables/deadline/escrow, state machine badges
 - [x] Disputes (`/vault/disputes`) — dispute resolution UI, 3 dispute types, state badges
 
