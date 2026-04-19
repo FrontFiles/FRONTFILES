@@ -412,8 +412,8 @@ export const TABLES = {
   ccr_amended_fields: 'ccr_amended_fields',
   assignment_dispute_cases: 'assignment_dispute_cases',
   assignment_events: 'assignment_events',
-  direct_offer_threads: 'direct_offer_threads',
-  direct_offer_events: 'direct_offer_events',
+  special_offer_threads: 'special_offer_threads',
+  special_offer_events: 'special_offer_events',
   offer_checkout_intents: 'offer_checkout_intents',
   // Identity layer (migrations 9, 15)
   users: 'users',

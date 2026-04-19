@@ -999,7 +999,7 @@ export interface CertifiedPackage {
 export type TransactionType =
   | 'direct_catalogue'
   | 'plugin_catalogue'
-  | 'direct_offer'
+  | 'special_offer'
   | 'exclusive_licence'
   | 'bulk'
   | 'assignment'

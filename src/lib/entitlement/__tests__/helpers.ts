@@ -42,7 +42,7 @@ export function makeGrant(
     term_start: '2025-01-01T00:00:00Z',
     term_end: null,
     entitlement_source_type: 'transaction',
-    source_type: 'direct_offer',
+    source_type: 'special_offer',
     source_id: 'source-001',
     transaction_id: 'txn-001',
     certified_package_id: null,
