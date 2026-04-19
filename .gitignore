@@ -58,3 +58,4 @@ next-env.d.ts
 # to untracked paths. Those existing files remain where they are.
 /public/assets/videos/*.mp4
 /public/assets/videos/*.mov
+*.tsbuildinfo*
