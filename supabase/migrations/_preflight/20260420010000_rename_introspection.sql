@@ -189,6 +189,7 @@ SELECT
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+  AND p.prokind = 'f'
   AND pg_get_functiondef(p.oid) ~ 'direct_offer'
 ORDER BY n.nspname, p.proname;
 
@@ -250,7 +251,11 @@ SELECT
       'direct_offer_status',
       'direct_offer_event_type',
       'direct_offer_auto_cancel_reason'
-    ) THEN 'EXPECTED — covered by forward §1'
+    ) THEN 'EXPECTED — enum covered by forward §1'
+    WHEN t.typtype = 'c' AND t.typrelid != 0
+      THEN 'AUTO — composite row type, renames automatically with parent table'
+    WHEN t.typtype = 'b' AND t.typname LIKE '\_%'
+      THEN 'AUTO — array wrapper, renames automatically with parent type'
     ELSE 'UNEXPECTED — investigate before apply'
   END AS flag
 FROM pg_type t
