@@ -90,8 +90,8 @@ Blank where not yet determinable. Update during execution.
 | T2 | — | depends on `@supabase/ssr` presence + session plumbing shape |
 | T2b | 0 in `src/` | memo only |
 | T3 | — | `userClient.ts` ~40 LOC + 15 call-site migrations |
-| T4-A | — | full Supabase branches on two stores + mappers + integration tests |
-| T4-B | **~ -50** | flag-gate + delete mock wiring |
+| T4 / Path A | — | full Supabase branches on two stores + mappers + integration tests |
+| T4 / Path B | **~ -50** | flag-gate + delete mock wiring |
 | T5 | 0 in `src/` | memo only |
 | P1 | — | `AssetFormat` normalisation touches 18 files |
 | P2 | — | `parseBody` in 29 routes, ~2 lines saved, ~4 lines added per route |
@@ -201,9 +201,9 @@ Parallel  (no tier dependency — can start any time)
    - `src/lib/assignment/store.ts` — `new Map(mockAssignments.map(...))` at module load, no Supabase branch (audit B-2)
    - `src/app/api/special-offer/route.ts` — reads assets from `mockVaultAssets` fixture rather than `vault_assets` (audit B-3)
 2. The three answer options, named and not ranked:
-   - **Live persistence** — special-offer + assignment state moves to Supabase behind the dual-mode pattern.
-   - **Scaffolding-only** — the current in-memory stores are a scaffolding artefact; the prod-route wiring to them is deleted and the Map stores are hard-gated to dev.
-   - **Hybrid** — special-offer persists live; assignment stays scaffolding-only until the editorial contract product brief is scoped.
+   - **Path A — Live persistence** — special-offer + assignment state moves to Supabase behind the dual-mode pattern.
+   - **Path B — Scaffolding-only** — the current in-memory stores are a scaffolding artefact; the prod-route wiring to them is deleted and the Map stores are hard-gated to dev.
+   - **Path C — Hybrid** — special-offer persists live; assignment stays scaffolding-only until the editorial contract product brief is scoped.
 3. The product questions (below) — each with an explicit answer, or a dated deferral reason.
 
 **Product questions João must answer (no implementation proposal attached):**
@@ -473,16 +473,16 @@ Parallel  (no tier dependency — can start any time)
 
 **Goal.** Act on the memo. Two branches.
 
-### Branch A — "Live persistence" decision from T0.5
+### Path A — "Live persistence" decision from T0.5
 
-**Files to touch (if Branch A):**
+**Files to touch (if Path A):**
 - `/Users/jnmartins/dev/frontfiles/src/lib/special-offer/store.ts` — add Supabase branch following the dual-mode pattern used in `src/lib/post/store.ts`
 - `/Users/jnmartins/dev/frontfiles/src/lib/assignment/store.ts` — same
 - `/Users/jnmartins/dev/frontfiles/src/app/api/special-offer/route.ts` — replace `mockVaultAssets.find(...)` with a real `vault_assets` query through `userClient` (now available post-T3)
 - `/Users/jnmartins/dev/frontfiles/src/lib/special-offer/__tests__/store.real.test.ts` — **new file**, Supabase-backed round-trip
 - `/Users/jnmartins/dev/frontfiles/src/lib/assignment/__tests__/store.real.test.ts` — **new file**
 
-**Exact edits (Branch A):**
+**Exact edits (Path A):**
 1. Mirror the mode-selector pattern from `src/lib/post/store.ts:37-49` (`getMode()`, `logModeOnce()`). Gate every function on `getMode() === 'mock'`.
 2. Define `SpecialOfferThreadRow`, `SpecialOfferEventRow`, `OfferCheckoutIntentRow` in `src/lib/db/schema.ts` matching the P5 migration (`special_offer_threads`, `special_offer_events`, `offer_checkout_intents`). **If P5 has not yet landed, use the `direct_offer_*` names exactly as on disk and open a ticket reminder to rename them when P5 flips.** Do not pre-rename in this plan.
 3. Write row→domain mappers (snake_case → camelCase).
@@ -490,15 +490,15 @@ Parallel  (no tier dependency — can start any time)
 5. Replace the `mockVaultAssets.find(...)` call in `src/app/api/special-offer/route.ts:76` with a real query.
 6. Round-trip integration test: create thread → counter → accept → assert event sequence in DB.
 
-### Branch B — "Scaffolding-only" decision from T0.5
+### Path B — "Scaffolding-only" decision from T0.5
 
-**Files to touch (if Branch B):**
+**Files to touch (if Path B):**
 - `/Users/jnmartins/dev/frontfiles/src/lib/special-offer/store.ts` — wrap the module-level `new Map()` behind an explicit guard
 - `/Users/jnmartins/dev/frontfiles/src/lib/assignment/store.ts` — same
 - `/Users/jnmartins/dev/frontfiles/src/app/api/special-offer/route.ts` — delete or gate behind `env.FFF_DEV_OFFERS_ENABLED`
 - (Optionally) delete the `direct_offer_*` / `special_offer_*` route prefixes entirely, returning 501 for the surface
 
-**Exact edits (Branch B):**
+**Exact edits (Path B):**
 1. Add an `FFF_DEV_STORES_ENABLED` server env flag in `src/lib/env.ts`, defaulting to `false`.
 2. Wrap the `new Map<...>()` initialiser in each of the two stores:
    ```ts
@@ -510,10 +510,10 @@ Parallel  (no tier dependency — can start any time)
 4. Remove or rename the `mockVaultAssets` import from the route (the fixture stays in `src/data/` but the route no longer imports it in prod).
 
 **Acceptance test.**
-- If Branch A: `bun test` shows the new `store.real.test.ts` round-trip passes against a live Supabase dev project.
-- If Branch B: hitting `/api/special-offer` in a non-dev environment returns 501; `bun run build` still exits 0.
+- If Path A: `bun test` shows the new `store.real.test.ts` round-trip passes against a live Supabase dev project.
+- If Path B: hitting `/api/special-offer` in a non-dev environment returns 501; `bun run build` still exits 0.
 
-**Depends on.** T0.5 (answer required). T3 (Branch A needs `userClient`). T2 (Branch A needs actor).
+**Depends on.** T0.5 (answer required). T3 (Path A needs `userClient`). T2 (Path A needs actor).
 
 ---
 
@@ -620,7 +620,7 @@ Per audit K-1. Remove from `src/lib/env.ts` (3 lines). Acceptance: `rg "GOOGLE_P
 Tier T0 through T5 + Parallel items landed, plus:
 - `getServiceClient()` usage in the app tree reduced to a grep-auditable set with written justifications.
 - Every mutation route resolves its actor from a server-side session, not a header or a body field.
-- The in-memory-only stores (`special-offer`, `assignment`) are either wired to Supabase (Branch A of T4) or hard-gated as dev-only (Branch B of T4).
+- The in-memory-only stores (`special-offer`, `assignment`) are either wired to Supabase (T4 / Path A) or hard-gated as dev-only (T4 / Path B).
 - The unsigned Stripe webhook is gone.
 - The test suite includes route-level integration coverage for authenticated vs unauthenticated vs wrong-actor for every mutation route.
 

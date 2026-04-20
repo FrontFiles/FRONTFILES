@@ -7,6 +7,16 @@
 
 ---
 
+## Vocabulary
+
+Path labels used throughout this memo and [REMEDIATION_PLAN_20260418.md](REMEDIATION_PLAN_20260418.md):
+
+- **Path A — live persistence lock.** Special-offer and assignment state moves to Supabase behind the existing dual-mode pattern; A.3 re-locks at v1.0-scaffold with real persistence, with v1.0-live re-lock following once T1 / T2 close auth.
+- **Path B — scaffolding-only de-scope.** The current in-memory `Map` stores are hard-gated to dev; prod routes return 501; A.3 does not re-lock until a separate live-persistence programme is scoped.
+- **Path C — hybrid.** Special-offer takes Path A; assignment stays on Path B until the editorial-contract product brief is scoped.
+
+---
+
 ## Subject systems
 
 Audit finding cross-refs come from [CODEBASE_AUDIT_20260418.md](CODEBASE_AUDIT_20260418.md).
