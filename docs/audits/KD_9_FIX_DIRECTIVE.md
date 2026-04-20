@@ -139,8 +139,9 @@ One commit (or a small commit series) on fix/kd-9-followup that:
      '@/lib/assignment/store'`. Do not use `await import()` at the
      call site; the test function is synchronous and the module is
      already statically imported. Note: this file is on the DELETE
-     list per P4_UI_DEPRECATION_AUDIT.md §3.3, so this edit is
-     deliberately minimal — do not refactor anything else in it.
+     list per P4_UI_DEPRECATION_AUDIT.md §3.4 (tests tied to retiring
+     UI/routes; §3.3 lists the parent support-lib directory), so this
+     edit is deliberately minimal — do not refactor anything else in it.
 
 ACCEPTANCE (every item must pass)
 1. `bun run test 2>&1 | tee /tmp/kd9fu-post.log` reports zero file-
@@ -257,7 +258,7 @@ This directive does **not** ship to Claude Code until all of the following are �
 6. Claude Code produces the exit report and a commit.
 7. Founder reviews the exit report; approves or requests revisions.
 8. On approval, founder merges `fix/kd-9-followup` into `main`.
-9. `P4_IMPLEMENTATION_PLAN.md` §2.2 #7 and §2.3 #8 flip from ✗ to ✓. Concern-1 dispatch §D #5 flips from ✗ to ✓ (residual: §D #1–#3, #7 still blocking per the concern-1 directive).
+9. `P4_IMPLEMENTATION_PLAN.md` §2.2 #7 and §2.2 #8 flip from ✗ to ✓. Concern-1 dispatch §D #5 flips from ✗ to ✓ (residual: §D #1–#3, #7 still blocking per the concern-1 directive).
 
 ## F — Notes for reviewer
 
@@ -282,9 +283,11 @@ This directive does **not** ship to Claude Code until all of the following are �
   - **m3 — §C and §F cross-refs.** Both corrected from `P4_UI_DEPRECATION_AUDIT.md` §3.3 to §3.4. §3.3 covers the support-library directory (`src/lib/assignment/`); §3.4 covers the tests tied to retiring UI/routes (`src/lib/assignment/__tests__/`, including the fingerprint-2 file). Cross-reference list at the top of the directive updated to name both sections explicitly.
   - **a1 — READ FIRST.** Added an AGENTS.md + `node_modules/next/dist/docs/` read-first pointer at the top of the §A body. Claude Code's training data pre-dates Next 16.2.2 + Vitest 4.1.2 + rolldown; reading these before coding is a repo-wide invariant per AGENTS.md and should not be assumed.
   - **Housekeeping — EXIT REPORT §8.** Range updated from "criteria 1–7" to "criteria 1–8" to match the new acceptance clause.
-  - Out-of-scope notes (flagged, not corrected in this pass — awaiting founder ruling):
-    - §E step 9 cites `§2.3 #8` as flipping to ✓ on this fix — appears to be a typo for `§2.2 #8`. Sweep candidate.
-    - §A DELIVERABLES #2 (line 142 in Draft 1 numbering) still cites `§3.3` for the api-helpers.test.ts DELETE classification; the m3 correction only touched §C and §F. §3.3 is not strictly wrong (parent dir `src/lib/assignment/` is on that list, which implies the subtree) but §3.4 is the precise cite. Sweep candidate for consistency with §C/§F.
+  - Not yet dispatched; §D gates 1–3 still pending. Committed at `22b515e`.
+- **2026-04-20 — Draft 3.** Founder-approved sweep of the two out-of-scope drift items flagged in Draft 2. Two edits, no scope or semantic change — citation precision only:
+  - **s1 — §E step 9 typo.** `§2.3 #8` → `§2.2 #8`. §2.3 #2 remains the PR-note discipline cited in ACCEPTANCE #7; §2.2 #8 is the acceptance condition that flips on this fix.
+  - **s2 — §A DELIVERABLES #2 precision.** `P4_UI_DEPRECATION_AUDIT.md §3.3` → `§3.4 (tests tied to retiring UI/routes; §3.3 lists the parent support-lib directory)`. Brings the dispatched body in line with §C and §F (both corrected in Draft 2 / m3). §3.3 was not strictly wrong — the parent directory listing implied the subtree — but §3.4 is the precise cite for the specific test file.
+  - Directive now fully citation-consistent across §A / §C / §E / §F / top cross-reference list. No further red-team sweeps planned pre-dispatch.
   - Not yet dispatched; §D gates 1–3 still pending.
 
 ---
