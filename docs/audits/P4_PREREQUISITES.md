@@ -18,7 +18,7 @@
 
 ## 2. `protect_ready_package()` trigger body inspection
 
-**Current state.** Function defined in `supabase/migrations/20260413230016_transactions_and_certified_packages_v2.sql:483`. Not inspected during Phase B or Phase C. May reference the old table and column names (`certified_packages`, `certified_package_items`, `certified_package_artifacts`, `certification_hash_at_issue`) inside its body.
+**Current state.** Function defined in `supabase/migrations/20260413230016_transactions_and_certified_packages_v2.sql:483`. Not inspected during Phase B or Phase C. May reference the old table and column names (`certified_packages`, `certified_package_items`, `certified_package_artifacts`, `certification_hash_at_issue`) inside its body. <!-- allow-banned: pre-rename identifiers cited in P4-prerequisite technical description per §9 compound-ban clarification -->
 
 **Risk.** Post-rename the function body still referencing the old identifiers would break on any insert/update to the renamed tables. Silent rollout hazard if not verified.
 
@@ -42,7 +42,7 @@
 
 ## 4. Founder confirmation on 7 enum fates
 
-**RESOLVED 2026-04-20 (revision 6).** Adjudication: six enums preserve without rename (`transaction_kind`, `transaction_status`, `package_kind`, `package_status`, `artifact_status`, `buyer_company_role`); one confirms parent-enum preservation with pre-captured value rename (`package_artifact_type`). Canonical source of record: `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 "Preserve without rename at P4" sub-block + revision 6 entry at §15. `buyer_company_role` P4 migration-sequencing prerequisite remains open under Entry 1 below.
+**RESOLVED 2026-04-20 (revision 6).** Adjudication: six enums preserve without rename (`transaction_kind`, `transaction_status`, `package_kind`, `package_status`, `artifact_status`, `buyer_company_role`); one confirms parent-enum preservation with pre-captured value rename (`package_artifact_type`). Canonical source of record: `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 "Preserve without rename at P4" sub-block + revision 6 entry at §15. `buyer_company_role` P4 migration-sequencing prerequisite remains open under Entry 1 above.
 
 ---
 
