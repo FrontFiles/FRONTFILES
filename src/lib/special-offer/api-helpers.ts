@@ -36,7 +36,9 @@ export async function withOfferError(
     if (err instanceof SpecialOfferError) {
       return errorResponse(err.code, err.message)
     }
-    const message = err instanceof Error ? err.message : 'Internal server error'
-    return errorResponse('INTERNAL_ERROR', message, 500)
+    const clientMessage = process.env.NODE_ENV !== 'production'
+      ? (err instanceof Error ? err.message : String(err))
+      : 'Internal server error'
+    return errorResponse('INTERNAL_ERROR', clientMessage, 500)
   }
 }

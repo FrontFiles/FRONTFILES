@@ -37,9 +37,11 @@ export async function withInternalError(
   try {
     return await fn()
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error'
+    const clientMessage = process.env.NODE_ENV !== 'production'
+      ? (err instanceof Error ? err.message : String(err))
+      : 'Internal server error'
     // Server-side log only — never echoed to the client.
     console.error('[posts api] internal error:', err)
-    return errorResponse('INTERNAL_ERROR', message, 500)
+    return errorResponse('INTERNAL_ERROR', clientMessage, 500)
   }
 }

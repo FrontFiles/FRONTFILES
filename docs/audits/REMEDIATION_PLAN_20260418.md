@@ -99,6 +99,17 @@ Blank where not yet determinable. Update during execution.
 | P4 | **~ +15 / -8** | env schema additions + removed `process.env` reads |
 | P5 | **~ -3** | env schema deletion |
 
+### F. Known test-env drift
+
+Added during T0 execution (2026-04-20). Not a tier; parallel KD-9-family track.
+
+- **Pre-T0 baseline.** 885 tests total: **875 passed / 1 failed / 9 skipped**, plus **17 test files failing to load** before any tests in them execute.
+- **Error fingerprint 1.** `Error: Environment validation failed — see errors above. This is a fail-fast by design.` — originates from `src/lib/env.ts` Zod fail-fast block. **Affects 16 of 17 failing files.**
+- **Error fingerprint 2.** `Error: Cannot find module '@/lib/assignment/store'` — raised by a dynamic `require()` call inside `src/lib/assignment/__tests__/api-helpers.test.ts`. **Affects 1 of 17 failing files.**
+- **Gap vs audit snapshot.** The audit (2026-04-18) cited a 1080 passed / 1 skipped baseline in `CODEBASE_AUDIT_20260418.md §Current-state inventory`. Actual today is 875 / 1 failed / 9 skipped + 17 file-load errors — **~205 tests not executing** vs the audit figure.
+- **Category.** KD-9 follow-up family (test-env loading, mock-mode sentinels). **Not a tier** in this plan. Runs on a parallel track.
+- **T0 stance.** Via `git stash --include-untracked` + rerun, the baseline before and after T0 edits is **identical** (875/1/9 + 17 file-load errors). T0 introduces zero regression. Accepted on that basis; see T0 §Acceptance test.
+
 ---
 
 ## What this plan is *not*
@@ -163,7 +174,7 @@ Parallel  (no tier dependency — can start any time)
    Keep the existing `console.error(...)` / Sentry capture on the server side unchanged — only the wire payload changes.
 3. The `providers/api-helpers.ts` variant (audit E-1) already gets this right. Do not edit it. Consolidation into one shared helper is Parallel, not T0.
 
-**Acceptance test (one line).** `rg "assignment/webhook/stripe" -t ts -t tsx` returns zero hits, and a forced 500 on any assignment/special-offer/posts mutation returns `{ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }` under `NODE_ENV=production`.
+**Acceptance test.** `rg "assignment/webhook/stripe" -t ts -t tsx` returns zero hits, and a forced 500 on any assignment/special-offer/posts mutation returns `{ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }` under `NODE_ENV=production`. Vitest suite returns no regression vs current baseline: 875 passed / 1 failed / 9 skipped, plus 17 file-load errors. Baseline drifted pre-T0 — see §Known test-env drift.
 
 **Depends on.** Nothing. T0 is the first safe landing.
 

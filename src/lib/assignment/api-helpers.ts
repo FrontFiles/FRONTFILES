@@ -57,7 +57,9 @@ export async function withDomainError(
     if (err instanceof AssignmentError) {
       return domainError(err)
     }
-    const message = err instanceof Error ? err.message : 'Internal server error'
-    return errorResponse('INTERNAL_ERROR', message, 500)
+    const clientMessage = process.env.NODE_ENV !== 'production'
+      ? (err instanceof Error ? err.message : String(err))
+      : 'Internal server error'
+    return errorResponse('INTERNAL_ERROR', clientMessage, 500)
   }
 }
