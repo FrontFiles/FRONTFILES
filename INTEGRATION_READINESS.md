@@ -2,6 +2,14 @@
 
 **Status:** v2 — decisions locked · **Date:** 2026-04-17 · **Owner:** João Nuno Martins
 
+## Canonical references
+
+Governing specs that sit above this plan. When this plan and a canonical spec diverge, the spec wins — update this plan to match.
+
+| Spec | Path | Scope | Revision policy |
+|---|---|---|---|
+| ECONOMIC_FLOW_v1 | `docs/specs/ECONOMIC_FLOW_v1.md` | Offers, assignments, disputes, ledger events, retention, pack primitives, terminology discipline | Any change to §4 / §5 / §7 / §8 of ECONOMIC_FLOW_v1.md requires founder sign-off before implementation begins (per §15). |
+
 ## Decision Locks (2026-04-17)
 
 All 12 architectural decisions resolved. Body of document retains original reasoning for audit trail; the table below is authoritative for execution.
@@ -35,6 +43,7 @@ All Phase 0 pre-flight items complete. CCP 1 executed. Evidence below; this bloc
 | P0.6 Tag `main` at last-known-good | Tagged | `checkpoint/preflight-green-20260417-1116`, `phase-1-baseline`, plus 4 `backup/pre-filter/*` safety tags |
 
 **Gate status:** G1 passed (D1–D12 locked, 2026-04-17) · Phase 0 **fully closed** — P0.2 resolved via KD-1 micro-fix (commit `4681e92`). CCP 1, CCP 2, CCP 3, CCP 4 complete. **Phase 1 (Foundation) closed** — G2 **passed** (2026-04-17); only parallel human task remaining is 1.1 Vercel preview/prod env wiring (does not block Phase 4/5 design work, blocks live deploy only).
+**Governing spec for offers / assignments / disputes / ledger scope:** `docs/specs/ECONOMIC_FLOW_v1.md` (2026-04-20).
 **Next CCP:** Phase 2 (Observability) or Phase 3 (Email) — both parallelisable after G2. KD-8 micro-CCP recommended before either, to restore reliable test signal.
 **CCP 2 status (2026-04-17):** **GREEN on dev.** Commit `c05928f feat(rls): apply RLS migration 20260420000000 to dev Supabase`. Verification: grep scan 0 matches; `tsc --noEmit` exit 0; 8/9 RLS tests pass (1 skip = KD-2 fixture drift); migration `20260420000000_rls_all_tables.sql` applied on Remote dev Supabase. Scope item 1 (Vercel preview/prod env wiring) is a follow-up human task; does not block CCP 2 gate but blocks full Phase 1 closeout. 4 deny-all + TODO entries carried forward as KD-3 through KD-6.
 **CCP 3 status (2026-04-17):** **GREEN.** Items 1.7, 1.8, 1.9 landed pre-CCP in migration `20260419110000_phase1_vector_cache_audit.sql` (pgvector + `asset_embeddings` + HNSW index; `ai_analysis` cache with `(subject_type, subject_id, model, model_version, input_hash)` unique; `audit_log` append-only with event_type/actor_id/target indexes; all three RLS-enabled service-role-only; the `20260420000000` RLS migration confirms these were pre-locked and are correctly skipped by the generalised pass). Item 1.10 landed in `src/lib/env.ts` (Zod fail-fast, every required var + optional bank, `env`/`flags`/`isSupabaseEnvPresent` exports). CCP 3 closeout consolidated `process.env` reads in 9 source files to import from `@/lib/env` — grep dropped 19 → 5 non-test files (health-route Vercel build metadata, dynamic secret/rate-limit resolvers, `NEXT_RUNTIME` runtime signal in `instrumentation.ts`; all documented exceptions). Verification: `tsc --noEmit` exit 0; `bun run build` exit 0 with 81 routes (route-count correction: prior entries in this doc cited "47 routes" against a stale baseline — actual post-CCP-3 build resolves 81 app routes; nothing regressed between CCPs); grep count 12 lines across 5 exception files as expected.

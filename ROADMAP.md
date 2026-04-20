@@ -1,7 +1,7 @@
 # Frontfiles — Pre-Integration Roadmap
 
 **View:** Now / Next / Later · **Source of truth for detail:** `INTEGRATION_READINESS.md` v2 (2026-04-17) + `CLAUDE_CODE_PROMPT_SEQUENCE.md`
-**Owner:** João Nuno Martins · **Last updated:** 2026-04-18 (post-KD-9 closeout — 16 newly-visible suites green, KD-11..KD-14 opened as P3/P4 follow-ups, KD-10 reserved, not opened)
+**Owner:** João Nuno Martins · **Last updated:** 2026-04-20 (post ECONOMIC_FLOW_v1 v1.0 — governing spec for offers / assignments / disputes / ledger landed on branch `docs/flow-spec-v1-20260420`; prior update 2026-04-18 post-KD-9 closeout)
 
 > This document is the communication-altitude view of the pre-integration work. It is deliberately thin. For phase-item granularity, size, and rationale, read `INTEGRATION_READINESS.md`. Do not duplicate detail here.
 
@@ -23,6 +23,16 @@
 | G6 — Full dry-run rehearsal on staging | Not started |
 
 **One-line:** Architectural layer locked + Phase 0 truly closed + CCP 2/3/4 green + Phase 1 foundation **closed** (G2 passed). Build stays provably clean (`bun run build` exit 0 across 81 routes; the earlier "47 routes" figure was a stale baseline). Real-world switches (Phase 4 Google, Phase 5 Stripe) are now unblocked at the architecture gate; they still wait on G3 (legal + Google verification) and G4 (Stripe Connect approval). KD-8 is the recommended next micro-CCP to restore reliable test signal before Phase 2/3 lands. Commit `5e652df` shows Phase 3.1 (Resend) already partially done — ahead-of-sequence, acceptable.
+
+---
+
+## Governing specs
+
+First-class artefacts that govern implementation work across phases. Any future Phase 2 / T4 / Path A work on the listed surfaces must conform to the spec named here; changes to guarded sections require founder sign-off per the spec's own revision policy.
+
+| Spec | Path | Scope | Revision gate |
+|---|---|---|---|
+| ECONOMIC_FLOW_v1 | `docs/specs/ECONOMIC_FLOW_v1.md` | Offers, assignments, disputes, ledger events, retention, pack primitives, terminology discipline | §15: changes to §4 / §5 / §7 / §8 require founder sign-off before implementation begins |
 
 ---
 
@@ -125,6 +135,7 @@ New scope items from today's decision locks (already listed in INTEGRATION_READI
 | **G2 passed** (2026-04-17) | Phase 1 (Foundation) closed. Only parallel human task remaining is 1.1 Vercel preview/prod env wiring; it does not block Phase 2/3/4/5 design work, only live deploys. |
 | **KD-8 closed** (2026-04-17) | Test signal restored. Three-part fix: (a) `"test": "vitest run"` script added to `package.json` so `bun run test` hits vitest instead of bun's built-in runner; (b) `vitest.setup.ts` registered via `test.setupFiles`, calling `@next/env`'s `loadEnvConfig(process.cwd())` before any test module imports `src/lib/env.ts`; (c) repaired a piggyback bug — `import { z } from 'zod'` in 4 files (env.ts + 3 API routes) tripped a dual-package interop issue under `bun run test` + vitest 4 / rolldown where `z.object` resolved to `undefined`; switched to `import * as z from 'zod'`, tsc clean. Suites executing jumped 30 → 46; tests 885 → 1,081; pass rate 90.8%. No regressions in previously-green suites. |
 | **KD-9 opened** (2026-04-17) | 99 test failures across 16 previously-dark suites, surfaced by KD-8's structural fix. Two dominant patterns: env-flag caching (CCP 3 design; `flags.*` + `MODE` frozen at module load, test `withEnv(...)` mutations have no effect) and real-Supabase-path fixtures (CCP 4 design; dual-mode modules pick real path under `isSupabaseEnvPresent === true`; fixtures written for mock contract fail against real-DB constraints). Medium severity. Fix is test-side (env-stubbing helper + fixture reshaping). Top of Now. |
+| **ECONOMIC_FLOW_v1 landed** (2026-04-20) | ECONOMIC_FLOW_v1 landed on branch `docs/flow-spec-v1-20260420`. 3 red-team passes (C/I/M + R1/R2/R3). Governing spec for offers, assignments, disputes, ledger, retention. Founder sign-off under §15 for §5/§8/§9/§12.4 changes. Cross-cutting artefact; not a CCP — listed under Governing specs and applied to open T4 schema work once T1 auth wiring is green. |
 
 No timeline moves, no reprioritisation of later phases. Phase 0 closed; CCP 2/3/4 closed; Phase 1 closed; G2 passed; KD-8 closed. KD-9 is the expected surface-area expansion that comes with restored test signal — not a regression.
 
