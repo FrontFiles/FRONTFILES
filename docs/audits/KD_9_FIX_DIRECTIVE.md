@@ -4,7 +4,7 @@
 
 **Governs.** A single execution session with Claude Code. One concern, one exit report. Parallel-track to P4; clears a hard prerequisite gate for P4 concern 2 (`P4_IMPLEMENTATION_PLAN.md` §2.2 #7).
 
-**Cross-references.** `docs/audits/REMEDIATION_PLAN_20260418.md` appendix F (baseline + fingerprints); `docs/audits/P4_IMPLEMENTATION_PLAN.md` §2.2 #7–#8; `docs/audits/P4_CONCERN_1_DIRECTIVE.md` §D #5; `KD-9-audit.md` §F (attestation anchor — informational only, do not re-open); `docs/audits/P4_UI_DEPRECATION_AUDIT.md` §3.3 (fingerprint-2 surface is on the DELETE list).
+**Cross-references.** `docs/audits/REMEDIATION_PLAN_20260418.md` appendix F (baseline + fingerprints); `docs/audits/P4_IMPLEMENTATION_PLAN.md` §2.2 #7–#8 and §2.3 #2 (PR-note discipline); `docs/audits/P4_CONCERN_1_DIRECTIVE.md` §D #5; `KD-9-audit.md` §F (attestation anchor — informational only, do not re-open); `docs/audits/P4_UI_DEPRECATION_AUDIT.md` §3.3 (support-lib `src/lib/assignment/` directory on DELETE list) + §3.4 (fingerprint-2 test file on DELETE list).
 
 ---
 
@@ -14,6 +14,12 @@ The text below is the directive as it will be pasted into Claude Code when dispa
 
 ```
 PHASE: KD-9 follow-up — clear 17 Vitest file-load errors
+
+READ FIRST
+Read `AGENTS.md` at repo root and the relevant guide in
+`node_modules/next/dist/docs/` before writing any code. This repo runs
+Next 16.2.2 + Vitest 4.1.2 + rolldown — APIs, conventions, and file
+structure may differ from your training data. Heed deprecation notices.
 
 SCOPE
 You are resolving the two failure fingerprints documented in
@@ -87,19 +93,27 @@ PRECONDITIONS (verify in order; stop at first failure)
 1. On branch fix/kd-9-followup. Create it from main if it does not
    exist; do not dispatch on main.
 2. `git status` is clean (no uncommitted changes).
-3. .env.local exists in repo root and contains non-empty values for
+3. .env.local exists in repo root and contains values for
    NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and
-   SUPABASE_SERVICE_ROLE_KEY. (If any is missing, STOP — this is a
-   founder-logistics prerequisite, not a code fix.)
+   SUPABASE_SERVICE_ROLE_KEY that validate against the schemas in
+   src/lib/env.ts (NEXT_PUBLIC_SUPABASE_URL must be a valid URL; the
+   two keys must be non-empty strings). A non-empty-but-malformed URL
+   still produces fingerprint 1. If any value is missing or invalid,
+   STOP — this is a founder-logistics prerequisite, not a code fix.
 4. Running `bun run test 2>&1 | tee /tmp/kd9fu-baseline.log` produces
    the expected baseline:
      - 875 passed, 1 failed, 9 skipped
      - 17 test files fail to load before any test in them executes
      - 16 of those 17 show fingerprint 1; 1 shows fingerprint 2
    Record the exact counts observed; cite them in your exit report.
-   If the observed baseline differs from the expected one by more
-   than ±2 on any dimension, STOP and surface — the world moved and
-   this directive's assumptions need review.
+   STOP and surface if any of these hold:
+     - pass / skipped / file-load counts drift by more than ±2 on any
+       single dimension, OR
+     - failed count exceeds 1 (i.e. any new test-logic failure beyond
+       the pre-fix single failure), OR
+     - the fingerprint distribution across the 17 load errors does
+       not match the 16 / 1 split.
+   The world moved and this directive's assumptions need review.
 
 DELIVERABLES
 One commit (or a small commit series) on fix/kd-9-followup that:
@@ -133,29 +147,50 @@ ACCEPTANCE (every item must pass)
    load errors. Every test file successfully loads and executes its
    tests (each test inside may pass, fail, or skip on its own merits
    — only the load-time failure counts against this criterion).
-2. Passed count ≥ 875 (pre-fix baseline). No regressions: every test
-   that passed pre-fix still passes post-fix.
+2. No-regression gate: every test that passed pre-fix still passes
+   post-fix. The absolute pass count SHOULD increase once the 16
+   fingerprint-1 files and the 1 fingerprint-2 file begin executing
+   — newly-loaded tests that pass are welcome and expected. Prove
+   no-regression by test name, not by count delta: diff the sorted
+   list of passing test IDs pre-fix vs. post-fix; the pre-fix set
+   must be a subset of the post-fix set.
 3. Failed count ≤ 1 pre-fix (unchanged) — or if you clear the 1
    pre-fix failure as a side effect of env fixes, note it in the exit
    report and explain why.
 4. Skipped count = 9 (unchanged).
 5. src/lib/env.ts production fail-fast behaviour preserved: the
    server-side schema still throws at module-load time when any
-   required var is missing. Prove this by showing (in the exit
-   report) that temporarily unsetting one required var from
-   .env.local still produces the fail-fast error in a dev run.
+   required var is missing. Prove this statically per VERIFY step 3
+   (quote the post-fix code paths + argue in prose); do NOT run a
+   live-mutation check on .env.local.
 6. No changes to test semantics: no `.skip()` / `.todo()` / `.only()`
    added or removed; no test assertions modified.
 7. One-line PR-style note captured in the commit body citing the
-   pre-fix and post-fix baseline counts, per plan §2.2 #8.
+   pre-fix and post-fix baseline counts, per plan §2.3 #2.
+8. Newly-loaded tests that fail on their own logic (not on load) do
+   NOT count as regressions against #2, but MUST be enumerated in the
+   exit report under Open Items for founder review. Classify each as
+   (a) pre-existing latent bug surfaced by loading, or (b) fresh break
+   introduced by the env-loader mechanism chosen. Do not silently
+   paper over them; do not auto-skip; do not fix them in this scope.
 
 VERIFY (commands to run and cite output for, in the exit report)
   - `bun run test 2>&1 | tail -40` — post-fix summary
   - `diff <(grep -c '^FAIL ' /tmp/kd9fu-baseline.log)
           <(grep -c '^FAIL ' /tmp/kd9fu-post.log)` — delta-check
-  - Manual invariant check: temporarily edit .env.local to remove
-    NEXT_PUBLIC_SUPABASE_URL, run `bun run dev` briefly, capture the
-    throw, restore .env.local. (Do NOT commit the edit.)
+  - Static invariant proof (do NOT mutate .env.local): in the exit
+    report, quote the post-fix src/lib/env.ts lines that (a) build
+    `rawEnv`, (b) branch server vs client via `isServer`, and (c) call
+    `envSchema.safeParse(rawEnv)` + `throw new Error('Environment
+    validation failed...')`. Argue in prose that these lines still
+    execute at module-load time on the server under NODE_ENV=production
+    and would throw if any required var were undefined. Also quote any
+    new code you added in vitest.config.ts / vitest.setup.ts /
+    globalSetup, and argue it runs ONLY in the test harness (never
+    under `bun run dev` or `bun run build`). This replaces the old
+    live-mutation check — rationale: editing a local secrets file
+    with a restore step is brittle and offers no stronger guarantee
+    than reading the code does.
 
 COMMIT
 Single commit (or small commit series) with message starting:
@@ -179,7 +214,7 @@ Produce a terminal-paste-ready report with these sections:
   5. Files changed — list with line counts.
   6. Post-fix counts — exact, from /tmp/kd9fu-post.log.
   7. Invariant proof — the fail-fast check from VERIFY step 3.
-  8. Acceptance checklist — criteria 1–7 with PASS/FAIL.
+  8. Acceptance checklist — criteria 1–8 with PASS/FAIL.
   9. Open items — anything flagged for founder review (e.g. an
      env-loader path you ruled out and why).
  10. Commit SHA(s).
@@ -197,7 +232,7 @@ This directive hands one scoped fix to Claude Code: the 17 Vitest file-load erro
 
 - The attested KD-9 main program (env-cache + fixture-drift families). That exit is anchored at commit `79df5cf` per `KD-9-audit.md` §F and is not reopened here.
 - Any of the P4 concern directives (concerns 1–5). Separate artefacts.
-- Deletion of `src/lib/assignment/__tests__/api-helpers.test.ts`. That happens in P4 concern 4 per `P4_UI_DEPRECATION_AUDIT.md` §3.3. The fingerprint-2 fix here is deliberately throwaway — a minimal two-line edit to a file on the DELETE list, not a refactor.
+- Deletion of `src/lib/assignment/__tests__/api-helpers.test.ts`. That happens in P4 concern 4 per `P4_UI_DEPRECATION_AUDIT.md` §3.4 (tests tied to retiring UI/routes; §3.3 covers the support-library directory itself). The fingerprint-2 fix here is deliberately throwaway — a minimal two-line edit to a file on the DELETE list, not a refactor.
 - `.env.local` provisioning. Founder logistics.
 - Merge of `fix/kd-9-followup` to `main`. Founder reviews the exit report; merge is a follow-up action, not part of this directive.
 
@@ -226,7 +261,7 @@ This directive does **not** ship to Claude Code until all of the following are �
 
 ## F — Notes for reviewer
 
-**Why fingerprint 2 is a two-line edit, not a refactor.** `src/lib/assignment/__tests__/api-helpers.test.ts` is on the DELETE list per `P4_UI_DEPRECATION_AUDIT.md` §3.3 (the whole `src/lib/assignment/__tests__/` directory retires with the Assignment Engine under P4 concern 4). Fixing the CJS require cleanly clears the file-load error without investing in code that's scheduled for deletion within weeks. An alternative — adding a Vitest exclude pattern in `vitest.config.ts` for that file — was rejected because it requires a matching cleanup in concern 4 and introduces a config entry that drifts from state if concern 4 slips.
+**Why fingerprint 2 is a two-line edit, not a refactor.** `src/lib/assignment/__tests__/api-helpers.test.ts` is on the DELETE list per `P4_UI_DEPRECATION_AUDIT.md` §3.4 (tests tied to retiring UI/routes — the whole `src/lib/assignment/__tests__/` directory retires with the Assignment Engine under P4 concern 4; §3.3 covers the parent support-library directory `src/lib/assignment/` itself). Fixing the CJS require cleanly clears the file-load error without investing in code that's scheduled for deletion within weeks. An alternative — adding a Vitest exclude pattern in `vitest.config.ts` for that file — was rejected because it requires a matching cleanup in concern 4 and introduces a config entry that drifts from state if concern 4 slips.
 
 **Why the fingerprint-1 preferred mechanism is `globalSetup`, not `setupFiles`.** `setupFiles` in Vitest 4 runs per-worker and is not guaranteed to execute before a test file's hoisted top-level ESM imports. `globalSetup` runs in the main process before worker spawn — strictly ordered. If the fix resolves cleanly via `setupFiles` in the current Vitest 4 minor, that's acceptable; if not, `globalSetup` is the structural fix. Moving the `loadEnvConfig` call into `vitest.config.ts` top-level (option ii) also works because config module evaluation is strictly synchronous and predates any worker dispatch — and it's the smallest change. Claude Code picks; this directive does not prescribe.
 
@@ -236,7 +271,21 @@ This directive does **not** ship to Claude Code until all of the following are �
 
 ## G — Revision history
 
-- **2026-04-20 — Draft 1.** Initial directive drafted under P4 plan §13.3 template. Scope: the 17 Vitest file-load errors documented in REMEDIATION_PLAN §F. Not yet dispatched; dispatch blocked by §D items 1–3. Related commit series: `e7e2f9f` (P4 plan + concern-1 directive + UI audit + spec rev-6 header bump). Anchored to KD-9-audit.md §F attestation at `79df5cf` (not reopened).
+- **2026-04-20 — Draft 1.** Initial directive drafted under P4 plan §13.3 template. Scope: the 17 Vitest file-load errors documented in REMEDIATION_PLAN §F. Not yet dispatched; dispatch blocked by §D items 1–3. Related commit series: `e7e2f9f` (P4 plan + concern-1 directive + UI audit + spec rev-6 header bump). Anchored to KD-9-audit.md §F attestation at `79df5cf` (not reopened). Committed at `4366852`.
+- **2026-04-20 — Draft 2.** Pre-dispatch red-team corrections applied. Ten edits, no scope change:
+  - **M1 — PRECONDITIONS #3.** Tightened .env.local requirement from "non-empty values" to "values that validate against src/lib/env.ts schemas" (URL validity for `NEXT_PUBLIC_SUPABASE_URL`; non-empty strings for the two keys). Malformed-but-present values also trip fingerprint 1.
+  - **M2 — ACCEPTANCE #2.** Reframed the no-regression gate. Pre-fix pass count was 875 because 17 files failed to load; post-fix the pass count SHOULD increase once those files execute. The gate is no-regression by test name (pre-fix passing set must be a subset of post-fix passing set), not a fixed count.
+  - **M3 — ACCEPTANCE #8 (new).** Newly-loaded tests that fail on their own logic (not on load) are classified as Open Items for founder review. Does not count as regression; must not be silently skipped or fixed in this scope. Pre-empts the silent-gap risk where fingerprint-1 resolution surfaces latent bugs.
+  - **M4 — VERIFY step 3.** Replaced the live `.env.local` mutate-and-restore check with a static proof: quote the post-fix env.ts + test-harness code paths in the exit report, argue invariant preservation in prose. Rationale: the live mutation offered no stronger guarantee than reading the code does, and carried non-trivial restore-failure risk on a local secrets file. Downstream update to ACCEPTANCE #5 so it cites VERIFY step 3 rather than a dev-run.
+  - **m1 — PRECONDITIONS #4.** Tolerance clause tightened: ±2 on any single dimension OR failed count > 1 OR fingerprint split drift all trigger STOP. Prior wording only called out ±2.
+  - **m2 — ACCEPTANCE #7.** Citation fix: PR-note discipline is plan §2.3 #2, not §2.2 #8 (§2.2 #8 is the acceptance condition itself, not the PR-note rule).
+  - **m3 — §C and §F cross-refs.** Both corrected from `P4_UI_DEPRECATION_AUDIT.md` §3.3 to §3.4. §3.3 covers the support-library directory (`src/lib/assignment/`); §3.4 covers the tests tied to retiring UI/routes (`src/lib/assignment/__tests__/`, including the fingerprint-2 file). Cross-reference list at the top of the directive updated to name both sections explicitly.
+  - **a1 — READ FIRST.** Added an AGENTS.md + `node_modules/next/dist/docs/` read-first pointer at the top of the §A body. Claude Code's training data pre-dates Next 16.2.2 + Vitest 4.1.2 + rolldown; reading these before coding is a repo-wide invariant per AGENTS.md and should not be assumed.
+  - **Housekeeping — EXIT REPORT §8.** Range updated from "criteria 1–7" to "criteria 1–8" to match the new acceptance clause.
+  - Out-of-scope notes (flagged, not corrected in this pass — awaiting founder ruling):
+    - §E step 9 cites `§2.3 #8` as flipping to ✓ on this fix — appears to be a typo for `§2.2 #8`. Sweep candidate.
+    - §A DELIVERABLES #2 (line 142 in Draft 1 numbering) still cites `§3.3` for the api-helpers.test.ts DELETE classification; the m3 correction only touched §C and §F. §3.3 is not strictly wrong (parent dir `src/lib/assignment/` is on that list, which implies the subtree) but §3.4 is the precise cite. Sweep candidate for consistency with §C/§F.
+  - Not yet dispatched; §D gates 1–3 still pending.
 
 ---
 
