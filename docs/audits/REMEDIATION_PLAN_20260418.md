@@ -147,6 +147,8 @@ T5
 Parallel  (no tier dependency — can start any time)
 ```
 
+> **Footnote — 2026-04-20, revision 5 of `docs/specs/ECONOMIC_FLOW_v1.md`:** post-revision-5, T4's body is a pointer to ECONOMIC_FLOW_v1 §14.1 Assignment Engine sunset sub-clause and §17 crosswalk appendix. From this point forward the spec's P0–P7 sequence is canonical; when this tier map and the spec diverge, the spec wins. The tier map itself is preserved for audit trail continuity.
+
 ---
 
 ## T0 — Zero-risk deletions
@@ -513,49 +515,25 @@ Tests that need a specific actor identity override the default with `vi.mocked(r
 
 ## T4 — Execute persistence decision from T0.5
 
+> **Note — 2026-04-20, revision 5 of `docs/specs/ECONOMIC_FLOW_v1.md`:** T4 was re-scoped. Prior Path A / Path B drafting is superseded. See §17 crosswalk in `docs/specs/ECONOMIC_FLOW_v1.md` for the item-level live-code-to-spec map. Treat T4's body below as a pointer to `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 P0–P7 sequence. The sections below are preserved for audit trail; do not execute them as written.
+
 **Goal.** Act on the memo. Two branches.
 
-### Path A — "Live persistence" decision from T0.5
+### Path A — "Live persistence" (superseded by ECONOMIC_FLOW_v1 revision 5)
 
-**Files to touch (if Path A):**
-- `/Users/jnmartins/dev/frontfiles/src/lib/special-offer/store.ts` — add Supabase branch following the dual-mode pattern used in `src/lib/post/store.ts`
-- `/Users/jnmartins/dev/frontfiles/src/lib/assignment/store.ts` — same
-- `/Users/jnmartins/dev/frontfiles/src/app/api/special-offer/route.ts` — replace `mockVaultAssets.find(...)` with a real `vault_assets` query through `userClient` (now available post-T3)
-- `/Users/jnmartins/dev/frontfiles/src/lib/special-offer/__tests__/store.real.test.ts` — **new file**, Supabase-backed round-trip
-- `/Users/jnmartins/dev/frontfiles/src/lib/assignment/__tests__/store.real.test.ts` — **new file**
+**Scope per `docs/specs/ECONOMIC_FLOW_v1.md` §14.1:** net-new economic layer landed at P4. No dual-mode retrofit of `src/lib/special-offer/store.ts` or `src/lib/assignment/store.ts`. The legacy stores retire with their backing tables at P4 (see §14.1 Assignment Engine sunset sub-clause + §17 crosswalk). The real shape for `offers` / `assignments` / `disputes` / `ledger_events` / `actor_handles` is enumerated in ECONOMIC_FLOW_v1 §7 and §8.
 
-**Exact edits (Path A):**
-1. Mirror the mode-selector pattern from `src/lib/post/store.ts:37-49` (`getMode()`, `logModeOnce()`). Gate every function on `getMode() === 'mock'`.
-2. Define `SpecialOfferThreadRow`, `SpecialOfferEventRow`, `OfferCheckoutIntentRow` in `src/lib/db/schema.ts` matching the P5 migration (`special_offer_threads`, `special_offer_events`, `offer_checkout_intents`). **If P5 has not yet landed, use the `direct_offer_*` names exactly as on disk and open a ticket reminder to rename them when P5 flips.** Do not pre-rename in this plan.
-3. Write row→domain mappers (snake_case → camelCase).
-4. Wire a `loadThread`, `saveThread`, `appendEvent` via `userClient(actor.jwt)` in the real branch.
-5. Replace the `mockVaultAssets.find(...)` call in `src/app/api/special-offer/route.ts:76` with a real query.
-6. Round-trip integration test: create thread → counter → accept → assert event sequence in DB.
+**Sequence:** ECONOMIC_FLOW_v1 §14.1 P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7. Read that section for the authoritative dependency chain.
 
-### Path B — "Scaffolding-only" decision from T0.5
+**Calendar scope re-estimate:** 3–5 calendar weeks per §14.1 P4 scope (net-new schema + net-new route set + full RLS + triggers + hash-chain + actor-handles seed + pack primitives UI + integration tests). The prior 5–7 working-day dual-mode estimate is obsolete.
 
-**Files to touch (if Path B):**
-- `/Users/jnmartins/dev/frontfiles/src/lib/special-offer/store.ts` — wrap the module-level `new Map()` behind an explicit guard
-- `/Users/jnmartins/dev/frontfiles/src/lib/assignment/store.ts` — same
-- `/Users/jnmartins/dev/frontfiles/src/app/api/special-offer/route.ts` — delete or gate behind `env.FFF_DEV_OFFERS_ENABLED`
-- (Optionally) delete the `direct_offer_*` / `special_offer_*` route prefixes entirely, returning 501 for the surface
+**Depends on.** ECONOMIC_FLOW_v1 revision 5 landed. T0.5 memo Q4 adjudicated (Amendment A). T1 auth wired. T2 session. T3 userClient split.
 
-**Exact edits (Path B):**
-1. Add an `FFF_DEV_STORES_ENABLED` server env flag in `src/lib/env.ts`, defaulting to `false`.
-2. Wrap the `new Map<...>()` initialiser in each of the two stores:
-   ```ts
-   if (!env.FFF_DEV_STORES_ENABLED) {
-     throw new Error('special-offer store is dev-only; set FFF_DEV_STORES_ENABLED=true')
-   }
-   ```
-3. In `/api/special-offer/route.ts`, gate the whole handler on the same flag, returning `501 NOT_IMPLEMENTED` otherwise.
-4. Remove or rename the `mockVaultAssets` import from the route (the fixture stays in `src/data/` but the route no longer imports it in prod).
+**Acceptance test.** Against a live Supabase dev project after P4 migration: (i) `CREATE TABLE offers / assignments / disputes / ledger_events / actor_handles` all present; (ii) `system` actor handle seeded; (iii) round-trip create-offer → counter → accept → deliver → accept_by_buyer → cashed_out produces 6 `ledger_events` rows on two threads with intact hash chain; (iv) dispute path produces 3+ `dispute.*` events on the dispute thread plus corresponding `assignment.*` events per §8.2a dual-thread emit invariant; (v) Stripe escrow ordering per §8.5 produces reconcilable state under failure injection.
 
-**Acceptance test.**
-- If Path A: `bun test` shows the new `store.real.test.ts` round-trip passes against a live Supabase dev project.
-- If Path B: hitting `/api/special-offer` in a non-dev environment returns 501; `bun run build` still exits 0.
+### Path B — "Scaffolding-only" (obsolete)
 
-**Depends on.** T0.5 (answer required). T3 (Path A needs `userClient`). T2 (Path A needs actor).
+Superseded 2026-04-20. T0.5 Q4 adjudication chose net-new at P4 (Path A in this tier's prior terminology; new flow in ECONOMIC_FLOW_v1 terminology). Path B's hard-gate-to-dev approach is not a viable outcome any longer. Original Path B body removed — see git history for the superseded text.
 
 ---
 

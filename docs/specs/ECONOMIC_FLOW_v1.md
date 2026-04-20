@@ -338,6 +338,8 @@ tamper-evident, independently reviewable, provenance-aware, verifiable, on-platf
 **Banned:**
 certified, certification, tamper-proof, immutable, guaranteed immutable, blockchain-verified (unless actually on-chain), fully-licensed (imprecise), secured (overclaim), bulletproof, rock-solid, enterprise-grade (marketing filler), verified (without subject — "verified by whom?").
 
+Compound identifiers inherit the ban. The live-code table name `certified_packages` (and its child tables `certified_package_items`, `certified_package_artifacts`) fall under the ban by implication and must be renamed before any spec-surface reference can land CI-clean. Rename target for the P4 migration: `provenance_packages` / `provenance_package_items` / `provenance_package_artifacts`. The `package_artifact_type` enum value `certificate` renames to `provenance_record`; the column `certification_hash_at_issue` renames to `provenance_hash_at_issue`. See §14.1 "Preserve with banned-term rename at P4" sub-block and §17 crosswalk for item-level action. <!-- allow-banned: meta-reference to banned terms in §9's own inventory clarification -->
+
 **Naming locks:**
 - Multi-item offer is a **pack**, not "bundle" or "collection." (Founder call: "pack" wins across product and marketing surfaces.)
 - Existing-work offer = **asset-pack** / **single_asset**.
@@ -461,9 +463,24 @@ An appealed decision is reviewed by a reviewer outside the original decision lin
 
 ### 12.6 Deprecated at P5 hard cut
 
+This section enumerates backend API routes only. UI surfaces are enumerated in the P4 implementation plan's UI deprecation audit.
+
 - Map-store-backed offer/assignment flows
 - `mockVaultAssets` fixture file
 - Any remaining UI referring to removed Stripe webhook path
+- API route `/api/special-offer/route.ts`
+- API route `/api/special-offer/[id]/accept/route.ts`
+- API route `/api/special-offer/[id]/counter/route.ts`
+- API route `/api/special-offer/[id]/decline/route.ts`
+- API route `/api/assignment/route.ts`
+- API route `/api/assignment/[id]/route.ts`
+- API route `/api/assignment/[id]/accept/route.ts`
+- API route `/api/assignment/[id]/cancel/route.ts`
+- API route `/api/assignment/[id]/ccr/route.ts`
+- API route `/api/assignment/[id]/dispute/route.ts`
+- API route `/api/assignment/[id]/fulfil/route.ts`
+- API route `/api/assignment/[id]/review/route.ts`
+- API route `/api/assignment/[id]/review-open/route.ts`
 
 ## 13. Out of scope for v1
 
@@ -483,11 +500,42 @@ An appealed decision is reviewed by a reviewer outside the original decision lin
 This spec assumes and requires:
 
 - **T1** landed — `requireActor` available; user-JWT Supabase clients available
-- **T4** landed — all tables, RLS policies, triggers, constraints from §7 and §8
+- **T4** to land at P4 — every table, RLS policy, trigger, and constraint enumerated in §7 and §8 is net-new to the codebase as of revision 5 (no existing migration implements them). The P4 migration introduces them as the canonical economic layer. See §14.1 "Assignment Engine sunset" sub-clause below and §17 crosswalk for the replacement map.
 - **KD-9 resolved** — RLS verifiable in CI (Vitest env loading fixed)
 - **P3 asset cutover** complete before P4 ships (offers need real assets to reference)
 
 Sequence per remediation plan: P0 (KD-9 + polish) → P1 (T1 auth) → P2 (T4 schema + RLS) → P3 (asset cutover) → P4 (offers + assignments cutover with pack primitives) → P5 (hard cut + AUTH_WIRED=true + prod assertion + platform fee confirmed) → P6 (T&Cs + GDPR runbook) → P7 (admin trail viewer, deferred).
+
+**Assignment Engine sunset (P4 hard cut).** At P4, the live-code economic-layer tables and their append-only event tables — all products of a retainer-oriented Assignment Engine design that predates revision 3's agent-model declaration (§1.1) — are dropped in the same migration that lands the spec-canonical `offers` / `assignments` / `disputes` / `ledger_events` / `actor_handles` shapes. No dual-mode retrofit of the legacy stores is performed (founder adjudication, 2026-04-20: "P4 is net-new only"). The migration SQL that creates the retired tables and enums remains in version control for provenance and for any future retainer-model re-introduction permitted only if a compatible v2 shape ships.
+
+Retired tables (15, all economic-layer):
+`assignments`, `assignment_rights_records`, `escrow_records`, `milestones`, `fulfilment_submissions`, `evidence_items`, `service_logs`, `review_records`, `commission_change_requests`, `ccr_amended_fields`, `assignment_dispute_cases`, `assignment_events`, `special_offer_threads` (renamed from `direct_offer_threads` at 2026-04-20), `special_offer_events` (renamed from `direct_offer_events` at 2026-04-20), `offer_checkout_intents`.
+
+Retired state / status enums (5, of which two carry value-collisions with the spec's new enums of the same name):
+`assignment_state` (collides — replaced by the spec's `assignment_state` with different values per §5), `assignment_sub_state`, `milestone_state`, `dispute_state` (collides — replaced by the spec's `dispute_state` per §7 with values `opened | resolved | appealed | appeal_resolved`), `special_offer_status` (renamed from `direct_offer_status`).
+
+Retired event-type / classification enums (14):
+`special_offer_event_type` (renamed from `direct_offer_event_type`), `special_offer_auto_cancel_reason` (renamed from `direct_offer_auto_cancel_reason`), `offer_party`, `assignment_class`, `milestone_type`, `fulfilment_type`, `evidence_item_kind` (value-collides with the spec's new `evidence_type` per §8.2a — different values), `review_determination`, `ccr_state`, `assignment_dispute_trigger`, `assignment_dispute_scope`, `assignment_dispute_resolution`, `dispute_filer_role`, `reviewer_role`.
+
+Explicitly out of retirement scope — these tables remain on the preserved path and are untouched by the P4 migration: `vault_assets` + `asset_media` family, `licence_grants` (and the shared `licence_type` enum), `users`, `user_granted_types`, `creator_profiles`, `buyer_accounts`, `buyer_company_memberships`, `companies`, `posts` family, `providers` family, `watermark_profiles` family, `upload_batches`, `asset_embeddings`, `ai_analysis`, `audit_log`, `download_events`.
+
+**Preserve with banned-term rename at P4.** The following product-surface tables and identifiers are preserved but require renames at the P4 migration to land CI-clean under §9's banned-term rule (§9 clarification on compound identifiers):
+
+- **Table renames:** `certified_packages` → `provenance_packages`; `certified_package_items` → `provenance_package_items`; `certified_package_artifacts` → `provenance_package_artifacts`. <!-- allow-banned: rename mapping — old identifiers cited as the rename source -->
+- **Column rename:** `certification_hash_at_issue` → `provenance_hash_at_issue`. <!-- allow-banned: rename mapping — old column cited as the rename source -->
+- **Enum value rename:** `package_artifact_type` value `certificate` → `provenance_record` (other values unchanged). <!-- allow-banned: rename mapping — old enum value cited as the rename source -->
+- **Preserved as-is (no rename):** `transactions` and `transaction_line_items`. Rationale: these tables serve `catalog_purchase` and `bundle_purchase` commerce paths that are explicitly §1 out-of-scope for ECONOMIC_FLOW_v1, plus `negotiated_purchase` which integrates with the spec's offer flow. They do not duplicate `ledger_events` — `ledger_events` is the audit spine (hash-chained per §8.3), `transactions` is the commerce state machine; the two coexist.
+- **Trigger follow-up:** if the body of `protect_ready_package()` references any of the renamed tables by name, update the internal references in the same P4 migration.
+
+**Founder review required (not classified as retire or preserve in revision 5):**
+Seven enums carry mixed ownership or banned-term concerns and are pending founder adjudication:
+
+- `buyer_company_role` — defined in the Assignment Engine enum migration but used by the preserved `buyer_company_memberships` in the identity layer; proposed preservation requires moving the definition to an identity-layer migration before the economic-layer drop.
+- `transaction_kind`, `transaction_status` — tied to preserved `transactions`.
+- `package_kind`, `package_status`, `artifact_status` — tied to the renamed `provenance_packages` family.
+- `package_artifact_type` — value rename as above; full enum scope pending confirmation.
+
+§17 crosswalk rows for these seven enums carry `?` in the P4 migration-action column pending adjudication.
 
 ### 14.2 Timer infrastructure
 
@@ -513,15 +561,85 @@ Sequence per remediation plan: P0 (KD-9 + polish) → P1 (T1 auth) → P2 (T4 sc
 
 Changes to this spec land via commit to this file. §Decisions (in T0.5 memo) takes precedence on contradiction. Any change to a state machine or event catalogue shape requires a concurrent payload version bump (`v=1` → `v=2`) if it breaks existing consumer shapes. Additive-only changes (new optional fields, new terminal states) may stay at the current `v`.
 
-Spec review gate: any change to §4, §5, §7, §8 requires founder sign-off before implementation begins.
+Spec review gate: any change to §4, §5, §7, §8, §9, §10, §14.1 Assignment Engine sunset sub-clause, or §17 requires founder sign-off before implementation begins. (Gate widened by revision 5; legitimacy of §10 inclusion verified on Art. 17 grounds — F8 tombstone semantics with §8.7 cross-reference.)
 
 **Revision 4 — 2026-04-20.** Red-team pass 4 findings applied. Dispute event set expanded to 5 (added `dispute.evidence_submitted`). `disputes` table added to §7 with `state` enum pinned (`opened | resolved | appealed | appeal_resolved`). §8.5 expanded with Stripe charge ordering, composition counter, and dual-thread emit blocks. §8.6 pre-consumer exception added. §8.7 post-archival portability (GDPR Art. 20) added. §5 dispute cool-down row added. §11.5 hash-chain operational invariants expanded by three bullets. §12.1 creator asset-withdrawal bullet added. §12.4 reason-codes enum added. F8 and F10 rewritten. See red-team-pass-4 record at end of document for detailed findings.
+
+**Revision 5 — 2026-04-20.** Governance correction, not a product redesign. Red-team pass 5 not applicable. Q4 of `docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` §Product questions adjudicated: **single-shot brief** — retainer model is out of scope for v1, deferred to v2 per §2 and §13. This closes the memo's Q4 `[pending]` marker (see concurrent amendment A). Six further edits made: (i) §14.1 T4-landed line truth-corrected — the spec's §7/§8 tables are net-new and will land at P4, not retrofitted; (ii) §14.1 Assignment Engine sunset sub-clause added enumerating 15 retired tables and 19 retired enums (see new §17 crosswalk for item-level detail); (iii) §14.1 "Preserve with banned-term rename at P4" sub-block added covering the `certified_packages` family rename to `provenance_packages` (plus `certification_hash_at_issue` column rename to `provenance_hash_at_issue` and `package_artifact_type` value rename `certificate` → `provenance_record`) and preserving `transactions` + `transaction_line_items` as-is (rationale: serves catalog/bundle/negotiated purchase paths; catalog and bundle are §1 out-of-scope; does not duplicate `ledger_events` — audit spine vs. commerce state machine); (iv) §12.6 deprecation list extended with 13 retiring route paths plus an intro line noting the section is backend routes only (UI surfaces enumerated in P4 implementation plan's UI deprecation audit); (v) §9 banned-term inventory clarifies compound identifier ban and names the `certified_packages` → `provenance_packages` rename target; (vi) new §17 crosswalk appendix maps every retiring live-code entity to its spec-canonical replacement and P4 migration action. Concurrent amendments: (a) `docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` §Product questions Q4 adjudicated; (b) `docs/audits/REMEDIATION_PLAN_20260418.md` T4 tier body rewritten to point at §14.1 P0–P7. Payload version stays at v=1 per §8.6 pre-consumer exception (no event shape changes). §15 review-gate widened by this revision from §4/§5/§7/§8 to §4/§5/§7/§8/§9/§10/§14.1 Assignment Engine sunset sub-clause/§17. §10 inclusion verified on Art. 17 grounds — F8 carries the tombstone + standing semantics with §8.7 cross-reference. Founder sign-off obtained for §9 / §10 (F-answer stability) / §12.6 / §14.1 / §15 / §17 edits of revision 5. Seven founder-review enums pending separate adjudication (see §14.1 Founder review required sub-block). <!-- allow-banned: rename-mapping narrative — old identifiers cited as rename sources per §9 compound-ban clarification -->
 
 See red-team-pass-4 record at end of document for detailed findings on revision 4.
 
 ## 16. Retention
 
 Ledger events are retained in the primary store for **6 years** after the final terminal-state transition of their thread. After 6 years, events are rotated to cold archival with hashed identifiers only (`actor_ref` replaced by `sha256(actor_ref)`); the primary-store rows are removed. The hash chain is preserved in archival form and remains independently verifiable. Actor handles tombstoned under §8.7 follow the same schedule, keyed off the last thread they participated in. The retention clock may be extended on a per-thread basis where an active legal obligation (hold, subpoena, regulator request) requires it, for the duration of that obligation.
+
+## 17. Appendix — live-code-to-spec crosswalk
+
+Traceability for the P4 Assignment Engine sunset. One row per live-code entity retired, renamed, preserved, or held for founder review. Reader of the live schema at any point can trace each entity to its spec-canonical replacement and the P4 migration action. See §14.1 "Assignment Engine sunset" sub-clause for the prose description.
+
+| Live-code entity | Kind | Spec-canonical replacement | P4 migration action |
+|---|---|---|---|
+| `assignments` (Assignment Engine shape) | table | `assignments` (spec §7 — linked to `offers` via `offer_id`, fee derived by join) | drop |
+| `assignment_rights_records` | table | absorbed into `offers.rights` jsonb (spec §7) | drop |
+| `escrow_records` | table | no direct replacement — Stripe Connect is authoritative; platform mirror absorbed into `ledger_events` `assignment.cashed_out` payload (spec §8.2) | drop |
+| `milestones` | table | no replacement (v1 is single-shot per §2; no milestones) | drop |
+| `fulfilment_submissions` | table | no replacement (brief-pack delivery tracked via `assignment_deliverables` per §7 / §11.5) | drop |
+| `evidence_items` | table | `dispute.evidence_submitted` events per §8.2a (for dispute context); no general-purpose replacement | drop |
+| `service_logs` | table | no replacement (service-hybrid model is not in v1 scope) | drop |
+| `review_records` | table | no replacement (review workflow is not in v1 scope) | drop |
+| `commission_change_requests` | table | no replacement (composition change via `offer.countered` counter per §11.3) | drop |
+| `ccr_amended_fields` | table | no replacement (covered by `offer.countered` payload diff per §8.1) | drop |
+| `assignment_dispute_cases` | table | `disputes` (spec §7, revision 4) | drop |
+| `assignment_events` | table | `ledger_events` polymorphic on `thread_type='assignment'` (spec §8.3) | drop |
+| `special_offer_threads` (fka `direct_offer_threads`) | table | `offers` (spec §7) | drop |
+| `special_offer_events` (fka `direct_offer_events`) | table | `ledger_events` polymorphic on `thread_type='offer'` (spec §8.3) | drop |
+| `offer_checkout_intents` | table | absorbed into `assignment.created` event transaction per §8.5 Stripe-ordering block | drop |
+| `assignment_state` enum | state enum | `assignment_state` per §5 (new values; hard collision with old) | drop-then-recreate with spec values |
+| `assignment_sub_state` enum | state enum | no replacement | drop |
+| `milestone_state` enum | state enum | no replacement | drop |
+| `dispute_state` enum (Assignment Engine) | state enum | `dispute_state` per §7 disputes table (new values `opened|resolved|appealed|appeal_resolved`; hard collision with old) | drop-then-recreate with spec values |
+| `special_offer_status` (fka `direct_offer_status`) | state enum | `offer_state` per §4 | drop |
+| `assignment_class` enum | classification enum | replaced by `offers.target_type` enum per §7 (different shape) | drop |
+| `milestone_type` enum | classification enum | no replacement | drop |
+| `fulfilment_type` enum | classification enum | no replacement | drop |
+| `evidence_item_kind` enum | classification enum | `evidence_type` per §8.2a (different shape, different values) | drop |
+| `review_determination` enum | classification enum | no replacement | drop |
+| `ccr_state` enum | state enum | no replacement | drop |
+| `assignment_dispute_trigger` enum | classification enum | `reason_code` per §12.4 (different shape) | drop |
+| `assignment_dispute_scope` enum | classification enum | no replacement (disputes are assignment-scoped only in spec per §7) | drop |
+| `assignment_dispute_resolution` enum | classification enum | `disputes.resolution` text-enum per §7 (`accepted_by_buyer|refunded|split`) | drop |
+| `dispute_filer_role` enum | classification enum | carried implicitly in `dispute.opened` payload per §8.2a | drop |
+| `reviewer_role` enum | classification enum | no replacement | drop |
+| `special_offer_event_type` (fka `direct_offer_event_type`) enum | event enum | free-form `event_type text` column on `ledger_events` per §8.3 (event name strings) | drop |
+| `special_offer_auto_cancel_reason` (fka `direct_offer_auto_cancel_reason`) enum | classification enum | `offer.rejected` payload `reason` field per §8.1 / §F10 | drop |
+| `offer_party` enum | classification enum | carried in `actor_ref` via `actor_handles` per §8.4 | drop |
+| `/api/special-offer/route.ts` | route | new spec-canonical offer routes (P4 net-new) | drop |
+| `/api/special-offer/[id]/accept/route.ts` | route | new spec-canonical accept route (P4 net-new) | drop |
+| `/api/special-offer/[id]/counter/route.ts` | route | new spec-canonical counter route (P4 net-new) | drop |
+| `/api/special-offer/[id]/decline/route.ts` | route | new spec-canonical reject route (P4 net-new) | drop |
+| `/api/assignment/route.ts` | route | absorbed into new offer-accept flow (assignments are derived by join per §6) | drop |
+| `/api/assignment/[id]/route.ts` | route | new spec-canonical assignment read route (P4 net-new) | drop |
+| `/api/assignment/[id]/accept/route.ts` | route | new spec-canonical buyer-accept-delivery route per §5 | drop |
+| `/api/assignment/[id]/cancel/route.ts` | route | no replacement (cancellation via dispute per §5 prose) | drop |
+| `/api/assignment/[id]/ccr/route.ts` | route | no replacement (composition change via `offer.countered` counter per §11.3) | drop |
+| `/api/assignment/[id]/dispute/route.ts` | route | new spec-canonical dispute routes per §12.4 / §8.2a (P4 net-new) | drop |
+| `/api/assignment/[id]/fulfil/route.ts` | route | new spec-canonical piece-delivered / delivered routes per §11.5 (P4 net-new) | drop |
+| `/api/assignment/[id]/review/route.ts` | route | no replacement (review workflow is not in v1 scope) | drop |
+| `/api/assignment/[id]/review-open/route.ts` | route | no replacement | drop |
+| `transactions` | table | distinct from `ledger_events` — `ledger_events` is the hash-chained audit spine per §8.3; `transactions` is the commerce state machine for catalog/bundle/negotiated purchase paths | preserve (out-of-scope purchase paths per §1) |
+| `transaction_line_items` | table | scoped with `transactions` | preserve (out-of-scope purchase paths per §1) |
+| `certified_packages` | table | product-surface deliverable (buyer pack / creator pack); no spec replacement | preserve-with-rename → `provenance_packages` <!-- allow-banned: rename mapping --> |
+| `certified_package_items` | table | scoped with parent | preserve-with-rename → `provenance_package_items` <!-- allow-banned: rename mapping --> |
+| `certified_package_artifacts` | table | scoped with parent | preserve-with-rename → `provenance_package_artifacts` <!-- allow-banned: rename mapping --> |
+| `certification_hash_at_issue` (column on `certified_package_artifacts`) | column | same semantics | preserve-with-rename → `provenance_hash_at_issue` <!-- allow-banned: rename mapping --> |
+| `package_artifact_type` value `certificate` | enum value | provenance-record surface | preserve-with-value-rename → `provenance_record` <!-- allow-banned: rename mapping --> |
+| `buyer_company_role` enum | classification enum | used by preserved `buyer_company_memberships` (identity layer) | ? founder review — likely move to identity-layer migration before the economic-layer drop |
+| `transaction_kind` enum | classification enum | tied to preserved `transactions` | ? founder review |
+| `transaction_status` enum | state enum | tied to preserved `transactions` | ? founder review |
+| `package_kind` enum | classification enum | tied to renamed `provenance_packages` family | ? founder review |
+| `package_status` enum | state enum | tied to renamed `provenance_packages` family | ? founder review |
+| `artifact_status` enum | state enum | tied to renamed `provenance_package_artifacts` | ? founder review |
+| `package_artifact_type` enum (full scope beyond the `certificate` value rename) | classification enum | tied to renamed `provenance_package_artifacts` | ? founder review <!-- allow-banned: rename mapping — old value cited in scope qualifier --> |
 
 **Red-team passes applied:** 2 (2026-04-20). Fixes integrated: C1–C11, I1–I10, M3–M5. Self-dealing prevention, Stripe Connect escrow (replacing manual-capture error), `offers.cancelled` state, `assignment_deliverables` revision table, platform fee rate-lock (F16), 14-day dispute window, creator-initiated dispute path, transition atomicity, client-side-only drafts, rate limiting, timer infrastructure, FX/VAT stubs.
 

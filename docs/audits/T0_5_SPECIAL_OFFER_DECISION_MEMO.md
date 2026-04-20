@@ -38,7 +38,7 @@ _Awaiting João's answers. Each question must have either an explicit answer or 
 1. **Retention.** Are active special-offer threads and assignments intended to survive a Vercel deploy / Supabase failover / server restart?  — **[pending]**
 2. **Audit obligations.** Does the editorial product commitment include an audit trail of negotiation events? — **[pending]**
 3. **Asset source.** `vault_assets` exclusive, or dual-mode with a gate flag? — **[pending]**
-4. **Assignment shape.** Single-shot brief or ongoing editorial contract? — **[pending]**
+4. **Assignment shape.** Single-shot brief or ongoing editorial contract? — **Single-shot brief (adjudicated 2026-04-20; see `docs/specs/ECONOMIC_FLOW_v1.md` §2 and revision-5 §15 entry). Retainer / ongoing editorial contract deferred to v2 per §13 gating.**
 5. **Cutover semantics.** Restart-loss acceptable at cutover, or migration plan required? — **[pending]**
 
 ### Full text from plan T0.5 spec (authoritative)
@@ -49,6 +49,8 @@ The short-form summaries above are a quick-reference index. The authoritative qu
 2. **Audit obligations.** Does the editorial product commitment include an audit trail of negotiation events (offer-sent, counter-sent, accepted, declined) that a journalist or buyer could later request? If yes, persistence is non-optional and `direct_offer_events` / `special_offer_events` must be wired.
 3. **Asset source.** When the special-offer route resolves an asset, should it consult `vault_assets` (DB) exclusively, or should it continue to resolve through a seed fixture in dev? If dual-mode, is the flag `isSupabaseEnvPresent` (global) or a dedicated `FFF_REAL_OFFERS` gate (scoped)?
 4. **Assignment shape.** Does "assignment" in the v1 spec mean a single-shot brief (commission one story for one fee) or an ongoing editorial contract (retainer, multi-delivery)? Persistence model, indexes, and lifecycle events differ. Answer before T4 begins.
+
+   **Adjudicated 2026-04-20 — single-shot brief.** Retainer / ongoing editorial contract is deferred to v2 per `docs/specs/ECONOMIC_FLOW_v1.md` §2 ("Single-shot only. Retainer deferred to v2, gated by ≥20 completed briefs + ≥3 explicit buyer asks for monthly") and §13 (out-of-scope list). This answer also closes the Q2 / Q3 cluster: Q2 net-new-only at P4 (no two-phase retrofit); Q3 legacy retire at P4 (migration SQL preserved in version control). See ECONOMIC_FLOW_v1 §14.1 Assignment Engine sunset sub-clause and §17 crosswalk for the concrete live-code retirement list. No change to Q1 or Q5 — those remain as-is in this memo.
 5. **Cutover semantics.** If persistence is live and an in-memory offer already exists on a running instance at the moment of cutover, is restart-loss acceptable? If not, state the migration plan (replay from events, re-drive from `direct_offer_events`, or accept hard-cut).
 
 ---
