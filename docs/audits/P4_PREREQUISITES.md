@@ -10,7 +10,7 @@
 
 **Risk.** If the P4 migration drops the Assignment Engine enum set with `CASCADE`, this enum dies and `buyer_company_memberships` loses its column type. The identity layer is out of retirement scope per `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 — this would be an unintended collateral drop.
 
-**Action.** Land a new identity-layer migration **before** the economic-layer drop migration that `CREATE TYPE buyer_company_role ... ` under the same value set, then `ALTER TABLE buyer_company_memberships ALTER COLUMN role TYPE buyer_company_role` pointing at the new type location. Then the P4 drop can CASCADE safely.
+**Action.** Land a new identity-layer migration **before** the economic-layer drop migration that `CREATE TYPE buyer_company_role ... ` under the same value set, then `ALTER TABLE buyer_company_memberships ALTER COLUMN role TYPE buyer_company_role` pointing at the new type location. Then the P4 drop can CASCADE safely. See also: `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 "Preserve without rename at P4" sub-block (revision 6) — spec-level record of this enum's preservation fate.
 
 **Owner.** P4 migration author.
 
@@ -42,13 +42,7 @@
 
 ## 4. Founder confirmation on 7 enum fates
 
-**Current state.** ECONOMIC_FLOW_v1 §14.1 "Founder review required" sub-block lists 7 enums with mixed-ownership or banned-term concerns: `buyer_company_role`, `transaction_kind`, `transaction_status`, `package_kind`, `package_status`, `artifact_status`, `package_artifact_type`. Phase B exit report §2 proposed a fate for each (see that report for per-enum recommendations). No founder confirmation recorded yet in the spec.
-
-**Risk.** P4 migration SQL for each enum's retire/preserve/rename/relocate action depends on the final founder call. Drafting without confirmation risks rework.
-
-**Action.** Founder confirms or overrides the proposed fates per enum. Decisions land as an appendix to this file (or as an updated §14.1 "Founder review required" sub-block in ECONOMIC_FLOW_v1, which would itself be a gated §14.1 edit per the widened §15 gate).
-
-**Owner.** Founder.
+**RESOLVED 2026-04-20 (revision 6).** Adjudication: six enums preserve without rename (`transaction_kind`, `transaction_status`, `package_kind`, `package_status`, `artifact_status`, `buyer_company_role`); one confirms parent-enum preservation with pre-captured value rename (`package_artifact_type`). Canonical source of record: `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 "Preserve without rename at P4" sub-block + revision 6 entry at §15. `buyer_company_role` P4 migration-sequencing prerequisite remains open under Entry 1 below.
 
 ---
 
