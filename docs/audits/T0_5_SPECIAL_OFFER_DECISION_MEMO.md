@@ -41,6 +41,16 @@ _Awaiting João's answers. Each question must have either an explicit answer or 
 4. **Assignment shape.** Single-shot brief or ongoing editorial contract? — **[pending]**
 5. **Cutover semantics.** Restart-loss acceptable at cutover, or migration plan required? — **[pending]**
 
+### Full text from plan T0.5 spec (authoritative)
+
+The short-form summaries above are a quick-reference index. The authoritative question text below is transcribed verbatim from [REMEDIATION_PLAN_20260418.md](REMEDIATION_PLAN_20260418.md) §T0.5. João answers against these when filling in; the short-form versions above can be updated in parallel or left as index labels.
+
+1. **Retention.** Are active special-offer threads and assignments intended to survive a Vercel deploy / a Supabase failover / a server restart? If "no" — state the reason and the expected demo horizon. If "yes" — proceed to Q2.
+2. **Audit obligations.** Does the editorial product commitment include an audit trail of negotiation events (offer-sent, counter-sent, accepted, declined) that a journalist or buyer could later request? If yes, persistence is non-optional and `direct_offer_events` / `special_offer_events` must be wired.
+3. **Asset source.** When the special-offer route resolves an asset, should it consult `vault_assets` (DB) exclusively, or should it continue to resolve through a seed fixture in dev? If dual-mode, is the flag `isSupabaseEnvPresent` (global) or a dedicated `FFF_REAL_OFFERS` gate (scoped)?
+4. **Assignment shape.** Does "assignment" in the v1 spec mean a single-shot brief (commission one story for one fee) or an ongoing editorial contract (retainer, multi-delivery)? Persistence model, indexes, and lifecycle events differ. Answer before T4 begins.
+5. **Cutover semantics.** If persistence is live and an in-memory offer already exists on a running instance at the moment of cutover, is restart-loss acceptable? If not, state the migration plan (replay from events, re-drive from `direct_offer_events`, or accept hard-cut).
+
 ---
 
 ## Front-end scope options

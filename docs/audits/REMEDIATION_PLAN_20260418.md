@@ -193,7 +193,7 @@ Parallel  (no tier dependency — can start any time)
 **Goal.** Force an explicit product call on persistence for special-offer and assignment before T4 can execute. This tier produces **a decision memo and nothing else**. No code changes.
 
 **Files to touch:**
-- `/Users/jnmartins/dev/frontfiles/docs/audits/PERSISTENCE_DECISION_MEMO_20260418.md` — **new file, to be authored by João**
+- `/Users/jnmartins/dev/frontfiles/docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` — **existing file** (authored 2026-04-20, commit `2708cac`). T0.5 execution is appending João's answers to the memo's §Product questions section; no new memo file is created.
 
 **Artefact to produce (memo structure).** One markdown file with:
 1. The subject systems at hand:
@@ -215,7 +215,7 @@ Parallel  (no tier dependency — can start any time)
 
 **Exact edits.** Create the memo. Do not edit code. Do not edit `store.ts`. Do not touch routes.
 
-**Acceptance test.** `docs/audits/PERSISTENCE_DECISION_MEMO_20260418.md` exists and every one of the five questions has either an explicit answer or a dated deferral.
+**Acceptance test.** `docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` §Product questions has an explicit answer or a dated deferral for every one of the five questions.
 
 **Depends on.** Nothing technical. T4 is blocked until this memo is signed off by João.
 
