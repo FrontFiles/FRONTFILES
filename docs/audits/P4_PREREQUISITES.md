@@ -6,11 +6,11 @@
 
 ## 1. `buyer_company_role` enum relocation
 
-**Current state.** Defined in `supabase/migrations/20260408230001_assignment_engine_enums.sql:142`. Used by the preserved identity-layer table `buyer_company_memberships.role` (`supabase/migrations/20260408230009_identity_tables.sql:163`). Also used internally by the retiring `reviewer_role` enum.
+**Current state.** Defined in `supabase/migrations/20260408230001_assignment_engine_enums.sql:142`. Used by **two** preserved tables: `buyer_company_memberships.role` (`supabase/migrations/20260408230009_identity_tables.sql:163`, identity layer) and `company_memberships.role` (`supabase/migrations/20260413230015_companies_and_memberships.sql:189`, companies layer). Also used internally by the retiring `reviewer_role` enum.
 
 **Risk.** If the P4 migration drops the Assignment Engine enum set with `CASCADE`, this enum dies and `buyer_company_memberships` loses its column type. The identity layer is out of retirement scope per `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 — this would be an unintended collateral drop.
 
-**Action.** Land a new identity-layer migration **before** the economic-layer drop migration that `CREATE TYPE buyer_company_role ... ` under the same value set, then `ALTER TABLE buyer_company_memberships ALTER COLUMN role TYPE buyer_company_role` pointing at the new type location. Then the P4 drop can CASCADE safely. See also: `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 "Preserve without rename at P4" sub-block (revision 6) — spec-level record of this enum's preservation fate.
+**Action.** Land a new identity-layer migration **before** the economic-layer drop migration that `CREATE TYPE buyer_company_role ... ` under the same value set, then two `ALTER TABLE ... ALTER COLUMN role TYPE buyer_company_role` statements — one on `buyer_company_memberships`, one on `company_memberships` — each pointing at the new type location. Then the P4 drop can CASCADE safely. See also: `docs/specs/ECONOMIC_FLOW_v1.md` §14.1 "Preserve without rename at P4" sub-block (revision 6) — spec-level record of this enum's preservation fate.
 
 **Owner.** P4 migration author.
 

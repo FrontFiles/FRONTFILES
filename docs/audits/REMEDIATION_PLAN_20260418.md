@@ -525,9 +525,9 @@ Tests that need a specific actor identity override the default with `vi.mocked(r
 
 **Sequence:** ECONOMIC_FLOW_v1 §14.1 P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7. Read that section for the authoritative dependency chain.
 
-**Calendar scope re-estimate:** 3–5 calendar weeks per §14.1 P4 scope (net-new schema + net-new route set + full RLS + triggers + hash-chain + actor-handles seed + pack primitives UI + integration tests). The prior 5–7 working-day dual-mode estimate is obsolete.
+**Calendar scope re-estimate:** 8–12 calendar weeks per §14.1 P4 scope (net-new schema + net-new route set + full RLS + triggers + hash-chain + actor-handles seed + pack primitives UI + integration tests + AUTH_WIRED plumbing + UI deprecation audit + net-new T4 acceptance test suite). Staged into two deploys recommended: (i) migration + AUTH_WIRED plumbing introduced with default false; (ii) UI cutover + AUTH_WIRED=true per §14.1 P5 sequence. Revised post-P4-audit 2026-04-20. The prior 3–5 calendar-week estimate is superseded; the prior 5–7 working-day dual-mode estimate is obsolete.
 
-**Depends on.** ECONOMIC_FLOW_v1 revision 5 landed. T0.5 memo Q4 adjudicated (Amendment A). T1 auth wired. T2 session. T3 userClient split.
+**Depends on.** ECONOMIC_FLOW_v1 revision 6 landed. T0.5 memo Q4 adjudicated (Amendment A). T1 auth wired. T2 session. T3 userClient split. **KD-9 is a hard P4 prerequisite** (RLS verifiable in CI; Vitest env loading fixed) — P4 acceptance test suite per `Acceptance test` below cannot run green without it. See appendix F "Known test-env drift" for current baseline.
 
 **Acceptance test.** Against a live Supabase dev project after P4 migration: (i) `CREATE TABLE offers / assignments / disputes / ledger_events / actor_handles` all present; (ii) `system` actor handle seeded; (iii) round-trip create-offer → counter → accept → deliver → accept_by_buyer → cashed_out produces 6 `ledger_events` rows on two threads with intact hash chain; (iv) dispute path produces 3+ `dispute.*` events on the dispute thread plus corresponding `assignment.*` events per §8.2a dual-thread emit invariant; (v) Stripe escrow ordering per §8.5 produces reconcilable state under failure injection.
 
