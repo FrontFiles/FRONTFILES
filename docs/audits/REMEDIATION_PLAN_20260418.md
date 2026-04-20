@@ -238,7 +238,7 @@ Parallel  (no tier dependency — can start any time)
 - `/Users/jnmartins/dev/frontfiles/src/app/api/media/[id]/route.ts`
 - `/Users/jnmartins/dev/frontfiles/src/app/api/providers/connections/route.ts`
 - `/Users/jnmartins/dev/frontfiles/src/app/api/providers/connections/[id]/route.ts`
-- `/Users/jnmartins/dev/frontfiles/src/lib/post/client.ts` (the only non-route consumer of `x-frontfiles-user-id`)
+- `/Users/jnmartins/dev/frontfiles/src/lib/post/client.ts` — **write site**: sets outgoing `'x-frontfiles-user-id': input.authorId` header at [src/lib/post/client.ts:216](../../src/lib/post/client.ts#L216) on `POST /api/posts`. See §Scope decisions below for T1 disposition (write is **removed in T1**, not deferred to T2).
 - `/Users/jnmartins/dev/frontfiles/src/app/api/special-offer/route.ts` (body-identity site)
 - `/Users/jnmartins/dev/frontfiles/src/app/api/special-offer/[id]/accept/route.ts`
 - `/Users/jnmartins/dev/frontfiles/src/app/api/special-offer/[id]/counter/route.ts`
@@ -290,13 +290,44 @@ Parallel  (no tier dependency — can start any time)
 3. In every listed route file, replace the identity read site with `await requireActor(request)`. Remove the `x-frontfiles-user-id` header read and the `body.buyerId`/`body.actorId`/`body.requesterId`/`body.responderId`/`body.authorId` read. Catch `AuthNotWiredError` at the route boundary (or let it bubble to the existing `withInternalError` wrapper, then teach that wrapper to return 501 for `AuthNotWiredError`).
 4. Do **not** change `src/lib/identity/guards.ts` in T1. `requireGrant` continues to read from the actor object; it will get its real actor once T2 lands. The guard's signature should move from `requireGrant(userId, 'buyer')` to `requireGrant(actor, 'buyer')` where the call site is already touched.
 
+**Scope decisions:**
+
+*`src/lib/post/client.ts` resolution.* The file is a **write site** — it sets the outgoing `'x-frontfiles-user-id': input.authorId` header at [line 216](../../src/lib/post/client.ts#L216) inside `submitPost()`. Server never reads an inbound header from this file. **T1 disposition: remove the write in T1. Do NOT treat `post/client.ts` as a T2-only change.**
+
+Rationale:
+
+1. **Honest-failure principle.** T1's point is to make every identity-trust surface fail loudly at the same moment. Leaving a write-site that the server ignores (`requireActor` discards the header in T1's stub) contradicts that principle and creates a stale signal for future readers ("why is this still here?").
+2. **Scope consistency.** `post/client.ts` is already on T1's 19-file list; excluding its edit leaves it on the list with nothing to do — phantom work.
+3. **Caller compatibility.** `submitPost()`'s callers already branch on typed `PostsClientError` codes via `err.code` (post composer components). When T1 lands, they receive `PostsClientError('AUTH_NOT_WIRED', 'auth not wired')` and render the existing error state — no composer change is needed.
+
+Concrete edit: delete the `'x-frontfiles-user-id': input.authorId` entry from the `headers` object at [post/client.ts:213–217](../../src/lib/post/client.ts#L213). Leave `authorId` inside the JSON body — the server route will read it and pass it to `requireActor`, which ignores it in T1 (returns 501) and validates it in T2.
+
+**Test migration:**
+
+(i) **Mock rewrite.** Every test currently setting `'x-frontfiles-user-id'` on a request or setting a body identity field (`buyerId`/`actorId`/`requesterId`/`responderId`/`authorId`) must mock `requireActor` via:
+
+```ts
+import { vi } from 'vitest'
+
+vi.mock('@/lib/auth/requireActor', () => ({
+  requireActor: vi.fn(async () => ({ userId: 'test-user-id', jwt: undefined })),
+  AuthNotWiredError: class extends Error {
+    status = 501 as const
+  },
+}))
+```
+
+Tests that need a specific actor identity override the default with `vi.mocked(requireActor).mockResolvedValueOnce({ userId: '<specific-id>' })` before the call.
+
+(ii) **Acceptance criterion.** After T1 lands, `bun run test` returns **1080 passed / 1 skipped** (the pre-T1 baseline per `CODEBASE_AUDIT_20260418.md` §Current-state inventory). Any deviation is a failed T1 landing — fix the test mocks, do not adjust the baseline.
+
 **Ship-gate policy (pick one explicitly — this is the one we pick):**
 
 > **Ship T1 to `main` behind `AUTH_WIRED=false` by default.** Production behaviour becomes: every affected route returns **HTTP 501 "auth not wired"** until T2 is merged and the flag is flipped. Dev / test environments that want to exercise route logic set `AUTH_WIRED=true` locally and stub `requireActor` in tests via `scopeEnvVars`.
 >
 > Rationale: the alternative ("do not ship T1 until T2") leaves the header-trust surface alive on `main` for the duration of T2, and creates a long-lived T1 branch that rots. A hard 501 is visible, testable, and non-bypassable. The editorial product has no live users yet; a temporary 501 on mutation routes is strictly better than continuing to trust body-supplied ids.
 
-**Acceptance test.** With `AUTH_WIRED=false`, calling any of the 19 listed routes with a valid-shaped payload returns `501` with body `{ error: { code: 'AUTH_NOT_WIRED', message: 'auth not wired' } }`. With `AUTH_WIRED=true` and no session implementation yet, same 501 is returned (T1 does not claim to work — it claims to be honest).
+**Acceptance test (two parts).** (1) With `AUTH_WIRED=false`, calling any of the 19 listed routes with a valid-shaped payload returns `501` with body `{ error: { code: 'AUTH_NOT_WIRED', message: 'auth not wired' } }`. With `AUTH_WIRED=true` and no session implementation yet, same 501 is returned (T1 does not claim to work — it claims to be honest). (2) `bun run test` returns **1080 passed / 1 skipped** — pre-T1 baseline unchanged.
 
 **Depends on.** T0 (delete unsigned Stripe webhook first so T1's sweep doesn't trip over it).
 
