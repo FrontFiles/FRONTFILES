@@ -213,10 +213,12 @@ M5 — system actor seed
     - tombstoned_at = NULL (never tombstoned).
   ON CONFLICT (handle) DO NOTHING.
   actor_handles has no actor_kind column (§8.4) — do not add one.
-  In the same commit (or a concern-3 follow-up, founder choice), expose
-  the sentinel via a single server-side config constant at
-  src/lib/economic-flow/system-actor.ts (or equivalent location). Never
-  expose it to clients (§8.4 last line).
+  Concern 1 ships the SQL seed only — no TypeScript surface. The
+  application-side constant exposing this sentinel (planned location
+  `src/lib/economic-flow/system-actor.ts` or equivalent) is deferred to
+  concern 3 and is OUT OF SCOPE for this dispatch. Do not create or modify
+  any TypeScript file in this concern. Per §8.4 last line, that constant
+  must never be exposed to clients when concern 3 lands it.
 
 Preflight (M2 only)
   Script queries pg_tables and pg_type for the three rename-source
@@ -343,29 +345,31 @@ This directive does **not** ship to Claude Code until all of the following are �
 
 | # | Gate | State | Blocker? |
 |---|---|---|---|
-| 1 | P4 plan + UI audit committed to `main` | ✗ — both files untracked as of 2026-04-20 | Yes |
-| 2 | Feature branch `feat/p4-economic-cutover` created off `main` | ✗ — not created | Yes |
-| 3 | Fresh Supabase local dev project running; `supabase migration list` clean | unknown — founder logistics | Yes |
+| 1 | P4 plan + UI audit committed to `main` | ✓ — landed on main at `e7e2f9f` (2026-04-20) | No |
+| 2 | Feature branch `feat/p4-economic-cutover` created off `main` | ✓ — cut 2026-04-20 off main at `60c8ba3` | No |
+| 3 | Fresh Supabase local dev project running; `supabase migration list` clean | ✗ — founder to run `supabase start` immediately before dispatch (see §E step 4) | Yes |
 | 4 | Stripe Connect test-mode credentials accessible | unknown — founder logistics | No (needed for concern 2, not concern 1 strictly) |
-| 5 | KD-9 resolved; `bun run test` zero file-load errors | ✗ — still pending per REMEDIATION_PLAN appendix F | **Hard blocker** for concern 2; soft blocker for concern 1 |
+| 5 | KD-9 resolved; `bun run test` zero file-load errors | ✓ — landed on main at `60c8ba3` (KD-9 fix `4336844` + cleanup `bc5343c`). 18 remaining failures are Supabase-routing concern documented at `docs/audits/P4_CONCERN_2_PRE_DRAFT_INPUTS.md`; do not block concern 1 | No |
 | 6 | Plan signed off under §15 review gate | ✓ — approved 2026-04-20 path A | No |
-| 7 | This directive reviewed by founder before dispatch | ✗ — pending | Yes |
+| 7 | This directive reviewed by founder before dispatch | ✓ — reviewed via digest 2026-04-20; Draft 3 corrections applied per §F | No |
 
-Gate 5 note: concern 1 migrations do not need KD-9 resolved to be authored — they are DDL, not Vitest code. But concern 2 (which validates concern 1) does. The P4 plan treats KD-9 as hard for the whole P4 acceptance envelope. If founder wants to parallelize, Claude Code can author concern 1 migrations against a live Supabase dev project while KD-9 work proceeds separately — but the concern 1 exit report cannot claim full acceptance until concern 2 runs green.
+Gate 3 note: Claude Code's first move on dispatch is precondition #1–#7 of §A, which includes #6 (Supabase local running). If `supabase start` is not running when §A is pasted, the dispatched session will stop on that precondition and the dispatch turn is wasted. Founder runs `supabase start` and confirms `supabase migration list` returns cleanly **immediately before** pasting §A — see §E step 4.
+
+Gate 5 note: as of 2026-04-20 KD-9 is landed on main. Eighteen residual test failures (1 in `rls.test.ts` + 17 in `service.test.ts`) are a mock-vs-live routing concern surfaced by the KD-9 env hydration; they are documented as P4 Concern 2 pre-draft inputs at `docs/audits/P4_CONCERN_2_PRE_DRAFT_INPUTS.md` and do not block concern 1. Concern 1 is DDL-only and does not exercise those code paths. Concern 2 directive will resolve them as part of its own scope.
 
 ---
 
 ## E — Proposed dispatch sequence
 
-1. Founder commits `P4_IMPLEMENTATION_PLAN.md` + `P4_UI_DEPRECATION_AUDIT.md` + this directive (`P4_CONCERN_1_DIRECTIVE.md`) to `main` as a single commit.
-2. Founder creates `feat/p4-economic-cutover` off that commit.
-3. KD-9 work proceeds. When `bun run test` reports zero file-load errors, flag.
-4. Founder provisions fresh Supabase local dev project.
-5. Founder reviews this directive (§A body) one last time.
+1. ✓ Founder commits `P4_IMPLEMENTATION_PLAN.md` + `P4_UI_DEPRECATION_AUDIT.md` + this directive (`P4_CONCERN_1_DIRECTIVE.md`) to `main`. (Done 2026-04-20 at `e7e2f9f`.)
+2. ✓ Founder creates `feat/p4-economic-cutover` off that commit. (Done 2026-04-20 off `60c8ba3`.)
+3. ✓ KD-9 work completes. `bun run test` reports zero file-load errors. (Done 2026-04-20; KD-9 fix landed at `4336844` + cleanup `bc5343c`, both on main.)
+4. **Founder runs `supabase start` in the repo root immediately before dispatch and confirms `supabase migration list` returns cleanly.** Do not skip — Claude Code's precondition #6 will stop the dispatch otherwise. If Supabase local is already running from prior work, run `supabase status` to confirm.
+5. ✓ Founder reviews this directive (§A body). (Reviewed via digest 2026-04-20; Draft 3 corrections applied — see §F.)
 6. Founder dispatches the §A body to Claude Code in a fresh session, on branch `feat/p4-economic-cutover`.
 7. Claude Code produces exit report.
 8. Founder reviews exit report; approves or requests revisions.
-9. On approval, concern 2 directive drafted.
+9. On approval, concern 2 directive drafted (P4 Concern 2 pre-draft inputs already captured at `docs/audits/P4_CONCERN_2_PRE_DRAFT_INPUTS.md`).
 
 ---
 
@@ -373,6 +377,8 @@ Gate 5 note: concern 1 migrations do not need KD-9 resolved to be authored — t
 
 - **2026-04-20 — Draft 1.** Initial directive drafted per plan §13.3 template. Not yet dispatched. Dispatch blocked by §D items 1, 2, 3, 7.
 - **2026-04-20 — Draft 2 (pre-dispatch correction).** Pre-dispatch red-team of §A body against ECONOMIC_FLOW_v1 §4 / §5 / §7 / §8 / §8.2a / §8.3 / §8.4 / §12.4 surfaced nine drifts inherited from the plan §4.2 M4 skeleton (fabricated enum values for `evidence_type` and `reason_code`; wrong column names on `ledger_events` — `payload_v` / `prev_hash` / `emitted_at`; wrong PK / column shape on `actor_handles` including a fabricated `actor_kind` enum; wrong hash formula missing `payload_version` / `created_at` / `actor_ref` and including `thread_type` / `thread_id`; wrong assignment_state and offer_state enum values; missing `offer_assets` / `offer_briefs` from the table list; missing trigger enumeration; spurious Exception 2 for `public.buyer_company_role`). Corrections applied: plan §4.2 M4 rewritten against spec; M5 seed corrected to the spec's sentinel-UUID shape; directive §A expanded with a "no fabricated values" guard and an itemised gotcha list; RLS bullet enumerated per-table; added acceptance criterion 8 (assignments carries no fee columns); acceptance criterion 5 expanded to the eight tables; acceptance criterion 7 extended to off-trigger hash recomputation. Concurrent edit: spec header bumped from "revision 4" to "revision 6" (stale since §15 revisions 5 and 6 landed 2026-04-20). Still not dispatched.
+
+- **2026-04-20 — Draft 3 (founder review pass + state refresh).** Founder reviewed §A body via digest. Approved with two corrections applied here: (1) §A M5 — removed the "founder choice" ambiguity that allowed an in-concern TypeScript constant. The `src/lib/economic-flow/system-actor.ts` constant is now explicitly deferred to concern 3 and out of scope for this dispatch. Resolves a real conflict between M5's TS instruction and the GATE block's SQL-only path allowlist. (2) §E step 4 — made the `supabase start` precondition explicit and instructional rather than ambient. Optional polish noted (canonical-JSONB form for hash chain in acceptance #7) but not yet applied — surface in dispatch exit report if Claude Code finds it ambiguous. State refresh: §D Gates 1, 2, 5, 7 promoted to ✓ (P4 docs landed on main `e7e2f9f`; `feat/p4-economic-cutover` cut off `60c8ba3`; KD-9 fix landed on main; this directive reviewed). §E steps 1, 2, 3, 5 marked done with SHAs. Gate 5 note rewritten to point at `P4_CONCERN_2_PRE_DRAFT_INPUTS.md` instead of obsolete REMEDIATION_PLAN appendix F reference. Net dispatch state: only Gate 3 (founder runs `supabase start`) and the dispatch turn itself remain.
 
 ---
 
