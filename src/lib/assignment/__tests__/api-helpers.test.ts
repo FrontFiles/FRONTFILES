@@ -17,7 +17,7 @@ import {
   withDomainError,
 } from '@/lib/assignment/api-helpers'
 import { AssignmentError } from '@/lib/assignment/errors'
-import { putAssignment, _resetStore } from '@/lib/assignment/store'
+import { putAssignment, _resetStore, listAssignments } from '@/lib/assignment/store'
 import {
   issueAssignmentBrief,
   acceptAssignment,
@@ -197,7 +197,7 @@ describe('resolveAssignment()', () => {
   it('resolves mock data assignments by their IDs', () => {
     // The store is seeded from mockAssignments on module load
     // After _resetStore(), mock data is restored
-    const allAssignments = require('@/lib/assignment/store').listAssignments()
+    const allAssignments = listAssignments()
     expect(allAssignments.length).toBeGreaterThan(0)
 
     const mockId = allAssignments[0].id
