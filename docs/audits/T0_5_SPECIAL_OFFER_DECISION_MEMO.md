@@ -231,7 +231,7 @@ Path A is "Live persistence for special-offer and assignment" (T4 Branch A). Bun
 3. **Empty-state redesign on `vault/offers`** — replace `<EmptyPanel .../>` with Special-Offer-specific zero-state. **~0.25 day.**
 4. **`OfferModal` wiring — Class 2 work bundled under exception.** Buyer-side `POST /api/special-offer` hookup with server validation / error handling. **~0.5 day.** This item is explicitly **Class 2 work, not Class 1**, bundled into Path A only under the exception below:
 
-   > Wiring the modal now creates real threads against the in-memory `Map` store. Every server restart evaporates them. Allowlist beta counterparties will hit this. When T4 lands, the `POST` call-site reworks — but that is a single point of change, not a scatter. This tradeoff is accepted only because Path A without wire-up is not actually demoable: a creator-side `/vault/offers` page that can accept / counter / decline is meaningless if no buyer can ever create a thread. Without Item 4, Path A ships half a feature.
+   > Wiring the modal now creates real threads against the in-memory `Map` store. Every server restart evaporates them. **Internal demo users (founder + internal collaborators) will hit this** — the v1.0-scaffold never reaches external counterparties (see §v1.0-scaffold lock doc — required disclosures). When T4 lands, the `POST` call-site reworks — but that is a single point of change, not a scatter. This tradeoff is accepted only because Path A without wire-up is not actually demoable *internally*: a creator-side `/vault/offers` page that can accept / counter / decline is meaningless if no buyer can ever create a thread. Without Item 4, Path A ships half a feature.
 
    The exception is bounded: Item 4 touches exactly one call-site (`OfferModal.handleSubmit` in `src/components/asset/AssetRightsModule.tsx`) and it gets rewritten once when T4 lands. No other buyer-side write call-sites are added in Path A. If the exception's scope expands mid-implementation, revisit.
 
@@ -249,18 +249,20 @@ Path A is "Live persistence for special-offer and assignment" (T4 Branch A). Bun
 
 ## v1.0-scaffold lock doc — required disclosures
 
-If Path A (or the Hybrid `A.special-offer` phase) ships and the A.3 feature gate is re-locked at a **v1.0-scaffold** level rather than v1.0-live, the accompanying lock doc must carry the explicit disclosures below. This list is **not** the lock doc itself — it is the **required-disclosure checklist** that governs drafting of the lock doc later.
+**The v1.0-scaffold lock is an internal versioning artifact.** It does not constitute a public release or allowlist beta launch. External counterparties do not access the scaffold implementation.
+
+With that framing, if Path A (or the Path C `A.special-offer` phase) ships and the A.3 feature gate is re-locked at a **v1.0-scaffold** level rather than v1.0-live, the accompanying lock doc must carry the explicit disclosures below. This list is **not** the lock doc itself — it is the **required-disclosure checklist** that governs drafting of the lock doc later.
 
 | # | Required disclosure | Source / evidence | Closes when |
 |---|---|---|---|
-| 1 | Offer state is held in an in-memory `Map` (`src/lib/special-offer/store.ts`). **Offer state does not survive server restart, deploy, instance swap, or scale-out.** | Audit B-1; memo §Subject systems | T4 |
-| 2 | `POST /api/special-offer` resolves assets from the `mockVaultAssets` fixture (`src/lib/mock-data.ts`), **not from the `vault_assets` table.** Assets uploaded by real creators cannot be offered on. | Audit B-3; memo §Subject systems | T4 |
-| 3 | `/checkout/[assetId]` accepts `?offerAmount=&licence=&threadId=` as trusted query params **without verifying them against the thread record.** Price-tamper surface: any caller can navigate to an arbitrary amount and the checkout renders it. | Memo §Class 3 | T4 (requires thread verification via typed client) |
-| 4 | Authentication is header-trust (`x-frontfiles-user-id`) + body-identity (`buyerId` / `actorId` / `requesterId` / `responderId` / `authorId`). **Impersonation surface: any caller can claim to be any user.** | Audit A-2 / A-3; REMEDIATION_PLAN §Grounding A/B | T1 (501 wall) → T2 (real session) |
-| 5 | **Feature is allowlist-only** until disclosures 1–4 are closed. Access to the offer surface must be gated by an explicit counterparty allowlist — no open-signup access. | Lock-doc obligation | T4 + T2 |
-| 6 | **v1.0-scaffold is explicitly not v1.0-live.** A second lock pass at v1.0-live must be executed once T1, T2, and T4 have closed the above. | Governance; the ladder in PLATFORM_REVIEWS.md | T1 + T2 + T4 |
+| 1 | Offer state is held in an in-memory `Map` (`src/lib/special-offer/store.ts`). **Offer state does not survive server restart, deploy, instance swap, or scale-out.** (Affects only internal demo state; no external user is ever exposed to the failure mode.) | Audit B-1; memo §Subject systems | T4 |
+| 2 | `POST /api/special-offer` resolves assets from the `mockVaultAssets` fixture (`src/lib/mock-data.ts`), **not from the `vault_assets` table.** Real-creator assets are not offerable through the scaffold. (Internal development-time limitation.) | Audit B-3; memo §Subject systems | T4 |
+| 3 | `/checkout/[assetId]` accepts `?offerAmount=&licence=&threadId=` as trusted query params **without verifying them against the thread record.** Price-tamper surface exists inside the scaffold; it does not reach external users because the scaffold is not externally routed. | Memo §Class 3 | T4 (requires thread verification via typed client) |
+| 4 | Authentication is header-trust (`x-frontfiles-user-id`) + body-identity (`buyerId` / `actorId` / `requesterId` / `responderId` / `authorId`). **Impersonation surface exists inside the scaffold.** It does not reach external users because no external caller is routed to scaffold API paths. | Audit A-2 / A-3; REMEDIATION_PLAN §Grounding A/B | T1 (501 wall) → T2 (real session) |
+| 5 | **No external access.** The scaffold is reachable only via development origins, staging origins, and localhost. Production domains do not route any caller to scaffold API paths. There is no allowlist beta, no soft-launch, and no external-counterparty tier during v1.0-scaffold. | Lock-doc obligation | v1.0-live re-lock (T1 + T2 + T4) |
+| 6 | **v1.0-scaffold is explicitly an internal versioning artifact, not v1.0-live.** A separate lock pass at v1.0-live must be executed once T1, T2, and T4 have closed disclosures 1–4. v1.0-scaffold does **not** constitute a public release, allowlist beta, or soft-launch under any circumstances. | Governance; the ladder in PLATFORM_REVIEWS.md | T1 + T2 + T4 |
 
-Any lock doc drafted without all six disclosures is **non-conformant** with this memo's governance intent. The disclosure numbers above are the headings the lock doc should carry verbatim.
+Any lock doc drafted without all six disclosures, or drafted in a way that describes v1.0-scaffold as an external-facing release tier, is **non-conformant** with this memo's governance intent. The disclosure numbers above are the headings the lock doc should carry verbatim.
 
 ---
 
