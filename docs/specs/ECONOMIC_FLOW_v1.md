@@ -1,6 +1,6 @@
 # ECONOMIC_FLOW_v1.md
 
-**Status:** LOCKED 2026-04-20 (revision 4)
+**Status:** LOCKED 2026-04-20 (revision 6)
 **Governs:** Path A v1 economic layer — offers, assignments, event trail, pack primitives
 **Cross-references:** `docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` §Decisions; `docs/audits/REMEDIATION_PLAN_20260418.md` tiers T1, T4; tier P0–P7 sequencing (see §14)
 **Terminology:** See §9. Banned: "certified", "tamper-proof", "immutable", "guaranteed immutable". Allowed: "tamper-evident", "independently reviewable", "provenance-aware", "verifiable".
