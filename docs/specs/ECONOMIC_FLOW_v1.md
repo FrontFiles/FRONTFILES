@@ -1,6 +1,6 @@
 # ECONOMIC_FLOW_v1.md
 
-**Status:** LOCKED 2026-04-20 (revision 2, post red-team pass 2)
+**Status:** LOCKED 2026-04-20 (revision 4)
 **Governs:** Path A v1 economic layer — offers, assignments, event trail, pack primitives
 **Cross-references:** `docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` §Decisions; `docs/audits/REMEDIATION_PLAN_20260418.md` tiers T1, T4; tier P0–P7 sequencing (see §14)
 **Terminology:** See §9. Banned: "certified", "tamper-proof", "immutable", "guaranteed immutable". Allowed: "tamper-evident", "independently reviewable", "provenance-aware", "verifiable".
@@ -59,7 +59,7 @@ Counter resets the expiration clock for the receiving side. Default expiration 7
 | `active` | `offer.accepted` fires | `delivered` |
 | `delivered` | Asset-pack: creator confirms rights grant. Brief-pack: all expected pieces delivered. | `accepted_by_buyer`, `revision_requested`, `disputed` |
 | `revision_requested` | Buyer requests revision (**brief-pack only**; asset-pack has no revisions) | `delivered` (loop; cap per `assignment_deliverables`) |
-| `accepted_by_buyer` | Buyer accepts delivery, or 14-day auto-accept window elapses | `cashed_out`, `disputed` (creator-initiated only, until `cashed_out`) |
+| `accepted_by_buyer` | Buyer accepts delivery, or 14-day auto-accept window elapses (clock origin: `assignments.delivered_at`) | `cashed_out`, `disputed` (buyer within 14d of delivered OR creator-initiated as `creator_cannot_deliver`, until `cashed_out`; both paths blocked if assignment has a prior terminal dispute resolution per §5 cool-down clause below) |
 | `cashed_out` | Stripe transfer clears to creator | terminal |
 | `disputed` | Buyer opens within 14 days of `accepted_by_buyer`, or creator opens any time before `cashed_out` | `accepted_by_buyer`, `refunded`, `split` |
 | `refunded` | Dispute resolved toward buyer | terminal (may be reopened into `dispute.under_appeal` within the §12.4a appeal window) |
@@ -67,8 +67,10 @@ Counter resets the expiration clock for the receiving side. Default expiration 7
 | `dispute.under_appeal` | Creator appeals any terminal dispute outcome (`accepted_by_buyer`, `refunded`, `split`) within the §12.4a appeal window | `accepted_by_buyer`, `refunded`, `split` (decided by independent-review path §12.4b; terminal — no second appeal) |
 
 **Dispute windows.**
-- Buyer-initiated: 14 days after `accepted_by_buyer`. After that, accepted is final and transitions to `cashed_out` on Stripe clearance.
+- Buyer-initiated: from `delivered` onward, through 14 days after `accepted_by_buyer` (clock origin: `assignments.delivered_at` for auto-accept path, or manual acceptance timestamp). After 14d post-acceptance, accepted is final and transitions to `cashed_out` on Stripe clearance.
 - Creator-initiated: any time before `cashed_out` (creator raises only after realizing they cannot deliver — payload reason `creator_cannot_deliver` — or counterparty fraud suspicion).
+
+**Dispute cool-down.** Once any dispute on an assignment has reached terminal resolution — whether `dispute.resolved` (admin ruling) or `dispute.appeal_resolved` (independent-review ruling) — no further creator-initiated dispute may be opened on the same assignment. Server-side guard: check for existence of a prior `dispute.resolved` or `dispute.appeal_resolved` event on the dispute thread keyed to `assignment_id`. Buyer-initiated disputes after a prior resolution are similarly blocked. This closes the re-entry loop admitted by the `accepted_by_buyer → disputed` exit.
 
 ## 6. Cross-domain handoff
 
@@ -89,7 +91,7 @@ offers {
   gross_fee       numeric(12,2) not null       -- total paid by buyer
   platform_fee_bps int not null                -- snapshotted at offer creation and locked for the life of the offer
   currency        char(3) not null
-  rights          jsonb not null               -- uniform scope; one rights config per offer
+  rights          jsonb not null               -- shape: {template: 'editorial_one_time'|'editorial_with_archive_12mo'|'commercial_restricted'|'custom', params: jsonb, is_transfer: bool}; "custom" flagged for admin review per F7
   current_note    text                         -- 500-char max, enforced by trigger
   expires_at      timestamptz not null
   state           offer_state not null
@@ -121,6 +123,22 @@ assignment_deliverables {                       -- tracks revision rounds per pi
   delivered_at  timestamptz
   PRIMARY KEY (assignment_id, piece_ref)
 }
+
+disputes {                                      -- dispute thread, one per escalation on an assignment
+  dispute_id           uuid pk default gen_random_uuid()
+  assignment_id        uuid fk(assignments) not null
+  opener_actor_handle  uuid fk(actor_handles.handle) not null
+  opened_at            timestamptz not null default now()
+  reason_code          text not null             -- enumerated per §12.4 reason codes
+  evidence_refs        jsonb                     -- array of storage URIs; nullable
+  state                text not null             -- enum pinned: 'opened'|'resolved'|'appealed'|'appeal_resolved' (transition order); state machine documented in §8.2a
+  resolution           text                      -- enum: 'accepted_by_buyer','refunded','split'; null until resolved
+  resolution_note      text                      -- admin-written, surfaced to both parties
+  resolved_at          timestamptz
+  appeal_deadline      timestamptz               -- set on state→resolved; resolved_at + 14d per §12.4a
+  appeal_resolved_at   timestamptz
+  appeal_rationale     text
+}
 ```
 
 N=1 is not special-cased. A `single_asset` offer has exactly one row in `offer_assets`; an `asset_pack` has ≥2. Same for briefs.
@@ -139,10 +157,10 @@ RLS: buyer and creator can read their own offers and child rows. Service-role ne
 
 ## 8. Event catalogue
 
-**Fifteen event types.** Namespaced (`offer.*`: 6; `assignment.*`: 9). Append-only. jsonb payload with embedded `v` version field (start at `v=1`; increment on breaking payload shape changes).
+**Twenty event types.** Namespaced (`offer.*`: 6; `assignment.*`: 9; `dispute.*`: 5). Append-only. jsonb payload with embedded `v` version field (start at `v=1`; increment on breaking payload shape changes, subject to the pre-consumer exception in §8.6).
 
 - **Payload discipline:** payloads carry transactional facts only (amounts, timestamps, state identifiers, reasons, piece_refs, rate-lock snapshots). Payloads MUST NOT contain names, email addresses, IP addresses, or raw auth identifiers. Party references are made via `actor_ref` only.
-- **Tamper-evidence:** each row carries `event_hash`, a sha256 digest over (`prev_event_hash`, `payload_version`, `event_type`, canonicalised `payload`, `created_at` ISO-8601, `actor_ref`), forming an append-only hash chain per thread. The chain is independently verifiable; the platform does not claim it is immutable or certified — only tamper-evident and independently reviewable.
+- **Tamper-evidence:** each row carries `event_hash`, a sha256 digest over (`prev_event_hash`, `payload_version`, `event_type`, canonicalised `payload`, `created_at` ISO-8601, `actor_ref`), forming an append-only hash chain per thread. The chain is independently verifiable; the platform does not claim it is immutable or certified — only tamper-evident and independently reviewable. <!-- allow-banned: meta-negation in §8 preamble declaring what the hash chain does NOT claim -->
 
 ### 8.1 Offer events
 
@@ -151,7 +169,7 @@ RLS: buyer and creator can read their own offers and child rows. Service-role ne
 | `offer.created` | Offer published, `draft` → `sent` | `{v, target_type, items, gross_fee, platform_fee_bps, currency, rights, expires_at, note}` |
 | `offer.countered` | Any counter | `{v, by_actor_id, fee_before, fee_after, added_items, removed_items, rights_diff, note_before, note_after, expires_at}` |
 | `offer.accepted` | Either side accepts | `{v, by_actor_id}` |
-| `offer.rejected` | Either side rejects, or force-termination (F10) | `{v, by_actor_id?, reason}` |
+| `offer.rejected` | Either side rejects, or force-termination (F10) | `{v, by_actor_id?, reason, affected_item_ids?}` |
 | `offer.expired` | Expiration timer fires | `{v, last_active_actor_id}` |
 | `offer.cancelled` | Buyer withdraws before counterparty acts since last buyer turn | `{v, by_actor_id}` |
 
@@ -168,6 +186,20 @@ RLS: buyer and creator can read their own offers and child rows. Service-role ne
 | `assignment.disputed` | Either party opens dispute | `{v, by_actor_id, reason, evidence_refs}` |
 | `assignment.refunded` | Dispute resolved toward buyer | `{v, amount_to_buyer, rationale}` |
 | `assignment.split` | Dispute resolved proportionally | `{v, amount_to_creator, amount_to_buyer, rationale}` |
+
+### 8.2a Dispute events
+
+Dispute events live on the `dispute` thread, keyed by `disputes.dispute_id` (§7). Each dispute gets its own hash chain, independent of the associated assignment thread.
+
+| Event | Emitted on | Payload (v=1) |
+|---|---|---|
+| `dispute.opened` | Either party initiates dispute (buyer from `delivered` or `accepted_by_buyer` within 14d; creator from `active`, `delivered`, or `accepted_by_buyer` with `creator_cannot_deliver`) | `{v, by_actor_id, assignment_id, reason, evidence_refs}` |
+| `dispute.evidence_submitted` | Either party submits additional evidence while `disputes.state IN ('opened','appealed')`; `system` actor NOT permitted (always a party act); server-side guard blocks emission once state reaches `resolved` or `appeal_resolved`; single-thread emit (ledger-only, no payment-surface coupling — dual-thread invariant does NOT apply); append-only (evidence cannot be withdrawn) | `{v, submitter_actor_handle, evidence_ref, evidence_type: 'asset_file'|'text_statement'|'external_link'|'other', submitted_at}` |
+| `dispute.resolved` | Platform admin decides dispute; assignment state transitions in same transaction | `{v, by_actor_id (admin), outcome: 'accepted_by_buyer'|'refunded'|'split', amount_to_buyer?, amount_to_creator?, rationale}` |
+| `dispute.appealed` | Creator invokes appeal within 14d of `dispute.resolved` (§12.4a) | `{v, by_actor_id (creator), grounds}` |
+| `dispute.appeal_resolved` | Independent reviewer decides appeal (§12.4b); terminal — no second appeal | `{v, by_actor_id (reviewer), outcome: 'accepted_by_buyer'|'refunded'|'split', rationale}` |
+
+**Dual-thread emit invariant.** When a dispute resolution or appeal resolution changes the assignment's terminal state, BOTH the dispute-thread event (`dispute.resolved` or `dispute.appeal_resolved`) AND the corresponding assignment-thread event (`assignment.accepted_by_buyer`, `assignment.refunded`, or `assignment.split`) are emitted in the same DB transaction per §8.5. This preserves §2's rule that every state mutation is paired with an event on its thread.
 
 ### 8.3 Storage & RLS
 
@@ -206,6 +238,14 @@ public.actor_handles(
 
 RLS: a user may read only the handle row that maps to their own auth_user_id. Platform admin may read all. Ledger events resolve actor identity via this table at read time only.
 
+**System actor.** A canonical `system` row is seeded in `actor_handles` at migration time:
+
+- `handle`: fixed sentinel UUID, documented in the T4 migration and locked for the life of the platform.
+- `auth_user_id`: NULL (never mapped to a real user).
+- `tombstoned_at`: NULL (never tombstoned).
+
+All platform-originated events — cron-driven expiration and 14-day auto-accept (§14.2), asset-unavailable force-termination (§F10), dispute admin rulings (§8.2a `dispute.resolved`), appeal independent-review rulings (§8.2a `dispute.appeal_resolved`) — MUST reference the `system` handle via `actor_ref`. Route handlers load this handle via a single server-side config constant; it is never exposed to clients.
+
 ### 8.5 Transition atomicity
 
 Every state mutation and its event emission occur inside a single DB transaction:
@@ -224,9 +264,59 @@ COMMIT;
 
 Rollback on any failure. Never emit an event without a state mutation, and never mutate state without an event. Enforced via server-side route handlers (no direct client writes). Event consumers (notifications, admin dashboards) are downstream of commit.
 
+**Stripe charge ordering (`offer.accepted`).** The full acceptance flow:
+
+1. Route handler opens an outer DB transaction and takes a row-level lock on the offer (`SELECT ... FOR UPDATE`).
+2. Offer state validated (`state IN ('sent','countered')`); if stale, abort with 409 Conflict.
+3. Stripe PaymentIntent created with `idempotency_key = offer.id + ':accept'`, destination = platform escrow balance, `capture_method = automatic`.
+4. On Stripe success: inner DB transaction runs the atomicity block above (UPDATE offer state, INSERT `offer.accepted` event, INSERT assignment, INSERT `assignment.created` event), COMMIT.
+5. On Stripe failure: abort outer transaction; offer remains in prior state; no events emitted.
+6. On DB commit failure after Stripe success: void the PaymentIntent via Stripe API using the same idempotency key. If the void itself fails, enqueue a reconciliation job for platform admin with `severity=critical` and log. This is the only path where Stripe state and DB state can diverge transiently; admin reconciles manually.
+
+Idempotency: because the Stripe idempotency key derives from `offer.id`, replay of the accept call returns the same PaymentIntent and cannot double-charge.
+
+**Composition-change counter (`offer.countered` with item diff).** A counter that modifies composition mutates child tables in the same transaction:
+
+```
+BEGIN;
+  UPDATE offers
+    SET state='countered', gross_fee=$new_fee, current_note=$new_note,
+        expires_at=$new_exp, updated_at=now()
+    WHERE id=$1 AND state IN ('sent','countered');
+  DELETE FROM offer_assets WHERE offer_id=$1 AND asset_id = ANY($removed_ids);
+  INSERT INTO offer_assets (offer_id, asset_id, position) VALUES (...)
+    ON CONFLICT (offer_id, asset_id) DO NOTHING;
+  INSERT INTO ledger_events (thread_type, thread_id, event_type, payload, actor_ref, prev_event_hash, event_hash)
+    VALUES ('offer', $1, 'offer.countered', $payload, $actor_ref, $prev_hash, $hash);
+COMMIT;
+```
+
+Payload carries the full composition diff: `{v, by_actor_id, fee_before, fee_after, added_items, removed_items, rights_diff, note_before, note_after, expires_at}`.
+
+**Dual-thread emit (dispute or appeal resolution).** When a resolution changes assignment state, two events fire on two threads in one transaction:
+
+```
+BEGIN;
+  UPDATE assignments SET state=$new_state, updated_at=now()
+    WHERE id=$assignment_id AND state IN ('disputed','dispute.under_appeal');
+  UPDATE disputes SET state=$new_state, resolution=$outcome,
+         resolved_at=COALESCE(resolved_at, now()),
+         appeal_resolved_at=CASE WHEN $new_state='appeal_resolved' THEN now() ELSE appeal_resolved_at END
+    WHERE dispute_id=$dispute_id;
+  INSERT INTO ledger_events (thread_type, thread_id, event_type, ...)
+    VALUES ('dispute', $dispute_id, $dispute_event_type, ...);  -- 'dispute.resolved' or 'dispute.appeal_resolved'
+  INSERT INTO ledger_events (thread_type, thread_id, event_type, ...)
+    VALUES ('assignment', $assignment_id, $assignment_event_type, ...);  -- 'assignment.refunded' / '.split' / '.accepted_by_buyer'
+COMMIT;
+```
+
+Each event uses its own thread's `prev_event_hash` chain. Dispute thread and assignment thread remain independently verifiable.
+
 ### 8.6 Payload versioning
 
 Consumers dispatch on the `v` field at application layer. Payload shape changes require a bump (`v=1` → `v=2`) and a dual-read period. Additive changes (new optional fields) may stay at the current `v`.
+
+**Pre-consumer exception.** Until the first production consumer ships (P5 hard cut), breaking payload shape changes may be applied in-place at `v=1` without a bump or dual-read period. This exception expires at P5; after P5, all breaking changes require `v` bump + dual-read window. Exception usage is logged in §15 revision entries.
 
 ### 8.7 GDPR erasure (Art. 17) and portability (Art. 20)
 
@@ -235,6 +325,8 @@ Consumers dispatch on the `v` field at application layer. Payload shape changes 
 **Portability:** on verified request, the platform exports every ledger event row where the user's (pre-erasure) handle appears as `actor_ref`, serialised as JSON, including the hash chain links for independent verification. Export is delivered within 30 days of request per GDPR Art. 12(3).
 
 **Retention boundary:** see §16.
+
+**Post-archival portability.** After the 6-year archival rotation (§16), `actor_ref` values in archival rows are replaced by `sha256(actor_ref)`. A portability request from a subject whose handle has been rotated cannot be joined deterministically to their original ledger events. In that case, the platform derives the hash of the subject's (now-tombstoned) handle at request time and returns matching archival rows, with an export header disclosing that subject identity beyond the 6-year window is not platform-resolvable and that the returned hash is the subject's own hash of record. If no match exists (e.g., subject never transacted), the export states this explicitly.
 
 ## 9. Terminology discipline
 
@@ -266,9 +358,9 @@ CI enforcement: grep-based pre-commit hook on `docs/**`, `src/**/*.ts`, `src/**/
 | F5 | Revision rounds | Negotiated per offer. Default in UI: 1 round per piece. Brief-pack only. Asset-pack has zero revision rounds. |
 | F6 | Platform fee transparency | Visible to both sides. Buyer sees "you pay X, creator receives Y." |
 | F7 | Rights scope surface | Platform-curated template library, counsel-reviewed, v1 fixed set (see F15). Override allowed only within legal bounds; "custom" entries flagged for admin review. |
-| F8 | In-flight offer fate on account deletion | Force-resolve first. Account deletion blocked while counterparty has standing. Pseudonymize on erasure of closed-state rows. |
+| F8 | In-flight offer fate on account deletion | Force-resolve first. Account deletion blocked while counterparty has standing — defined as: any `offers.state IN ('sent','countered')` with the deleting user as buyer or creator; any `assignments.state NOT IN ('cashed_out','refunded','split')` involving the user; any `disputes.state NOT IN ('resolved','appeal_resolved')` involving the user. On erasure of a user whose threads are all terminal-resolved, their `actor_handles` row is tombstoned per §8.7; ledger events are preserved with actor label resolving to "deleted actor". |
 | F9 | Pack size limits | Min 1 (N=1 is the single case). Max 20 per offer in v1. |
-| F10 | Asset availability during pending pack offer | Available to other buyers. First-to-accept wins. Pending offers on already-accepted assets force-terminated via `offer.rejected` with `{reason: 'asset_no_longer_available'}`. Both sides notified. |
+| F10 | Asset availability during pending pack offer | Available to other buyers. First-to-accept wins. Pending offers on already-accepted assets force-terminated via `offer.rejected` with `{reason: 'asset_no_longer_available', affected_item_ids}` (payload schema per §8.1 and §11.4). Both sides notified. |
 | F11 | Pack pricing display | Per-item reference price (informational, from creator's list price if set) + pack total (the only negotiated value). |
 | F12 | Mixed-media packs | Allowed. Rights uniformity constrains what mixes make sense; schema allows all. |
 | F13 | Counter changes composition | Allowed. UI surfaces diff explicitly: added items, removed items, fee delta, note delta. |
@@ -311,6 +403,9 @@ CI enforcement: grep-based pre-commit hook on `docs/**`, `src/**/*.ts`, `src/**/
 - Each piece delivered fires `assignment.piece_delivered` with `{piece_ref, submitted_at}`; `assignment_deliverables.delivered_at` set in same transaction
 - Assignment transitions `active → delivered` when all rows in `assignment_deliverables` have `delivered_at IS NOT NULL`
 - Revision rounds per-deliverable; `assignment_deliverables.revisions_used < revision_cap` gate enforced server-side; cap snapshotted at assignment creation from offer terms
+- On `assignment.revision_requested` for piece P, `assignment_deliverables.delivered_at` for P is cleared to NULL in the same transaction; `revisions_used` is incremented by 1.
+- Redelivery of piece P fires `assignment.piece_delivered` again, setting `delivered_at` afresh.
+- Assignment transitions `revision_requested → delivered` when all rows in `assignment_deliverables` again have `delivered_at IS NOT NULL` — same predicate as `active → delivered`, re-evaluated on each piece-delivered event.
 
 ### 11.6 Asset-pack delivery
 
@@ -329,6 +424,7 @@ CI enforcement: grep-based pre-commit hook on `docs/**`, `src/**/*.ts`, `src/**/
 - **Assignment view (extended).** For brief-pack: per-piece progress derived from `assignment_deliverables` + event trail. For asset-pack: rights-grant confirmation state.
 - **State badges.** Reflect §9 discipline. Allowed: "Offer pending," "Rights grant complete," "Pack delivered." Never: "Certified," "Verified."
 - **Fee transparency panel.** Buyer-side: "Gross fee €X. Platform fee €Y. Creator receives €Z." Snapshot shown once `offer.created`.
+- **Creator asset-withdrawal action.** Creator may withdraw an asset from their portfolio via portfolio management view. Withdrawal triggers a server-side pass over all `offers.state IN ('sent','countered')` referencing the asset; each is force-terminated via `offer.rejected` with `{reason: 'asset_no_longer_available', affected_item_ids}`. Identical mechanism and notification surface to §F10 (asset-accepted-elsewhere path).
 
 ### 12.2 Offer cancellation UX
 
@@ -347,6 +443,7 @@ CI enforcement: grep-based pre-commit hook on `docs/**`, `src/**/*.ts`, `src/**/
 - Buyer: button visible in `delivered` and `accepted_by_buyer` (within 14d) states.
 - Creator: button visible in `active` and `delivered` states with label "Can't deliver — open dispute."
 - Both routes require reason code + optional evidence upload.
+- **Reason codes (enumerated).** Buyer-initiated: `delivery_incomplete`, `delivery_off_brief`, `rights_mismatch`, `unresponsive_creator`, `other`. Creator-initiated: `creator_cannot_deliver`, `buyer_fraud_suspicion`, `other`. "Other" requires a free-text rationale in the payload; admin reviews at higher scrutiny.
 - Opens `disputed` state; platform admin receives notification; flow moves to admin dispute queue (P7 UI; v1 uses SQL dashboard).
 
 ### 12.4a Creator appeal window
@@ -418,6 +515,10 @@ Changes to this spec land via commit to this file. §Decisions (in T0.5 memo) ta
 
 Spec review gate: any change to §4, §5, §7, §8 requires founder sign-off before implementation begins.
 
+**Revision 4 — 2026-04-20.** Red-team pass 4 findings applied. Dispute event set expanded to 5 (added `dispute.evidence_submitted`). `disputes` table added to §7 with `state` enum pinned (`opened | resolved | appealed | appeal_resolved`). §8.5 expanded with Stripe charge ordering, composition counter, and dual-thread emit blocks. §8.6 pre-consumer exception added. §8.7 post-archival portability (GDPR Art. 20) added. §5 dispute cool-down row added. §11.5 hash-chain operational invariants expanded by three bullets. §12.1 creator asset-withdrawal bullet added. §12.4 reason-codes enum added. F8 and F10 rewritten. See red-team-pass-4 record at end of document for detailed findings.
+
+See red-team-pass-4 record at end of document for detailed findings on revision 4.
+
 ## 16. Retention
 
 Ledger events are retained in the primary store for **6 years** after the final terminal-state transition of their thread. After 6 years, events are rotated to cold archival with hashed identifiers only (`actor_ref` replaced by `sha256(actor_ref)`); the primary-store rows are removed. The hash chain is preserved in archival form and remains independently verifiable. Actor handles tombstoned under §8.7 follow the same schedule, keyed off the last thread they participated in. The retention clock may be extended on a per-thread basis where an active legal obligation (hold, subpoena, regulator request) requires it, for the duration of that obligation.
@@ -425,3 +526,5 @@ Ledger events are retained in the primary store for **6 years** after the final 
 **Red-team passes applied:** 2 (2026-04-20). Fixes integrated: C1–C11, I1–I10, M3–M5. Self-dealing prevention, Stripe Connect escrow (replacing manual-capture error), `offers.cancelled` state, `assignment_deliverables` revision table, platform fee rate-lock (F16), 14-day dispute window, creator-initiated dispute path, transition atomicity, client-side-only drafts, rate limiting, timer infrastructure, FX/VAT stubs.
 
 **Red-team pass 3 applied:** 3 (2026-04-20). Rethink through ethics / creator-empowerment / simplicity / legal-safety lenses. R1 agent-model declaration (§1.1). R2 unified ledger_events with pseudonymous actor_handles, hash-chained tamper-evidence, payload discipline (§8.3 / §8.4 / §8 header / §8.7). R3 retention schedule (§16), creator appeal right with independent review (§5 / §12.4a / §12.4b), data portability (§8.7), tamper-evidence mechanism (§9), terminology lock strengthened (§9). Founder sign-off obtained under §15 for §5 / §8 / §9 / §12.4 changes. Pre-consumer: payload stays at v=1 per §8.6 exception.
+
+**Red-team pass 4 applied:** 4 (2026-04-20). Scenario-driven walkthrough against revision 3 surfaced 19 items (7 blocks, 7 fixes, 5 notes). Blocks resolved: G1 (dispute event catalogue §8.2a added with 4 events: dispute.opened, dispute.resolved, dispute.appealed, dispute.appeal_resolved; total event count 19); G2 (canonical system actor seeded in §8.4); G3 (dispute cool-down prose added to §5 — no re-dispute after any prior terminal resolution); G7 (Stripe charge ordering added to §8.5 with pre-commit charge / post-commit void-on-failure reconciliation); G11 (buyer-initiated dispute window harmonized across §5 table, §5 prose, §12.4); G12 (disputes table added to §7; thread_id source clarified); G13 (dual-thread emit example added to §8.5). Fixes: G5 (§8.7 post-archival portability); G8 + G9 (§11.5 delivered_at lifecycle + multi-piece retrigger); G10 (§8.5 composition-change counter example); A1 (§7 rights jsonb shape); A2 (§12.4 enumerated reason codes); A3 (§8.1 offer.rejected payload carries affected_item_ids). Notes: G4 (§5 clock origin inline); G6 (§8.6 pre-consumer exception clause); G14 + A5 (§F8 rewrite with standing enumeration); A4 (§12.1 creator asset-withdrawal surface). Founder sign-off obtained under §15 for §4 / §5 / §7 / §8 / §12 changes. Payload stays at v=1 per §8.6 pre-consumer exception.
