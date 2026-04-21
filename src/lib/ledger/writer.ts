@@ -89,22 +89,53 @@ export type EmitEventResult =
       reason:
         | 'PAYLOAD_VALIDATION_FAILED'
         | 'HASH_CHAIN_VIOLATION'
+        | 'CONCURRENT_CHAIN_ADVANCE'
         | 'INSERT_FAILED'
       detail: string
     }
 
-// ─── Trigger error matchers ───────────────────────────────────────
+// ─── Trigger / index error matchers ───────────────────────────────
 //
-// `enforce_ledger_hash_chain()` raises via:
-//   RAISE EXCEPTION 'ledger_events hash-chain violation: ...'
-//     USING ERRCODE = 'check_violation';
-// (migration 20260421000004 L442-446). Postgres maps
-// `check_violation` to SQLSTATE `23514`. We match the SQLSTATE
-// first (stable regardless of RAISE text rewording) and fall back
-// to a substring match on the RAISE text if the code is absent.
+// Three-way classification on the RPC error surface:
+//
+//   1. SQLSTATE 23514 + 'ledger_events hash-chain violation' in the
+//      RAISE text → HASH_CHAIN_VIOLATION. The BEFORE-INSERT trigger
+//      `enforce_ledger_hash_chain()` (migration 20260421000004
+//      L427-468, RAISE at L442-446) fires this when the caller's
+//      supplied `prev_event_hash` no longer matches the current
+//      thread tail. This is the programmer-error case — the
+//      caller read a stale tail outside the correct atomic RPC,
+//      or passed a literal hash that was never on the chain.
+//
+//   2. SQLSTATE 23505 + 'ledger_events_thread_prev_hash_unique' in
+//      the RAISE text → CONCURRENT_CHAIN_ADVANCE. The UNIQUE index
+//      added by migration 20260421000006 fires this when two
+//      concurrent inserts on the same thread both passed the
+//      BEFORE-INSERT trigger (same stale read of the tail under
+//      read-committed) but only one can land. This is the race
+//      case — infrastructure, not programmer error. See the
+//      design lock §6.1b for the full race analysis.
+//
+//   3. Anything else → INSERT_FAILED fallback.
+//
+// Caller retry semantics are identical for (1) and (2): both mean
+// "re-read the thread tail inside your atomic RPC and retry".
+// The distinction is preserved here so telemetry can separate the
+// programmer-error bug rate from the legitimate infra race rate.
+//
+// Both matchers check SQLSTATE AND a substring scoped to the
+// specific trigger / index name. Plain SQLSTATE is unsafe —
+// 23505 is raised by every UNIQUE constraint in the schema, so
+// matching SQLSTATE alone would wrongly classify e.g. an
+// `actor_handles_auth_user_id_key` violation as a ledger-chain
+// race. The substring match pins the classifier to the exact
+// Postgres object whose violation carries the retry semantics.
 const HASH_CHAIN_VIOLATION_SQLSTATE = '23514'
 const HASH_CHAIN_VIOLATION_RAISE_SUBSTR =
   'ledger_events hash-chain violation'
+const CONCURRENT_INSERT_SQLSTATE = '23505'
+const CONCURRENT_INSERT_INDEX_NAME =
+  'ledger_events_thread_prev_hash_unique'
 
 // Every row-level insert in P4 uses the literal 'v1' payload_version.
 // Spec §8.6 pre-consumer exception: breaking payload shape changes
@@ -121,6 +152,12 @@ function isHashChainViolation(err: RpcErrorLike): boolean {
   return msg.includes(HASH_CHAIN_VIOLATION_RAISE_SUBSTR.toLowerCase())
 }
 
+function isConcurrentChainAdvance(err: RpcErrorLike): boolean {
+  if (err.code !== CONCURRENT_INSERT_SQLSTATE) return false
+  const msg = err.message?.toLowerCase() ?? ''
+  return msg.includes(CONCURRENT_INSERT_INDEX_NAME.toLowerCase())
+}
+
 /**
  * Append one ledger event.
  *
@@ -129,8 +166,10 @@ function isHashChainViolation(err: RpcErrorLike): boolean {
  * 3. Call `rpc_append_ledger_event` with the validated payload. The
  *    BEFORE INSERT trigger validates the hash chain and computes
  *    `event_hash`.
- * 4. On error: classify as HASH_CHAIN_VIOLATION (SQLSTATE-matched)
- *    or INSERT_FAILED. On success: return the trigger-computed
+ * 4. On error: classify three-way via the matcher block above —
+ *    CONCURRENT_CHAIN_ADVANCE (race on the UNIQUE index),
+ *    HASH_CHAIN_VIOLATION (trigger stale prev), or INSERT_FAILED
+ *    fallback. On success: return the trigger-computed
  *    `event_hash` and the new row's `id`.
  *
  * The writer does NOT log payload contents at any log level —
@@ -179,6 +218,18 @@ export async function emitEvent<T extends EventType>(
   })
 
   if (error) {
+    // Classifier order: CONCURRENT_CHAIN_ADVANCE (race) → HASH_CHAIN_VIOLATION
+    // (programmer-error stale prev) → INSERT_FAILED fallback. In practice
+    // the BEFORE-INSERT trigger catches stale prev before the UNIQUE index
+    // check fires, so only one path surfaces per error — but the ordering
+    // is robust to any future Postgres-level re-ordering.
+    if (isConcurrentChainAdvance(error as RpcErrorLike)) {
+      return {
+        ok: false,
+        reason: 'CONCURRENT_CHAIN_ADVANCE',
+        detail: error.message,
+      }
+    }
     if (isHashChainViolation(error as RpcErrorLike)) {
       return {
         ok: false,

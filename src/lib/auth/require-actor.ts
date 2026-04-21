@@ -1,4 +1,4 @@
-'use server'
+import 'server-only'
 
 /**
  * Frontfiles — requireActor (spec-canonical actor resolution)
@@ -15,6 +15,9 @@
  *   - docs/audits/P4_CONCERN_3_DIRECTIVE.md — this file's
  *     governing directive, including the fail-closed contract
  *     and the token-extraction scope.
+ *   - docs/audits/P4_CONCERN_4A_1_DIRECTIVE.md §DECISIONS D8 —
+ *     server-sentinel rationale (this module's L1 directive
+ *     choice; mirrored from src/lib/ledger/writer.ts).
  *
  * Contract (four outcomes):
  *
@@ -43,9 +46,15 @@
  * `auth.uid()` ever matches it. §8.4's "never exposed to
  * clients" invariant therefore holds without an explicit guard.
  *
- * 'use server' note: the two `export type` declarations below
- * are erased at compile time and do not become Server Functions.
- * The only runtime export is `requireActor`, matching AC #7.
+ * Server-only sentinel: `import 'server-only'` (not
+ * `'use server'`). Per P4_CONCERN_4A_1_DIRECTIVE.md §DECISIONS
+ * D8: this module is an internal server-side helper called by
+ * route handlers, NOT a Server Function surface. `'use server'`
+ * would wrongly mark `requireActor()` as a Server Function
+ * callable from client components; `import 'server-only'` raises
+ * a build error if any client component imports the module —
+ * the correct sentinel for an internal helper. Closes 4A.1
+ * exit-report open item (g).
  */
 
 import { isAuthWired } from '@/lib/flags'

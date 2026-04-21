@@ -155,6 +155,73 @@ describe('emitEvent', () => {
     }
   })
 
+  it('classifies unique-violation on the ledger prev-hash index as CONCURRENT_CHAIN_ADVANCE', async () => {
+    // Race case: the BEFORE-INSERT trigger `enforce_ledger_hash_chain()`
+    // passed (two concurrent inserts both read the same stale thread
+    // tail under read-committed), but the UNIQUE index added by
+    // migration 20260421000006 caught the second commit. The writer
+    // must classify this distinctly from HASH_CHAIN_VIOLATION so
+    // telemetry can separate programmer-error stale-prev bugs from
+    // legitimate infra races. Caller retry semantics are identical.
+    const { db } = makeStubClient({
+      data: null,
+      error: {
+        code: '23505',
+        message:
+          'duplicate key value violates unique constraint '
+          + '"ledger_events_thread_prev_hash_unique"',
+      },
+    })
+
+    const result = await emitEvent({
+      db,
+      threadType: 'offer',
+      threadId: THREAD_ID,
+      eventType: 'offer.created',
+      payload: validOfferCreatedPayload(),
+      actorRef: ACTOR_REF,
+      prevEventHash: null,
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.reason).toBe('CONCURRENT_CHAIN_ADVANCE')
+    }
+  })
+
+  it('classifies unique-violations from unrelated constraints as INSERT_FAILED (not CONCURRENT_CHAIN_ADVANCE)', async () => {
+    // Load-bearing test: plain SQLSTATE 23505 matching would misclassify
+    // every UNIQUE violation in the schema as a ledger-chain race. The
+    // classifier requires BOTH SQLSTATE 23505 AND the specific
+    // `ledger_events_thread_prev_hash_unique` index name in the RAISE
+    // text. A 23505 raised by, e.g., `actor_handles_auth_user_id_key`
+    // must fall through to INSERT_FAILED.
+    const { db } = makeStubClient({
+      data: null,
+      error: {
+        code: '23505',
+        message:
+          'duplicate key value violates unique constraint '
+          + '"actor_handles_auth_user_id_key"',
+      },
+    })
+
+    const result = await emitEvent({
+      db,
+      threadType: 'offer',
+      threadId: THREAD_ID,
+      eventType: 'offer.created',
+      payload: validOfferCreatedPayload(),
+      actorRef: ACTOR_REF,
+      prevEventHash: null,
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.reason).toBe('INSERT_FAILED')
+    }
+  })
+
   it('classifies unrecognised Supabase errors as INSERT_FAILED', async () => {
     const { db } = makeStubClient({
       data: null,
