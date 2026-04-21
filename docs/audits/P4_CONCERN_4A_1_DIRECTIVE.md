@@ -297,8 +297,15 @@ Per-file requirements:
     math is Postgres-side); design lock §6.1a (atomicity is caller's
     responsibility via RPC); spec §8.3 (storage shape + hash preimage);
     spec §8.5 (atomicity); spec §8.6 (payload versioning).
-  - 'use server' directive at file top.
+  - FIRST LINE of the module (BEFORE imports): `import 'server-only'`.
+    NOT `'use server'`. See D8 below for the rationale — the writer
+    is an internal server-to-Postgres helper, never a Server Function
+    surface. `import 'server-only'` raises a build error if any
+    client component imports this module; `'use server'` would
+    (wrongly) mark every export as a Server Function callable from
+    client components.
   - Imports:
+      import 'server-only'
       import * as z from 'zod'
       import type { SupabaseClient } from '@supabase/supabase-js'
       import type { EventType, EventPayload, ThreadType } from './types'
@@ -664,12 +671,12 @@ D6. No `'use server'` directive on system-actor.ts. Rationale: the
     file exports a single string const. 'use server' marks every
     export as a Server Function (Next.js 16 convention), which is
     wrong for a plain data constant. Server-only-ness is enforced
-    by the module graph: only server-only callers (writer.ts,
-    future cron handlers, dispute admin RPC call sites) import
-    this module, and those callers are themselves 'use server' or
-    live under src/app/api/. Any attempt to import from a client
-    component will be caught by Next.js's server/client boundary
-    check — no directive needed here.
+    by the module graph: only server-only callers (writer.ts via
+    `import 'server-only'` — see D8; future cron handlers;
+    dispute admin RPC call sites) import this module. Any attempt
+    to import from a client component will be caught by Next.js's
+    server/client boundary check — no directive needed on
+    system-actor.ts itself.
 
 D7. `rights` and `rights_diff` payload fields are typed as `unknown`
     in types.ts and `z.unknown()` in schemas.ts at this stage.
@@ -682,6 +689,34 @@ D7. `rights` and `rights_diff` payload fields are typed as `unknown`
     this — breaking payload shape changes can happen in-place at
     v=1 until the first production consumer ships at P5. 4A.2
     directive will update both files as its first task.
+
+D8. `import 'server-only'` on writer.ts, NOT `'use server'`. The
+    writer (`emitEvent`) is an internal server-to-Postgres helper:
+    it takes a `SupabaseClient` instance, runs Zod validation, and
+    calls a service-role RPC. It is never a legitimate Server
+    Function surface — there is no client-component call path to
+    it, and if one appeared it would be a security issue (a Server
+    Function implicitly trusts the client-supplied action ref and
+    would bypass the requireActor() gate that route handlers
+    enforce). The two directives behave differently:
+      - `'use server'` marks every export in the file as a Server
+        Function registered with the React Server Actions runtime,
+        callable from client components via action references.
+        This is the pattern used (off-pattern) in
+        `src/lib/auth/require-actor.ts` from concern 3. Wrong fit
+        for writer.ts.
+      - `import 'server-only'` is a package-import sentinel that
+        throws a build error if any client component imports the
+        module (directly or transitively). It does NOT mark
+        exports as Server Functions. Correct fit for writer.ts.
+    Cost: single line at writer.ts top. Known downstream debt:
+    `src/lib/auth/require-actor.ts` (concern 3) uses `'use server'`
+    where it should use `import 'server-only'` on the same
+    grounds — `requireActor()` is not a legitimate Server Function
+    surface either. That cleanup is deferred to a follow-up
+    commit on feat/p4-economic-cutover, batched with the
+    concern-1 trigger race follow-up migration before 4A.2
+    dispatches. Do NOT touch require-actor.ts in 4A.1.
 
 BANNED TERMS
 Per ECONOMIC_FLOW_v1 §9 and project conventions, the following terms
@@ -896,6 +931,7 @@ Gate 4 is the critical one. The design lock is the source of truth this directiv
 
 - **2026-04-21 — Draft 1.** Initial directive drafted after `P4_CONCERN_4_DESIGN_LOCK.md` Draft 2 (which corrected §6.1 to locate hash math Postgres-side and narrowed §9.1 scope after a red-team pass before dispatch). Structural deviation from `P4_CONCERN_3_DIRECTIVE.md`: this directive cites `P4_CONCERN_4_DESIGN_LOCK.md §9.1` as the scope source-of-truth rather than `P4_IMPLEMENTATION_PLAN.md §X`, because concern 4 was described monolithically in the plan and the design lock is the first sub-phase decomposition. Seven decisions resolved inline (D1 flat `src/lib/ledger/` path over the deferred `src/lib/economic-flow/` path; D2 hash math is Postgres-trigger-owned; D3 caller loads prev_event_hash; D4 business RPCs deferred to 4A.2+; D5 concern-1 trigger race flagged not fixed here; D6 no 'use server' on system-actor.ts; D7 `rights`/`rights_diff` typed `unknown` pending 4A.2 tightening). One carryover gate: the design lock (`P4_CONCERN_4_DESIGN_LOCK.md`) is currently untracked and must be committed before this directive dispatches (§D gate 4).
 - **2026-04-21 — Draft 2 (red-team patches B1–B5).** Founder ran an adversarial pass against §A before dispatch; five blocking findings patched inline, leaving §A implementation-safe. **B1** — writer.ts step (c): RPC arg list now includes `p_payload_version: 'v1'` as a hard-coded string literal, with a NOTE distinguishing the embedded payload `v: 1` (spec §8.6 payload field) from the row-level `payload_version text` column (migration 20260421000004). **B2** — writer.ts step (d): hash-chain violation matcher is now grounded — directive instructs Claude Code to read `enforce_ledger_hash_chain()` at migration L427-466 BEFORE writing the matcher, use SQLSTATE as primary match with RAISE-text substring as fallback, cite both in the exit report, and STOP if the trigger body at that line range doesn't match expectations. **B3** — writer.ts step (e): return shape of `supabase.rpc()` clarified — `{ data: Array<{ id, event_hash }> | null, error }` per RETURNS TABLE form; read `data?.[0]`; treat missing/empty data with no error as an invariant violation (`INSERT_FAILED` with detail 'RPC returned no row'). **B4** — schemas.ts: `piece_ref` removed from the UUID list and loosened to `z.string().min(1)` with a TODO for 4A.3 to tighten once the piece-identifier format is pinned by the assignment delivery state machine. **B5** — schemas.ts: `target_type` now typed `z.enum(['brief_pack', 'asset_pack'])` with a DDL cross-check instruction (if spec §8.1/§8.2 rows disagree with the `offers.target_type` / `assignments.target_type` CHECK/enum in migration 20260421000004, STOP). Also rolled in three non-blocking tightenings while the §A body was open: `currency` → `z.string().length(3)` (ISO 4217); `platform_fee_bps` → `z.number().int().min(0).max(10000)` (bps bound); `currency` moved out of the free-text z.string() group. Five non-blocking notes from the same pass remain open for founder adjudication separately (N1 `'use server'` vs `import 'server-only'` on writer.ts — a D8 candidate; N4 AC #8 test-count estimate `~15–20` vs actual `~30`; and two Design-Lock-scope notes that don't apply to this directive). D1–D7 decisions unchanged. No re-scoping; the scope set by Design Lock §9.1 is intact.
+- **2026-04-21 — Draft 3 (N1 resolved as D8).** Founder resolved the remaining N1 note from the Draft 2 red-team pass. Decision: **writer.ts uses `import 'server-only'`, NOT `'use server'`**. Three edits: (a) DELIVERABLE (4) writer.ts spec — replaced the `'use server' directive at file top` instruction with an `import 'server-only'` first-line instruction, added rationale referencing D8; imports block prepended with `import 'server-only'`. (b) §DECISIONS RESOLVED — added D8 (~45 lines) documenting the semantic distinction between `'use server'` (Server Function registration for client-component callers) and `import 'server-only'` (build-time client-import sentinel), and flagging `src/lib/auth/require-actor.ts` from concern 3 as inherited tech debt — same semantic mismatch, deferred to a follow-up commit on feat/p4-economic-cutover before 4A.2. (c) D6 updated to cite D8 when describing the module-graph enforcement path from writer.ts. Scope: one-line change at writer.ts top + directive documentation. No re-scoping; no test-count shift; no schema change. Dispatch gate 5 (founder verdicts directive) now cleared; remaining gate is 6 (working tree clean immediately before dispatch — procedural).
 
 ---
 
