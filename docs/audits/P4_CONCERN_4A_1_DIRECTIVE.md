@@ -199,17 +199,44 @@ Per-file requirements:
       - uses `.strict()` so unknown keys fail validation (catch drift
         early; the pre-consumer exception §8.6 makes this safe)
       - uses z.string().uuid() for `by_actor_id`, `last_active_actor_id`,
-        `submitter_actor_handle`, `offer_id`, `assignment_id`, `piece_ref`
+        `submitter_actor_handle`, `offer_id`, `assignment_id`
+      - uses z.string().min(1) for `piece_ref`. Rationale: the spec
+        row at §8.2 does not pin `piece_ref` as a UUID — it may be
+        an opaque reference (submission slot id, file hash, or
+        composite key) depending on how 4A.3's assignment delivery
+        state machine chooses to mint piece identifiers. Keep the
+        constraint loose here; 4A.3 directive will tighten to the
+        final shape (UUID, prefixed ref, or otherwise) as its first
+        task. Leave a TODO comment in schemas.ts pointing at
+        P4_CONCERN_4A_3 so the tightening is not forgotten.
+      - uses z.enum(['brief_pack', 'asset_pack']) for `target_type`
+        (appears in `offer.created` and `assignment.created` payload
+        rows). Before finalising the enum, cross-check against
+        migration 20260421000004 — the DDL defines a CHECK constraint
+        or enum type on `offers.target_type` (and equivalent on
+        `assignments.target_type`). The Zod enum MUST exactly match
+        the DB-level allowed values. If spec §8.1 / §8.2 payload
+        rows and the DDL CHECK/enum disagree, STOP and surface the
+        discrepancy in the exit report — do not silently pick one.
+        The most likely agreement set is `['brief_pack', 'asset_pack']`
+        (matching the two-lane architecture); verify.
       - uses z.string().datetime() for `at`, `submitted_at`, `expires_at`
       - uses z.number().int().nonnegative() for `rounds_used`,
-        `rounds_remaining`, `platform_fee_bps`, `expected_piece_count`
+        `rounds_remaining`, `expected_piece_count`
+      - uses z.number().int().min(0).max(10000) for `platform_fee_bps`
+        (basis points cap at 10000 = 100%; >10000 is nonsensical and
+        the DDL likely CHECKs the same bound)
       - uses z.number() for monetary fields (`gross_fee`, `fee_before`,
         `fee_after`, `amount`, `net_to_creator`, `amount_to_buyer`,
         `amount_to_creator`); integer-vs-float tightening deferred to
         when the money type lands — do NOT invent Money types here
       - uses z.boolean() for `auto`
+      - uses z.string().length(3) for `currency` (ISO 4217 three-letter
+        code; e.g. `'EUR'`, `'USD'`). Not a full enum — the allowed
+        currency set is a business-config concern, not a payload-
+        validation concern
       - uses z.string() for free-text `note`, `reason`, `rationale`,
-        `grounds`, `payment_ref`, `currency`
+        `grounds`, `payment_ref`
       - uses z.unknown() for `rights` and `rights_diff` (see (1) note)
       - uses z.enum([...]) for `evidence_type` and `outcome`
       - marks `by_actor_id?`, `reason?`, `affected_item_ids?`,
@@ -309,24 +336,73 @@ Per-file requirements:
          { ok: false, reason: 'PAYLOAD_VALIDATION_FAILED',
                    detail: <flattened Zod issues as a single string> }.
       c. Call the Supabase RPC `rpc_append_ledger_event` (file 11 below)
-         with the validated payload, thread_type, thread_id, event_type,
-         actor_ref, prev_event_hash. Reason for using the RPC rather
-         than a direct `supabase.from('ledger_events').insert(...)`:
-         the RPC returns the trigger-computed `event_hash` via a
-         RETURNING-equivalent path, and centralises the canonical insert
-         shape so 4A.2+'s business RPCs can call the same internal
-         SQL helper if they want (rather than re-inlining the insert
-         columns; this keeps the column list in one place).
-      d. On Supabase error: distinguish the trigger's
-         HASH_CHAIN_VIOLATION RAISE (the trigger at migration L427-466
-         raises with a specific error text; match on it) from generic
-         insert failures. If it matches trigger text, return
-         { ok: false, reason: 'HASH_CHAIN_VIOLATION', detail: error.message }.
-         Otherwise return { ok: false, reason: 'INSERT_FAILED', detail: error.message }.
-         (Your exit report must cite the exact RAISE message the
-         trigger uses so this matcher is grounded in the real text.)
-      e. On success: the RPC returns a single row `{ id, event_hash }`.
-         Return { ok: true, eventHash: row.event_hash, eventId: row.id }.
+         with the following args map:
+           {
+             p_thread_type:     args.threadType,
+             p_thread_id:       args.threadId,
+             p_event_type:      args.eventType,
+             p_payload_version: 'v1',           // row-level column value; see NOTE below
+             p_payload:         <validated payload>,
+             p_actor_ref:       args.actorRef,
+             p_prev_event_hash: args.prevEventHash,
+           }
+         NOTE — two distinct `version` fields. The `v: 1` literal
+         inside the payload jsonb is the SPEC §8.6 embedded payload
+         version (a numeric literal inside the jsonb blob, validated
+         by the Zod schema). The row-level `payload_version text`
+         column on ledger_events (per migration 20260421000004) is
+         a separate surface; for the entirety of P4 it is the string
+         literal `'v1'`. 4A.1 hard-codes `'v1'` at the writer
+         boundary. Do NOT derive it from the payload's `v` field;
+         do NOT parametrise it; do NOT surface it on EmitEventArgs.
+         When the first post-P5 consumer ships and payloads bump
+         to `v: 2`, a follow-up directive will thread a
+         `payloadVersion` arg through — not before.
+         Reason for using the RPC rather than a direct
+         `supabase.from('ledger_events').insert(...)`: the RPC returns
+         the trigger-computed `event_hash` via a RETURNING-equivalent
+         path, and centralises the canonical insert shape so 4A.2+'s
+         business RPCs can call the same internal SQL helper if they
+         want (rather than re-inlining the insert columns; this keeps
+         the column list in one place).
+      d. On Supabase error: distinguish the trigger's hash-chain
+         violation from generic insert failures. BEFORE WRITING THE
+         MATCHER, open `supabase/migrations/20260421000004_economic_flow_v1_ddl.sql`
+         at lines 427-466 and read the `enforce_ledger_hash_chain()`
+         function body. Identify (i) the exact `RAISE EXCEPTION` text
+         used for the prev_event_hash mismatch case and (ii) the
+         `SQLSTATE` code, if any, attached via `USING ERRCODE = ...`.
+         Use the SQLSTATE as the primary matcher (Supabase surfaces
+         it on `error.code`), with a case-insensitive substring match
+         on the RAISE text as a fallback if SQLSTATE is absent or
+         comes through as the generic `P0001`. Sketch:
+           if (error.code === <trigger-SQLSTATE> ||
+               error.message.toLowerCase().includes(<trigger-raise-substring>)) {
+             return { ok: false, reason: 'HASH_CHAIN_VIOLATION',
+                      detail: error.message }
+           }
+           return { ok: false, reason: 'INSERT_FAILED',
+                    detail: error.message }
+         Cite BOTH the SQLSTATE (or its absence) AND the exact RAISE
+         text verbatim in the exit report §Open items, so the
+         founder can verdict the matcher against the real trigger.
+         If the trigger body has NO RAISE at L427-466 (wrong line
+         range, moved, or the violation surfaces via a different
+         mechanism like a UNIQUE constraint), STOP and report — do
+         not invent a matcher.
+      e. On success: `supabase.rpc('rpc_append_ledger_event', { ... })`
+         returns `{ data: Array<{ id: string; event_hash: string }> |
+         null, error: PostgrestError | null }`. The RPC's
+         `RETURNS TABLE (...)` form surfaces as an array even when
+         exactly one row is returned. Read `const row = data?.[0]`.
+         If `data` is nullish or `data.length === 0` despite
+         `error` being null, return
+         `{ ok: false, reason: 'INSERT_FAILED',
+            detail: 'RPC returned no row' }` — this is an invariant
+         violation (the INSERT ... RETURNING must yield exactly one
+         row) and downstream callers should not have to handle an
+         undefined event_hash. On `row` present:
+         `return { ok: true, eventHash: row.event_hash, eventId: row.id }`.
   - The writer MUST NOT log payload contents at any level, per §8
     payload-discipline note and §12 PII concerns. A `console.debug`
     or logger.info carrying only event_type + thread_type + thread_id +
@@ -819,6 +895,7 @@ Gate 4 is the critical one. The design lock is the source of truth this directiv
 ## F — Revision history
 
 - **2026-04-21 — Draft 1.** Initial directive drafted after `P4_CONCERN_4_DESIGN_LOCK.md` Draft 2 (which corrected §6.1 to locate hash math Postgres-side and narrowed §9.1 scope after a red-team pass before dispatch). Structural deviation from `P4_CONCERN_3_DIRECTIVE.md`: this directive cites `P4_CONCERN_4_DESIGN_LOCK.md §9.1` as the scope source-of-truth rather than `P4_IMPLEMENTATION_PLAN.md §X`, because concern 4 was described monolithically in the plan and the design lock is the first sub-phase decomposition. Seven decisions resolved inline (D1 flat `src/lib/ledger/` path over the deferred `src/lib/economic-flow/` path; D2 hash math is Postgres-trigger-owned; D3 caller loads prev_event_hash; D4 business RPCs deferred to 4A.2+; D5 concern-1 trigger race flagged not fixed here; D6 no 'use server' on system-actor.ts; D7 `rights`/`rights_diff` typed `unknown` pending 4A.2 tightening). One carryover gate: the design lock (`P4_CONCERN_4_DESIGN_LOCK.md`) is currently untracked and must be committed before this directive dispatches (§D gate 4).
+- **2026-04-21 — Draft 2 (red-team patches B1–B5).** Founder ran an adversarial pass against §A before dispatch; five blocking findings patched inline, leaving §A implementation-safe. **B1** — writer.ts step (c): RPC arg list now includes `p_payload_version: 'v1'` as a hard-coded string literal, with a NOTE distinguishing the embedded payload `v: 1` (spec §8.6 payload field) from the row-level `payload_version text` column (migration 20260421000004). **B2** — writer.ts step (d): hash-chain violation matcher is now grounded — directive instructs Claude Code to read `enforce_ledger_hash_chain()` at migration L427-466 BEFORE writing the matcher, use SQLSTATE as primary match with RAISE-text substring as fallback, cite both in the exit report, and STOP if the trigger body at that line range doesn't match expectations. **B3** — writer.ts step (e): return shape of `supabase.rpc()` clarified — `{ data: Array<{ id, event_hash }> | null, error }` per RETURNS TABLE form; read `data?.[0]`; treat missing/empty data with no error as an invariant violation (`INSERT_FAILED` with detail 'RPC returned no row'). **B4** — schemas.ts: `piece_ref` removed from the UUID list and loosened to `z.string().min(1)` with a TODO for 4A.3 to tighten once the piece-identifier format is pinned by the assignment delivery state machine. **B5** — schemas.ts: `target_type` now typed `z.enum(['brief_pack', 'asset_pack'])` with a DDL cross-check instruction (if spec §8.1/§8.2 rows disagree with the `offers.target_type` / `assignments.target_type` CHECK/enum in migration 20260421000004, STOP). Also rolled in three non-blocking tightenings while the §A body was open: `currency` → `z.string().length(3)` (ISO 4217); `platform_fee_bps` → `z.number().int().min(0).max(10000)` (bps bound); `currency` moved out of the free-text z.string() group. Five non-blocking notes from the same pass remain open for founder adjudication separately (N1 `'use server'` vs `import 'server-only'` on writer.ts — a D8 candidate; N4 AC #8 test-count estimate `~15–20` vs actual `~30`; and two Design-Lock-scope notes that don't apply to this directive). D1–D7 decisions unchanged. No re-scoping; the scope set by Design Lock §9.1 is intact.
 
 ---
 
