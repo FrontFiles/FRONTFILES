@@ -1,6 +1,6 @@
 # P4 Concern 2 — Decision Memo
 
-**Status.** Closed. Committed on `feat/p4-economic-cutover` at `9ba00e4`.
+**Status.** Closed. Committed on `feat/p4-economic-cutover` at `17ec6f0`.
 **Supersedes.** `P4_CONCERN_2_DIRECTIVE.md` (pre-draft, obsolete — see §Cleanup).
 **Consumes.** `P4_CONCERN_2_PRE_DRAFT_INPUTS.md` (pre-draft scratchpad; retain for audit trail).
 
