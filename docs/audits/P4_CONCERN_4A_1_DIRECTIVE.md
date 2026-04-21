@@ -126,7 +126,7 @@ row disagrees with the spec row, the SPEC wins — flag the discrepancy
 in your exit report §Open items and derive the Zod schema from the
 spec row. Do NOT silently follow the directive row.
 
-DELIVERABLES (10 files; 5 NEW lib files, 3 NEW tests, 3 EDITs, 1 NEW migration)
+DELIVERABLES (11 files; 4 NEW lib files, 3 NEW tests, 3 EDITs, 1 NEW migration)
 Produce in this order:
   1. NEW   src/lib/ledger/types.ts
   2. NEW   src/lib/ledger/schemas.ts
@@ -842,7 +842,7 @@ Produce a terminal-paste-ready report with these sections:
      row (§8.1 / §8.2 / §8.2a). Cite any fields where you chose a
      tighter or looser Zod constraint than the spec row implies.
      Flag any spec-vs-directive disagreement.
-  4. Decisions log — confirm D1–D7 from §A were honored as written,
+  4. Decisions log — confirm D1–D8 from §A were honored as written,
      OR cite where you deviated and why.
   5. Banned-term lint — full output of the rg command.
   6. Acceptance checklist — each of criteria 1–15 with PASS/FAIL.
