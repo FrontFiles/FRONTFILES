@@ -68,10 +68,10 @@ Until P5 stands up a CI-reachable Supabase with post-P4 schema, integration mode
 
 ## What concerns 3/4/5 still need
 
-- **Concern 3 (app-side).** Thread P4 economic schema renames through API routes, services, and server actions. Unblocked by this commit.
-- **Concern 4 (UI).** Consumer-side copy and label updates for the renamed fields/surfaces. Depends on concern 3.
-- **Concern 5 (cleanup).** Remove deprecated aliases, legacy column shims, and any transitional compatibility code introduced across concerns 1–4.
-- **P5 (merge).** Landing `feat/p4-economic-cutover` to main. Integration-mode wiring in CI is a P5-or-later decision.
+- **Concern 3 (AUTH_WIRED plumbing).** Add `FFF_AUTH_WIRED` to `src/lib/env.ts`; add `src/lib/auth/require-actor.ts` with fail-closed behaviour when the flag is off; gate the spec-canonical replacements for the 13 retiring routes behind the flag in middleware so they return `FEATURE_DISABLED` until P5 cutover. Default false in deploy 1. Independent of concerns 1–2 per `P4_CONCERN_1_DIRECTIVE.md` §C — can run in parallel. 2–3 day estimate. Full scope: `P4_IMPLEMENTATION_PLAN.md` §6.
+- **Concern 4 (UI cutover).** Retire the 13 routes and 9 consuming UI pages per `P4_UI_DEPRECATION_AUDIT.md`; sequence behind `AUTH_WIRED`. Depends on concerns 1 and 3 both landed. 7–12 day estimate. Full scope: `P4_IMPLEMENTATION_PLAN.md` §7.
+- **Concern 5 (legacy doc retirement).** Retire specs and audits superseded by the P4 set. Full scope: `P4_IMPLEMENTATION_PLAN.md` §8.
+- **P5 (merge).** Land `feat/p4-economic-cutover` to main and flip `FFF_AUTH_WIRED=true` in `.env.production`. Integration-mode CI wiring is a P5-or-later decision.
 
 ---
 
