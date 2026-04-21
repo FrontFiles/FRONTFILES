@@ -63,6 +63,15 @@ for (const [key, value] of Object.entries(process.env)) {
   }
 }
 
+// P4 concern 3 — default the spec-canonical AUTH_WIRED flag to `true`
+// in the test worker env so concern 4's replacement route handlers
+// (each guarded by `if (!isAuthWired()) return errorResponse(...)`)
+// exercise the live path by default. Tests that need the off path
+// stub explicitly via `vi.stubEnv('FFF_AUTH_WIRED', 'false')`.
+// Orthogonal to FF_INTEGRATION_TESTS (mock-vs-integration routing in
+// src/lib/providers/store.ts); both gates coexist.
+forwardedEnv.FFF_AUTH_WIRED = 'true'
+
 export default defineConfig({
   test: {
     environment: 'node',

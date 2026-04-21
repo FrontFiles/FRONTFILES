@@ -67,6 +67,13 @@ const envSchema = z.object({
     .default('false')
     .describe('Gates the real /api/upload commit path. `false` → 503 response.'),
 
+  FFF_AUTH_WIRED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .describe(
+      "Gates the spec-canonical request surface (requireActor + the 13 retiring routes' replacements). Default false in deploy 1; flipped true at P5.",
+    ),
+
   FFF_STORAGE_DRIVER: z
     .enum(['fs', 'supabase'])
     .default('fs')
@@ -161,6 +168,7 @@ const rawEnv = {
   // Server-only — undefined in the client bundle by design.
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   FFF_REAL_UPLOAD: process.env.FFF_REAL_UPLOAD,
+  FFF_AUTH_WIRED: process.env.FFF_AUTH_WIRED,
   FFF_STORAGE_DRIVER: process.env.FFF_STORAGE_DRIVER,
   FFF_STORAGE_FS_ROOT: process.env.FFF_STORAGE_FS_ROOT,
   FFF_STORAGE_SUPABASE_BUCKET: process.env.FFF_STORAGE_SUPABASE_BUCKET,
@@ -268,6 +276,9 @@ export const flags = {
   },
   get storageSupabase(): boolean {
     return process.env.FFF_STORAGE_DRIVER === 'supabase'
+  },
+  get authWired(): boolean {
+    return process.env.FFF_AUTH_WIRED === 'true'
   },
 }
 

@@ -58,3 +58,26 @@ export function isFffSharingEnabled(): boolean {
 export function isRealUploadEnabled(): boolean {
   return flags.realUpload
 }
+
+/**
+ * AUTH_WIRED — spec-canonical request-surface gate.
+ *
+ * When false (the default in deploy 1), every spec-canonical
+ * route handler that is the replacement for one of the 13
+ * retiring routes (per P4_UI_DEPRECATION_AUDIT.md §2) returns
+ * `FEATURE_DISABLED` 404. When true (P5 cutover), the live
+ * `requireActor()` resolution and route bodies execute.
+ *
+ * Server-only flag. Read at the top of each spec-canonical
+ * route handler via the FFF Sharing pattern:
+ *
+ *   if (!isAuthWired()) {
+ *     return errorResponse('FEATURE_DISABLED', 'Auth not wired.', 404)
+ *   }
+ *
+ * Concern 3 ships the helper. Concern 4 wires it into each
+ * replacement route handler.
+ */
+export function isAuthWired(): boolean {
+  return flags.authWired
+}
