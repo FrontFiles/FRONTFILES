@@ -79,9 +79,11 @@ describe('OfferCreatedPayloadSchema', () => {
   })
 
   it('rejects unknown keys — .strict() is enforced', () => {
+    // `safeParse` takes `unknown`, so an object literal with an
+    // extra key is not a TS type error at this call site — the
+    // probe is purely runtime, via Zod's .strict() mode.
     const result = OfferCreatedPayloadSchema.safeParse({
       ...validOfferCreated(),
-      // @ts-expect-error — intentionally unknown field to probe strict()
       extra_field: 'should not be allowed',
     })
     expect(result.success).toBe(false)

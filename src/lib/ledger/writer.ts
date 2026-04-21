@@ -73,8 +73,8 @@ export type EmitEventArgs<T extends EventType> = {
    *  validated inside `emitEvent` before the RPC call. */
   payload: EventPayload<T>
   /** uuid — `actor_handles.handle`. Either a party handle (via
-   *  `requireActor()`) or `SYSTEM_ACTOR_HANDLE` for platform-
-   *  originated events. */
+   *  `requireActor()`) or the platform system-actor sentinel for
+   *  platform-originated events. */
   actorRef: string
   /** uuid-hex or null. NULL only for the first event on a thread.
    *  Loaded by the caller inside its atomic RPC before calling
