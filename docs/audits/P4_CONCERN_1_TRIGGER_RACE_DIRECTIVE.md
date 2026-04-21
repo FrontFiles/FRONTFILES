@@ -71,9 +71,15 @@ PRECONDITIONS (verify in order; stop at first failure)
  1. On branch feat/p4-economic-cutover. If not, stop.
  2. `git status` is clean (no uncommitted changes, no stray files).
     Any deviation → stop.
- 3. HEAD is commit 468a3a03dbfd324cde95b0d26bfe6ce52b3e1155 (4A.1
-    follow-on corrections). Cite the actual SHA in the exit report.
-    If HEAD is different, stop and report.
+ 3. HEAD is commit f513933 (docs-only: this directive file, draft 1,
+    on top of 468a3a03dbfd324cde95b0d26bfe6ce52b3e1155 — the 4A.1
+    follow-on corrections commit). The only delta between
+    468a3a0 and f513933 is the addition of
+    docs/audits/P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md; no code,
+    schema, or config change. Cite the actual full HEAD SHA in
+    the exit report. If HEAD is not f513933 (or has any commits
+    beyond f513933), stop and report — state has drifted and the
+    directive must be re-validated before execution.
  4. `bun run test` reports 1103 passed | 10 skipped | 0 failed (the
     baseline after 468a3a0). Report actual counts. Any failure or
     file-load error → stop.
@@ -570,3 +576,4 @@ When all boxes clear, paste §A verbatim into Claude Code. Wait for the exit rep
 ## E — Revision history
 
 - **2026-04-21** — Drafted. Closes 4A.1 exit-report open items (a) and (g). Builds on `468a3a0`. Uses migration slot `20260421000006`, introduces `CONCURRENT_CHAIN_ADVANCE` writer result kind, swaps `require-actor.ts` to `import 'server-only'`.
+- **2026-04-21** — Precondition #3 updated after commit `f513933` (directive-file-only) landed on top of `468a3a0`. The directive file's own precondition set was internally contradictory — #3 expected HEAD `468a3a0`, #12 required the directive file to be present. Resolution: #3 now expects `f513933` with a docs-only-delta note; #12 unchanged. No scope change, no substantive edit.
