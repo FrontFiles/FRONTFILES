@@ -4,16 +4,17 @@
 
 **Governs.** A single execution session with Claude Code. Ships the Postgres-side business RPC catalogue (5 RPCs + 1 retry helper) for the offer state machine, plus the TS-side `src/lib/offer/*` domain helpers (state, pricing, rights, composer, types) and their unit tests. **No** route handlers, **no** pages, **no** components in this slice — those land in Parts B and C (separate follow-on directives). Intentional narrowing to keep the exit-report surface verdicatable.
 
-**Relationship to §9.2 full scope.** Design lock §9.2 bundles the full offer surface into one sub-phase (routes + pages + components + AssetRightsModule REWRITE + pack composer). One Claude Code session cannot safely land all of it — the diff is ~30+ files and the exit-report surface becomes un-verdicatable in a single pass. This directive splits 4A.2 into three dispatchable parts:
+**Relationship to §9.2 full scope.** Design lock §9.2 bundles the full offer surface into one sub-phase (routes + pages + components + AssetRightsModule REWRITE + pack composer). One Claude Code session cannot safely land all of it — the diff is ~30+ files and the exit-report surface becomes un-verdicatable in a single pass. This directive splits 4A.2 into **six dispatchable parts** (sequence: **A → B1 → B2 → C1 → C2 → D**):
 
 - **Part A** (this directive) — business RPCs + `src/lib/offer/*` + unit tests. ~9 files. One session.
-- **Part B** (`P4_CONCERN_4A_2B_DIRECTIVE.md`, drafted after Part A exits clean) — 7 route handlers (`src/app/api/offers/**`), TS-side retry/Stripe wrapper for `POST /api/offers/[id]/accept`, route-level integration tests. ~12 files.
-- **Part C** (`P4_CONCERN_4A_2C_DIRECTIVE.md`, drafted after Part B exits clean) — `/vault/offers` + `/vault/offers/[id]` pages, `src/components/offer/*` (10 components incl. PackComposer modal + FeeTransparencyPanel + RightsTemplatePicker + EventTrailViewer wiring), AssetRightsModule `OfferModal` REWRITE. ~20 files.
-
-A fourth follow-on directive covers **offer expiration cron** (Supabase Edge Function; `offer.expired` system event per §3.5) and lands after Part C. Timer placement open question §10.2 is resolved there, not here.
+- **Part B1** (`P4_CONCERN_4A_2_B1_DIRECTIVE.md`, drafted after Part A exits clean) — the five non-accept offer route handlers (`POST /api/offers`, `POST /api/offers/[id]/counter`, `POST /api/offers/[id]/reject`, `POST /api/offers/[id]/cancel`, `GET /api/offers/[id]`), TS-side error-classification wrapper, route-level integration tests. No Stripe. ~8 files.
+- **Part B2** (`P4_CONCERN_4A_2_B2_DIRECTIVE.md`, drafted after Part B1 exits clean) — the accept route (`POST /api/offers/[id]/accept`) and the §8.5 Stripe PaymentIntent straddle wrapper (outer state read → PaymentIntent create → `rpc_accept_offer` → void-on-failure), Stripe-straddle integration tests, idempotency-key contract. Isolated so the Stripe concern has its own exit report. ~5 files.
+- **Part C1** (`P4_CONCERN_4A_2_C1_DIRECTIVE.md`, drafted after Part B2 exits clean) — `/vault/offers` + `/vault/offers/[id]` pages and the lib-heavy, copy-light components (`OfferInboxList`, `OfferCard`, `OfferDetailView`, `FeeTransparencyPanel`, `ExpirationSelector`, shared `EventTrailViewer`, `StateBadge`, `ActorLabel`). ~12 files.
+- **Part C2** (`P4_CONCERN_4A_2_C2_DIRECTIVE.md`, drafted after Part C1 exits clean AND counsel-final rights-template copy lands) — the composition-heavy and rights-heavy surfaces: `PackComposer`, `OfferCounterEditor`, `OfferPreviewPanel`, `RightsTemplatePicker`, and the `src/components/asset/AssetRightsModule.tsx` `OfferModal` REWRITE. Gated on counsel-finalised template bodies per §D. ~8 files.
+- **Part D** (`P4_CONCERN_4A_2_D_DIRECTIVE.md`, drafted after Part C2 exits clean) — offer expiration cron (Supabase Edge Function; `offer.expired` system event per §3.5). Resolves timer placement open question §10.2.
 
 **Cross-references.**
-`docs/audits/P4_CONCERN_4_DESIGN_LOCK.md` §2.3 (library decomposition), §3.1 (offer route inventory — Part B scope), §6.1 (writer contract), §6.1a (atomicity via Postgres RPCs — **this directive implements the catalogue**), §6.1b (concurrent-insert race — closed by M6 upstream), §7 (flag strategy — Part B/C scope), §9.2 (sub-phase scope); `docs/audits/P4_CONCERN_4A_1_DIRECTIVE.md` §DECISIONS D4 (lazy import for Supabase client — mirrored in retry-helper shape), §EXIT REPORT open item (d) `rights` / `rights_diff` tightening (**this directive tightens `rights` schema**); `docs/audits/P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT open items (a) retry policy and (b) isolation choice (**this directive resolves both as D-level decisions**); `docs/specs/ECONOMIC_FLOW_v1.md` §4 (offer state machine), §7 (offer shape + triggers + rate limit), §8.1 (offer payload rows), §8.3 (ledger storage shape), §8.4 (actor handles + system sentinel), §8.5 (transition atomicity — including the Stripe acceptance straddle flow), §11 (pack mechanics), §F9 + §F15 + §F16 (pack size, rights templates, rate-lock); `supabase/migrations/20260421000004_economic_flow_v1_ddl.sql` L61-66 (`offer_target_type` enum), L68-94 (offers table + CHECK), L96-113 (`offer_assets`, `offer_briefs`), L222-243 (`ledger_events` shape), L427-468 (trigger body — **unchanged**); `supabase/migrations/20260421000005_seed_system_actor.sql` (system actor seed); `supabase/migrations/20260421000006_ledger_events_unique_prev_hash.sql` (UNIQUE prev-hash index — load-bearing for Part A's retry helper); `supabase/migrations/20260421000010_rpc_append_ledger_event.sql` (utility RPC — cited for pattern; not modified).
+`docs/audits/P4_CONCERN_4_DESIGN_LOCK.md` §2.3 (library decomposition), §3.1 (offer route inventory — Part B1/B2 scope), §6.1 (writer contract), §6.1a (atomicity via Postgres RPCs — **this directive implements the catalogue**), §6.1b (concurrent-insert race — closed by M6 upstream), §7 (flag strategy — Parts B1/B2/C1/C2 scope), §9.2 (sub-phase scope); `docs/audits/P4_CONCERN_4A_1_DIRECTIVE.md` §DECISIONS D4 (business RPCs deferred to 4A.2+ — **this directive ships the catalogue**) and D7 (`rights` / `rights_diff` typed `z.unknown()` pending 4A.2 tightening), §EXIT REPORT 10(d) `rights` / `rights_diff` as `unknown` (**this directive tightens `rights` schema for the offer surface**); `docs/audits/P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT 13(a) retry policy for CONCURRENT_CHAIN_ADVANCE and HASH_CHAIN_VIOLATION and 13(b) isolation choice vs UNIQUE-only (**this directive resolves both as D1 and D2**); `docs/specs/ECONOMIC_FLOW_v1.md` §4 (offer state machine), §7 (offer shape + triggers + max-3-pending rate limit at L152), §8.1 (offer payload rows), §8.3 (ledger storage shape), §8.4 (actor handles + system sentinel), §8.5 (transition atomicity — including the Stripe acceptance straddle flow), §11 (pack mechanics), §F9 (pack size), §F15 (rights templates — counsel-reviewed bodies land in Part C2), §F16 (platform-fee rate-lock; distinct from §7's max-3-pending rate limit); `supabase/migrations/20260421000004_economic_flow_v1_ddl.sql` L61-66 (`offer_target_type` enum), L68-94 (offers table + CHECK), L96-113 (`offer_assets`, `offer_briefs`), L222-243 (`ledger_events` shape), L427-468 (trigger body — **unchanged**); `supabase/migrations/20260421000005_seed_system_actor.sql` (system actor seed); `supabase/migrations/20260421000006_ledger_events_unique_prev_hash.sql` (UNIQUE prev-hash index — load-bearing for Part A's retry helper); `supabase/migrations/20260421000010_rpc_append_ledger_event.sql` (utility RPC — cited for pattern; not modified).
 
 ---
 
@@ -24,14 +25,14 @@ The text below is the directive as it will be pasted into Claude Code when dispa
 ```
 PHASE: P4 Concern 4A.2 — Offer Surface Part A
        (business RPCs + src/lib/offer/* domain helpers;
-       Part B route handlers and Part C UI follow as
-       separate directives)
+       Parts B1/B2 route handlers and Parts C1/C2 UI follow
+       as separate directives)
 
 SCOPE
 You are building the Postgres-side business RPC catalogue for the
 five user-driven offer state transitions (plus one system-side
 expiration RPC), and the TS-side `src/lib/offer/*` domain-helper
-library that route handlers in Part B will consume. Each business
+library that route handlers in Parts B1/B2 will consume. Each business
 RPC atomically pairs the `offers`-table state mutation with the
 matching `ledger_events` emission per ECONOMIC_FLOW_v1 §8.5, using
 an in-function bounded retry loop that catches the two hash-chain
@@ -99,13 +100,13 @@ TS-side library:
   src/lib/offer/tests/*.test.ts — unit tests per module
 
 Explicit narrowing:
-  - ZERO route handlers in this directive. Part B creates
-    src/app/api/offers/** — deferred.
-  - ZERO pages or components. Part C.
+  - ZERO route handlers in this directive. Parts B1/B2
+    create src/app/api/offers/** — deferred.
+  - ZERO pages or components. Parts C1/C2.
   - ZERO Stripe integration. rpc_accept_offer emits the events
     and creates the assignments row; the TS-side Stripe
     PaymentIntent straddle flow (§8.5 steps 3-6) wraps the RPC
-    in Part B.
+    in Part B2.
   - ZERO changes to src/lib/ledger/*. The writer contract at
     src/lib/ledger/writer.ts stays as-is; business RPCs do their
     own INSERT INTO ledger_events inline and rely on the trigger
@@ -193,7 +194,18 @@ PRECONDITIONS (verify in order; stop at first failure)
     number. A non-empty baseline is not blocking but must be
     cited in the exit report — the tests must not assume an
     empty thread.
-18. `offers` table row count is 0. If non-zero, stop — the
+18. `assignment_deliverables` table exists in the current
+    DDL. Verify via
+    `rg -n 'CREATE TABLE public.assignment_deliverables'
+       supabase/migrations/20260421000004_economic_flow_v1_ddl.sql`
+    — must match at L163 of migration `20260421000004`. If the
+    table is absent or the match line differs, STOP. This
+    precondition exists because `rpc_accept_offer` populates
+    `assignment_deliverables` rows atomically with the accept
+    transition (see DELIVERABLE rpc_accept_offer step 6 and
+    D14 below). Cite the matched line number in the exit
+    report.
+19. `offers` table row count is 0. If non-zero, stop — the
     business RPC smoke tests create and reference offers by
     fresh UUIDs; a non-empty baseline is not blocking for
     production but must be reconciled before this migration's
@@ -224,7 +236,7 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
            (iv)  Exhausted retries → RAISE EXCEPTION with
                  ERRCODE='P0001' and a message that cites the
                  thread + attempt count. The caller (route handler
-                 in Part B) surfaces this as a 503 with a retry
+                 in Parts B1/B2) surfaces this as a 503 with a retry
                  hint.
          Backoff table: ARRAY[0.01, 0.03, 0.10] seconds. Values
          chosen to let a single contending writer clear within
@@ -240,10 +252,12 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
            WHERE buyer_id=p_buyer_id AND creator_id=p_creator_id
            AND state IN ('sent','countered')) >= 3 then RAISE with
            ERRCODE='P0002', message 'rate_limit: max 3 pending
-           offers per buyer/creator'.
+           offers per buyer/creator'. (Per spec §7 L152 — this is
+           the application-layer max-3-pending rule, NOT §F16 which
+           is the unrelated platform-fee rate-lock.)
          - INSERT INTO offers (...) VALUES (...) RETURNING id INTO
            v_offer_id. State = 'sent'. platform_fee_bps snapshotted
-           here per §F16.
+           here per §F16 (platform-fee rate-lock).
          - Populate child table per p_target_type:
              'single_asset' | 'asset_pack' → INSERT INTO
                offer_assets (offer_id, asset_id, position) from
@@ -307,7 +321,7 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
            (one row per offer_briefs row, copying revision_cap
            from offer_briefs.spec.revision_cap).
          - RETURN the four identifiers.
-         NOTE: this RPC does NOT touch Stripe. The Part B route
+         NOTE: this RPC does NOT touch Stripe. The Part B2 route
          handler wraps this in the §8.5 straddle flow (outer
          state read → Stripe PaymentIntent → this RPC → void on
          RPC failure). The RPC idempotency surface is just the
@@ -330,10 +344,16 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
            path (§4 spec: "Cancellation via dispute after
            accepted, not offer cancellation").
          - "Last turn was buyer's" guard (spec §4): look at the
-           most recent event on the offer thread; if its actor_ref
-           is the creator, RAISE ERRCODE='P0005' 'not_last_turn'.
-           (For the first event on the thread — offer.created by
-           buyer — this guard trivially passes.)
+           most recent NON-SYSTEM event on the offer thread
+           (SELECT ... FROM ledger_events WHERE thread_type='offer'
+           AND thread_id=p_offer_id AND actor_ref !=
+           '00000000-0000-0000-0000-000000000001'::uuid ORDER BY
+           created_at DESC, id DESC LIMIT 1); if its actor_ref
+           resolves to the offer's creator, RAISE ERRCODE='P0005'
+           'not_last_turn'. Excluding the system sentinel from
+           this lookup is load-bearing — see D15. For the first
+           event on the thread — offer.created by buyer — this
+           guard trivially passes.
          - UPDATE offers SET state='cancelled',
            cancelled_by=<buyer_user_id>, updated_at=now().
          - Emit offer.cancelled via helper.
@@ -359,13 +379,46 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
        seed row if one is already in scope — cite the source),
        calls rpc_create_offer + rpc_counter_offer + rpc_cancel_offer
        end-to-end, asserts the ledger_events rows land with
-       correct prev_event_hash chain, cleans up in reverse order,
-       and RAISE NOTICE on success. If any step RAISEs, the whole
-       migration txn rolls back. The assertion does NOT exercise
-       rpc_accept_offer (no assignments row infra in an assertion
-       block) or rpc_expire_offer (requires sleep). It covers
-       create → counter → cancel, which is the minimum smoke
-       triad that proves the retry helper + the happy path.
+       correct prev_event_hash chain, and RAISE NOTICE on success.
+       If any step RAISEs, the whole migration txn rolls back.
+       The assertion does NOT exercise rpc_accept_offer (no
+       assignments row infra in an assertion block) or
+       rpc_expire_offer (requires sleep). It covers create →
+       counter → cancel, which is the minimum smoke triad that
+       proves the retry helper + the happy path.
+
+       CLEANUP (sentinel-scoped — load-bearing for non-empty
+       baselines): the assertion DO-block MUST embed a unique
+       sentinel value in the `payload.note` field of every row
+       it writes (offers, ledger_events, offer_assets or
+       offer_briefs if populated). Sentinel format:
+       `'P4_4A_2_ASSERTION_SENTINEL_' || gen_random_uuid()::text`,
+       captured into a local variable at the top of the
+       DO-block. Every INSERT emitted by the assertion threads
+       the sentinel into `payload.note` (for events) and into
+       `offers.current_note` (for the offer row) so that
+       cleanup can identify the assertion's own rows by exact
+       sentinel match. Cleanup is reverse-FK-order but
+       WHERE-clause-scoped on the sentinel: DELETE FROM
+       ledger_events WHERE payload->>'note' LIKE sentinel || '%';
+       DELETE FROM offer_assets / offer_briefs WHERE
+       offer_id IN (SELECT id FROM offers WHERE
+       current_note LIKE sentinel || '%'); DELETE FROM offers
+       WHERE current_note LIKE sentinel || '%'; DELETE FROM
+       actor_handles WHERE handle = v_disposable_handle;
+       DELETE FROM auth.users WHERE id IN
+       (v_buyer_id, v_creator_id). The `LIKE sentinel || '%'`
+       pattern accommodates buildOfferCreatedPayload's note
+       formatting. This matches the pattern established in
+       migration `20260421000006_ledger_events_unique_prev_hash.sql`
+       (which uses `payload->>'_test' = 'unique-prev-hash-row-1'`
+       for its own sentinel scope) and makes cleanup safe under
+       any `ledger_events` / `offers` baseline, including
+       production-like seeded states. A reverse-FK-order DELETE
+       without sentinel scoping is REJECTED up front — if the
+       assertion's writes cannot be unambiguously identified by
+       sentinel match, the DO-block must RAISE before cleanup
+       runs.
 
   NEW  src/lib/offer/types.ts
        - OfferTargetType = 'single_asset' | 'asset_pack' |
@@ -403,6 +456,19 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
            actorHandle === offer.buyer_handle AND
            (lastEventActorRef is undefined OR
             lastEventActorRef === offer.buyer_handle).
+           CONTRACT: `lastEventActorRef` is the actor_ref of
+           the most recent NON-SYSTEM event on the offer
+           thread (system actor UUID
+           '00000000-0000-0000-0000-000000000001' filtered
+           out). The Part B1 route handler is responsible for
+           applying this filter when loading the value — if
+           the literal last event was emitted by the system
+           actor, the caller must walk back through the
+           ledger until it finds a non-system event (or
+           return undefined if none exists). The guard itself
+           treats `lastEventActorRef` as already-filtered.
+           This mirrors the Postgres-side filter in
+           `rpc_cancel_offer` (see D15).
 
          canExpire({ offer, now })
            allowed if offer.state ∈ {'sent','countered'} AND
@@ -441,20 +507,30 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
 
   NEW  src/lib/offer/rights.ts
        - RIGHTS_TEMPLATES registry keyed by RightsTemplateId.
-         Each entry: { id, label, is_transfer: false,
-         default_params: { ... } }. Per §F15, v1 ships exactly
-         three counsel-reviewed templates plus 'custom'. Template
-         bodies are placeholder-approximate; counsel-reviewed
-         finalisation is a separate concern (flag in exit report
-         if the default_params shapes need founder input).
+         Each entry has EXACTLY three fields: { id:
+         RightsTemplateId; label: string; is_transfer:
+         boolean }. Per §F15, v1 ships exactly three counsel-
+         reviewed template identifiers plus 'custom'. Do NOT
+         ship `default_params`, `terms`, `clauses`, or any
+         other legal-bearing copy in this directive's registry
+         — the counsel-final template BODIES (clause copy,
+         default params, jurisdictional carve-outs) land in
+         Part C2, gated on counsel sign-off per §D. Part A
+         ships only the identifier + label + transfer-flag,
+         which is all the Part B1/B2 routes and Part C1 pages
+         need to validate and render.
        - RightsSchema: Zod schema tightening the spec §8.1 and
          §8.2 payloads' `rights` / `rights_diff` field (currently
          z.unknown() in src/lib/ledger/schemas.ts). Shape:
-         { template: RightsTemplateId; params: jsonb-object;
-           is_transfer: boolean }.
-         Closes 4A.1 exit-report open item (d) for the offer
-         payloads. Assignment- and dispute-side `rights_diff`
-         tightening stays deferred.
+         { template: RightsTemplateId; params: z.record(
+           z.string(), z.unknown()); is_transfer: boolean }.
+         `params` stays open-valued in Part A because the
+         counsel-final shape is unlocked here; Part C2 tightens
+         `params` once the template bodies ship.
+         Closes `P4_CONCERN_4A_1_DIRECTIVE.md` §EXIT REPORT
+         10(d) for the offer payloads. Assignment- and dispute-
+         side `rights_diff` tightening stays deferred to 4A.3 /
+         4A.4.
        - validateRights(rights: unknown): ParseResult<Rights>
          Wraps RightsSchema.safeParse; template='custom' entries
          are admitted but flagged (per §F7 "flagged for admin
@@ -462,7 +538,7 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
          a DB side-effect here — admin review lives downstream.
 
        IMPORTANT: do NOT modify src/lib/ledger/schemas.ts in
-       this directive. Part B (route handlers) will import
+       this directive. Part B1/B2 (route handlers) will import
        RightsSchema from src/lib/offer/rights.ts and compose it
        into a stricter OfferCreatedPayload validator at the route
        boundary. Centralising the lax `z.unknown()` tightening
@@ -501,6 +577,13 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
        - rejection by party (non-party attempts)
        - canCancel rejection when last event actor is creator
        - canCancel rejection when actor is creator
+       - canCancel ALLOWED when lastEventActorRef is the
+         buyer-handle even though a more recent system event
+         occurred on the thread (D15 contract — caller is
+         responsible for system-actor filtering; the guard
+         treats the filtered value as authoritative). Include
+         a comment citing D15 so future readers understand
+         the caller contract.
        - canExpire rejection when expires_at > now
 
   NEW  src/lib/offer/tests/pricing.test.ts
@@ -552,9 +635,10 @@ Create supabase/migrations/20260421000011_rpc_offer_business.sql:
        23505 error surface the retry helper catches)
      - Migration 20260421000004 L427-468 (the trigger — 23514
        surface)
-     - 4A.1 exit-report open items (a) retry + (b) isolation —
-       explicitly state those are resolved in this migration's
-       helper
+     - P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md §EXIT REPORT
+       13(a) retry policy + 13(b) isolation — explicitly state
+       those are resolved in this migration's helper (see D1
+       and D2 below)
 
   B. BEGIN; ... COMMIT; wrapper per precedent.
 
@@ -594,12 +678,17 @@ Create supabase/migrations/20260421000011_rpc_offer_business.sql:
 
   F. Inline DO-block assertion (create → counter → cancel
      smoke triad). Mirror migration 20260421000006's assertion
-     shape: disposable actor, disposable users if needed
-     (auth.users rows; use gen_random_uuid() and the minimal
-     shape), RAISE NOTICE on success, RAISE EXCEPTION with
-     clear message on any step-level failure. Cleanup: reverse
-     FK order (ledger_events → offer_assets/offer_briefs →
-     offers → actor_handles → auth.users).
+     shape: sentinel-scoped cleanup (see DELIVERABLES
+     §CLEANUP block above), disposable actor, disposable
+     users if needed (auth.users rows; use gen_random_uuid()
+     and the minimal shape), RAISE NOTICE on success, RAISE
+     EXCEPTION with clear message on any step-level failure.
+     Cleanup: reverse FK order SCOPED BY SENTINEL match on
+     payload.note / current_note — NOT a blanket reverse-FK
+     DELETE. Sentinel format
+     `'P4_4A_2_ASSERTION_SENTINEL_' || gen_random_uuid()::text`
+     captured into `v_sentinel` at the top of the DO-block and
+     threaded into every INSERT the assertion performs.
 
      If the assertion needs auth.users rows and creating them
      from within a migration is infrastructurally awkward on
@@ -655,16 +744,33 @@ DECISIONS RESOLVED (do not re-litigate during execution)
 
 D1 Retry policy is in-Postgres (_emit_offer_event_with_retry),
    not TS-side. N=3 bounded, backoff ARRAY[0.01, 0.03, 0.10]
-   seconds via pg_sleep. Closes 4A.1 exit-report open item (a).
-   TS-side route handlers (Part B) do NOT retry; they receive
-   the final classified result (success or P0001 exhausted
-   retries) and propagate. Rationale: in-RPC retry keeps the
-   row-lock held across attempts (no lock-drop-and-reacquire
-   race), and the retry surface for all six RPCs is a single
-   helper — centralised observability, one code path.
+   seconds via pg_sleep. Closes
+   P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md §EXIT REPORT 13(a).
+   TS-side route handlers (Parts B1/B2) do NOT retry; they
+   receive the final classified result (success or P0001
+   exhausted retries) and propagate. Rationale: in-RPC retry
+   keeps the row-lock held across attempts (no lock-drop-and-
+   reacquire race), and the retry surface for all six RPCs is a
+   single helper — centralised observability, one code path.
+
+   Row-lock scope lock-in (R1): the row-lock acquired by
+   SELECT ... FOR UPDATE inside each business RPC is held
+   ONLY for the duration of that RPC's execution —
+   worst-case ~150ms (3 × 0.10s backoff ceiling, plus trivial
+   work). In Part B2, the §8.5 Stripe straddle flow explicitly
+   does NOT hold this row-lock across the Stripe PaymentIntent
+   RTT. The sequence is: (outer) state read without FOR UPDATE
+   → Stripe PaymentIntent create (~500ms-2s, NO DB row-lock
+   held) → `rpc_accept_offer` invoked only AFTER PaymentIntent
+   succeeds (row-lock acquired then released within the RPC,
+   <150ms) → Stripe void-on-failure (idempotency-keyed). The
+   Part B2 directive must state this lock-scope constraint
+   explicitly; a naïve "row-lock straddling the PaymentIntent"
+   implementation is REJECTED up front.
 
 D2 Isolation is read-committed (Postgres default). NOT
-   SERIALIZABLE. Closes 4A.1 exit-report open item (b).
+   SERIALIZABLE. Closes
+   P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md §EXIT REPORT 13(b).
    Rationale: UNIQUE (thread_type, thread_id, prev_event_hash)
    NULLS NOT DISTINCT from migration 20260421000006 is the
    correctness backstop; SERIALIZABLE adds read-set-conflict
@@ -703,21 +809,24 @@ D6 Stripe is OUT of scope for Part A. rpc_accept_offer emits
    events and creates the assignment row but does not call
    Stripe. The TS-side §8.5 straddle flow (outer state read →
    PaymentIntent create → rpc_accept_offer → void-on-failure)
-   is Part B's work. Rationale: Stripe wiring adds ~200 LoC of
+   is Part B2's work. Rationale: Stripe wiring adds ~200 LoC of
    TS and moves the exit-report surface out of "pure SQL +
    pure TS lib" territory. Keeping Part A dispatchable in one
    session.
 
-D7 Rate limit (max 3 pending per buyer-creator per §F16)
-   enforced in rpc_create_offer via an in-RPC COUNT guard.
-   Duplicates no existing DDL constraint; §F16 is an
-   application-layer rule, not a DB invariant. Race-safe
-   because the COUNT runs inside the same txn as the INSERT
-   and the rate-limit ceiling is asymmetric (a concurrent
-   fourth insert will succeed at this guard; subsequent reads
-   will see 4 pending — acceptable v1 approximation;
-   tightening to a session-level advisory lock deferred
-   unless observed abuse).
+D7 Rate limit (max 3 pending per buyer-creator per spec §7
+   L152) enforced in rpc_create_offer via an in-RPC COUNT
+   guard. Duplicates no existing DDL constraint; §7's max-3-
+   pending is an application-layer rule, not a DB invariant.
+   Race-safe because the COUNT runs inside the same txn as
+   the INSERT and the rate-limit ceiling is asymmetric (a
+   concurrent fourth insert will succeed at this guard;
+   subsequent reads will see 4 pending — acceptable v1
+   approximation; tightening to a session-level advisory
+   lock deferred unless observed abuse). Do NOT conflate with
+   §F16 — that's the platform-fee rate-LOCK (snapshotted on
+   `offer.created` and locked for the life of the offer), a
+   separate concern handled at the INSERT itself.
 
 D8 Max-20-items constraint enforcement. Prefer the DDL trigger
    from migration 20260421000004 over duplicating in PL. If the
@@ -728,16 +837,18 @@ D9 `rights` payload tightening lives in src/lib/offer/rights.ts,
    not in src/lib/ledger/schemas.ts. The ledger schemas stay
    bound to §8 spec shapes (z.unknown() for `rights` and
    `rights_diff`); the offer-domain tightening is composed in
-   at the route boundary in Part B. Rationale: ledger schemas
+   at the route boundary in Parts B1/B2. Rationale: ledger schemas
    are the "spec surface"; rights templates are the "domain
    policy." Separating them keeps the ledger surface portable
    across future payload-shape changes.
 
-D10 Canonicalisation (4A.1 open item (b)) remains open. Not
-    this directive's scope. The trigger computes event_hash
-    from a jsonb::text cast today; any canonicalisation
-    formalisation (sorted keys, explicit whitespace) is a
-    separate migration.
+D10 Canonicalisation (P4_CONCERN_4A_1_DIRECTIVE.md §EXIT
+    REPORT 10(b), carried forward as
+    P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md §EXIT REPORT
+    13(c)) remains open. Not this directive's scope. The
+    trigger computes event_hash from a jsonb::text cast today;
+    any canonicalisation formalisation (sorted keys, explicit
+    whitespace) is a separate migration.
 
 D11 Migration slot is 20260421000011. Groups with the RPC
     block (000010 = rpc_append_ledger_event; 000011 = business
@@ -745,7 +856,7 @@ D11 Migration slot is 20260421000011. Groups with the RPC
 
 D12 `rpc_expire_offer` is callable in Part A but has no caller
     yet. The cron lives in Part D. Rationale: having the RPC
-    defined now lets Part C render an offer-list page that
+    defined now lets Part C1 render an offer-list page that
     shows 'expired' offers correctly even before the cron
     wires up, because any pre-seeded 'expired' rows will
     exist in the DB from test fixtures.
@@ -753,6 +864,50 @@ D12 `rpc_expire_offer` is callable in Part A but has no caller
 D13 No new MCP / SDK / util dependencies. PL/pgSQL only in the
     migration; TypeScript + Zod only in the lib. Same surface
     as 4A.1 and the trigger-race follow-up.
+
+D14 `rpc_accept_offer` populates `assignment_deliverables`
+    rows atomically at accept time (for brief-pack offers,
+    one row per offer_briefs row, copying revision_cap from
+    offer_briefs.spec.revision_cap). The `assignment_deliverables`
+    table itself is owned by 4A.3 per design lock §9.3, and
+    its mutation RPCs (rpc_submit_deliverable, rpc_accept_
+    deliverable, rpc_request_revision) land in 4A.3. Part A
+    owns ONLY the atomic populate step at accept — no other
+    writes, no reads outside the accept txn. This cross-phase
+    coupling is intentional and acknowledged: pushing the
+    populate to 4A.3 would either (a) leave an
+    assignment without deliverable rows between accept and the
+    first 4A.3-era UPDATE, breaking the "assignment.created
+    event implies deliverable scaffold exists" invariant, or
+    (b) force a second event on the fresh assignment thread in
+    4A.3 just to populate rows, complicating the thread's head
+    state. Keeping the populate inside `rpc_accept_offer` is
+    the correct atomicity boundary. Precondition 18 asserts
+    the table exists in the current DDL (migration
+    `20260421000004` L163); if the assertion fails, STOP and
+    re-validate this directive before dispatch.
+
+D15 `rpc_cancel_offer` "last turn was buyer's" guard filters
+    system-actor events out of the lookup (see DELIVERABLE
+    rpc_cancel_offer step 3). Rationale: spec §F10 allows the
+    system actor to emit events mid-thread (e.g., future
+    force-termination paths, admin interventions) without
+    advancing the state machine beyond what a party action
+    would. Without the filter, a buyer who saw a system event
+    after their own last turn would fail the "last turn was
+    mine" check and be trapped in the offer — unable to
+    cancel through no fault of their own. Filtering
+    `actor_ref != '00000000-0000-0000-0000-000000000001'`
+    restores the intended semantics: "the last PARTY action
+    on this offer was the buyer's." The TS-side pure guard
+    `canCancel` in `src/lib/offer/state.ts` receives
+    `lastEventActorRef` from the caller, and the caller (Part
+    B1 route handler) MUST apply the same system-actor filter
+    when loading it — this is specified in the state.ts
+    contract below. A unit test case in
+    `src/lib/offer/tests/state.test.ts` covers the scenario
+    where the literal last event is system but the last non-
+    system event was buyer's (guard allows cancel).
 
 BANNED TERMS
   rg -n 'certif|immutab|tamper.proof' \
@@ -800,7 +955,7 @@ ACCEPTANCE CRITERIA (all must hold)
     append events in 4A.4).
 13. `rg -n 'use server\|isAuthWired\|requireActor'
        src/lib/offer/` returns zero matches — no route-handler
-    plumbing in the lib. Part B is where auth guards live.
+    plumbing in the lib. Parts B1/B2 are where auth guards live.
 14. Zero changes to any file outside §DELIVERABLES. Verify
     with `git diff --stat` in the exit report.
 15. Exactly 9 files created per §DELIVERABLES (1 migration +
@@ -808,9 +963,13 @@ ACCEPTANCE CRITERIA (all must hold)
 16. Single commit, no squash, no amend, on
     feat/p4-economic-cutover.
 17. D1 (in-RPC retry) and D2 (read-committed + UNIQUE-only)
-    from 4A.1 exit-report open items (a) and (b) are
-    explicitly addressed by the migration header comment AND
-    by the helper body itself.
+    from P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md §EXIT REPORT
+    13(a) and 13(b) are explicitly addressed by the migration
+    header comment AND by the helper body itself.
+18. Precondition 18 (`assignment_deliverables` table
+    existence) passes. Exit report §1 lists PASS with the
+    matched L163 line number from migration
+    `20260421000004`.
 
 COMMIT
 Single concern-scoped commit. Template:
@@ -821,7 +980,7 @@ Single concern-scoped commit. Template:
   state machine (5 user-driven + 1 system RPC), a shared
   in-function retry helper that closes the hash-chain race at
   the RPC boundary, and the `src/lib/offer/*` domain helpers
-  consumed by the Part B route handlers.
+  consumed by the Parts B1/B2 route handlers.
 
   * supabase/migrations/20260421000011 —
     _emit_offer_event_with_retry: N=3 bounded retry on 23514
@@ -829,14 +988,16 @@ Single concern-scoped commit. Template:
     pg_sleep backoff [10ms, 30ms, 100ms]; centralises the race
     surface for all six business RPCs.
     rpc_create_offer: inserts offer + child table rows, rate-
-    limit guard (max 3 pending per buyer-creator, §F16),
-    emits offer.created.
+    limit guard (max 3 pending per buyer-creator, spec §7 L152;
+    platform_fee_bps snapshot per §F16), emits offer.created.
     rpc_counter_offer: row-lock + state guard + party guard;
     mutates composition; emits offer.countered with diff.
     rpc_accept_offer: row-lock + state guard + party guard;
-    emits offer.accepted AND creates assignments row AND emits
+    emits offer.accepted AND creates assignments row AND
+    populates assignment_deliverables rows for brief-packs
+    (atomic cross-phase populate per D14) AND emits
     assignment.created on the new assignment thread (dual-
-    thread emit per §8.5; Stripe straddle lands in Part B).
+    thread emit per §8.5; Stripe straddle lands in Part B2).
     rpc_reject_offer / rpc_cancel_offer / rpc_expire_offer:
     round out the state machine.
     Inline DO-block asserts the create → counter → cancel
@@ -845,24 +1006,29 @@ Single concern-scoped commit. Template:
   * src/lib/offer/types.ts, state.ts, pricing.ts, rights.ts,
     composer.ts, index.ts — pure-TS domain helpers. state.ts
     mirrors the Postgres guards (preflight; the RPC is the
-    authoritative boundary). rights.ts ships the §F15
-    counsel-reviewed template registry and tightens the
+    authoritative boundary). rights.ts ships the §F15 template
+    identifier + label + transfer-flag registry (counsel-final
+    template bodies land in Part C2) and tightens the
     z.unknown() `rights` field in the ledger payload schemas
-    (closes 4A.1 exit-report open item (d) for the offer
-    surface). composer.ts owns the pack-composition
-    validators and the offer.created / offer.countered
-    payload builders.
+    (closes P4_CONCERN_4A_1_DIRECTIVE.md §EXIT REPORT 10(d)
+    for the offer surface). composer.ts owns the pack-
+    composition validators and the offer.created /
+    offer.countered payload builders.
 
   * Unit tests at src/lib/offer/tests/* — table-driven per
     module.
 
   Decisions D1 (in-RPC retry, N=3, pg_sleep backoff) and D2
-  (read-committed + UNIQUE-only) close 4A.1 exit-report open
-  items (a) and (b).
+  (read-committed + UNIQUE-only) close
+  P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md §EXIT REPORT 13(a)
+  and 13(b). D9 (rights tightening in offer lib) closes
+  P4_CONCERN_4A_1_DIRECTIVE.md §EXIT REPORT 10(d) for the
+  offer surface; assignment- and dispute-side `rights_diff`
+  tightening stays deferred to 4A.3 / 4A.4.
 
   Directive: docs/audits/P4_CONCERN_4A_2_DIRECTIVE.md
   Builds on: e9a0bc0
-  Unblocks: 4A.2 Part B (route handlers)
+  Unblocks: 4A.2 Part B1 (non-accept route handlers)
 
   Co-Authored-By: Claude <noreply@anthropic.com>
 
@@ -872,11 +1038,13 @@ accumulates concerns 1-5; merge happens at P5.
 EXIT REPORT
 Produce a terminal-paste-ready report with these sections:
 
- 1. Preconditions check — each of #1-18 with PASS/FAIL + a line
+ 1. Preconditions check — each of #1-19 with PASS/FAIL + a line
     explaining why. Cite the actual HEAD SHA, Postgres version,
     baseline test count, and ledger_events / offers / auth.users
-    row counts (from preconditions 17 and 18 and any lookup
-    needed for the inline assertion).
+    row counts (from preconditions 17 and 19 and any lookup
+    needed for the inline assertion). Precondition 18 is the
+    `assignment_deliverables` table-existence check at
+    `20260421000004` L163.
  2. File list — every file created with line counts. Must be
     exactly 9 files.
  3. Migration body — paste the helper signature + the six RPC
@@ -893,7 +1061,7 @@ Produce a terminal-paste-ready report with these sections:
  7. Decisions log — confirm D1-D13 from §A were honoured as
     written OR cite where you deviated and why.
  8. Banned-term lint — full output of the rg command.
- 9. Acceptance checklist — each of criteria 1-17 with PASS/FAIL.
+ 9. Acceptance checklist — each of criteria 1-18 with PASS/FAIL.
 10. Test-run output — tail of `bun run test`. Cite the delta
     from the 1105 baseline (report the new-test count; any
     non-skip regression → FAIL).
@@ -903,7 +1071,7 @@ Produce a terminal-paste-ready report with these sections:
     from the inline assertion and no ROLLBACK.
 14. Commit SHA.
 15. Open items — anything warranting founder review before
-    Part B. Must include AT LEAST:
+    Part B1. Must include AT LEAST:
     (a) Whether `rights` template bodies in
         RIGHTS_TEMPLATES are counsel-reviewed-final or
         placeholder. If placeholder, flag that counsel review
@@ -924,34 +1092,33 @@ Produce a terminal-paste-ready report with these sections:
 
 ## B — Scope confirmation
 
-Part A is the **first of three directives** that together land design lock §9.2's offer surface. The full §9.2 scope (routes + pages + components + AssetRightsModule REWRITE + pack composer) cannot land in one Claude Code session without compromising the exit-report surface. Splitting into three dispatchable parts preserves the verdict-gate cadence established by concerns 1 through 4A.1.
+Part A is the **first of six directives** (A → B1 → B2 → C1 → C2 → D) that together land design lock §9.2's offer surface. The full §9.2 scope (routes + Stripe straddle + pages + composition-heavy components + AssetRightsModule REWRITE + pack composer + expiration cron) cannot land in one Claude Code session without compromising the exit-report surface. Splitting into six dispatchable parts preserves the verdict-gate cadence established by concerns 1 through 4A.1 and isolates the counsel-copy dependency to Part C2.
 
 **Part A (this directive) covers:**
 - Postgres business RPC catalogue: `rpc_create_offer`, `rpc_counter_offer`, `rpc_accept_offer`, `rpc_reject_offer`, `rpc_cancel_offer`, `rpc_expire_offer`.
-- Shared `_emit_offer_event_with_retry` helper that closes the hash-chain race at the RPC boundary (resolving 4A.1 exit-report open item (a)).
+- Shared `_emit_offer_event_with_retry` helper that closes the hash-chain race at the RPC boundary (resolving `P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT 13(a)).
 - `src/lib/offer/*` TS domain helpers: types, state guards, pricing, rights template registry, composer, barrel.
 - Unit tests per lib module.
 - Inline migration assertion covering the create → counter → cancel smoke triad.
 
 **Part A does NOT cover:**
-- `src/app/api/offers/**` route handlers. Part B.
-- TS-side Stripe straddle flow for `POST /api/offers/[id]/accept`. Part B.
-- `/vault/offers` + `/vault/offers/[id]` pages. Part C.
-- `src/components/offer/*` components (`PackComposer`, `OfferInboxList`, `OfferCard`, `OfferDetailView`, `OfferCounterEditor`, `OfferPreviewPanel`, `FeeTransparencyPanel`, `RightsTemplatePicker`, `ExpirationSelector`). Part C.
-- `src/components/asset/AssetRightsModule.tsx` `OfferModal` REWRITE. Part C.
-- `shared/EventTrailViewer.tsx`, `shared/StateBadge.tsx`, `shared/ActorLabel.tsx`. Part C.
+- The five non-accept offer route handlers (`POST /api/offers`, `POST /api/offers/[id]/counter`, `POST /api/offers/[id]/reject`, `POST /api/offers/[id]/cancel`, `GET /api/offers/[id]`). Part B1.
+- The accept route handler (`POST /api/offers/[id]/accept`) and its §8.5 Stripe PaymentIntent straddle wrapper. Part B2.
+- `/vault/offers` + `/vault/offers/[id]` pages and the lib-heavy, copy-light components (`OfferInboxList`, `OfferCard`, `OfferDetailView`, `FeeTransparencyPanel`, `ExpirationSelector`, shared `EventTrailViewer`, `StateBadge`, `ActorLabel`). Part C1.
+- The composition- and rights-heavy components (`PackComposer`, `OfferCounterEditor`, `OfferPreviewPanel`, `RightsTemplatePicker`) plus the `src/components/asset/AssetRightsModule.tsx` `OfferModal` REWRITE. Part C2 — gated on counsel-finalised template bodies per §D.
 - Offer expiration cron (Supabase Edge Function). Part D follow-on.
-- Concern 2 offer-scope acceptance test suite (integration-level). Part B owns these since they exercise route handlers.
+- Route-level acceptance test suite for the non-accept offer routes. Part B1 owns these since they exercise those route handlers.
+- Stripe-straddle integration tests for the accept route. Part B2.
 - `rights_diff` tightening for assignment and dispute payloads. 4A.3 and 4A.4.
 
 **Part A closes these upstream open items:**
-- 4A.1 exit-report open item **(a)** — retry policy for `CONCURRENT_CHAIN_ADVANCE` and `HASH_CHAIN_VIOLATION`: resolved as in-RPC bounded retry, N=3, pg_sleep backoff.
-- 4A.1 exit-report open item **(b)** — isolation choice: resolved as read-committed + UNIQUE-only.
-- 4A.1 exit-report open item **(d)** for the offer surface only — `rights` field tightening in `src/lib/offer/rights.ts` (the assignment and dispute tightenings remain deferred).
+- `P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT **13(a)** — retry policy for `CONCURRENT_CHAIN_ADVANCE` and `HASH_CHAIN_VIOLATION`: resolved as in-RPC bounded retry, N=3, pg_sleep backoff (D1).
+- `P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT **13(b)** — isolation choice (SERIALIZABLE vs UNIQUE-only): resolved as read-committed + UNIQUE-only (D2).
+- `P4_CONCERN_4A_1_DIRECTIVE.md` §EXIT REPORT **10(d)** for the offer surface only — `rights` field tightening in `src/lib/offer/rights.ts` (D9). Assignment- and dispute-side `rights_diff` tightening remain deferred.
 
 **Part A does NOT close:**
-- 4A.1 exit-report open item **(b)** canonicalisation (D10) — remains long-term, not blocking.
-- 4A.1 exit-report open item **(d)** for assignment `rights_diff` and dispute `evidence_refs` — deferred to 4A.3 / 4A.4.
+- `P4_CONCERN_4A_1_DIRECTIVE.md` §EXIT REPORT **10(b)** canonicalisation (carried forward in `P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT 13(c); D10) — remains long-term, not blocking.
+- `P4_CONCERN_4A_1_DIRECTIVE.md` §EXIT REPORT **10(d)** for assignment `rights_diff` and dispute `evidence_refs` — deferred to 4A.3 / 4A.4.
 
 ---
 
@@ -975,11 +1142,11 @@ The spec §8.5 accept flow straddles TS and Postgres:
 3. TS: call `rpc_accept_offer` (inner atomic block)
 4. TS: on RPC failure, Stripe void via API (idempotency key = `offer.id + ':accept'`)
 
-Keeping Stripe out of Part A means the RPC is purely atomic — one txn, one state transition, one event emission — and the Stripe concern lives entirely in the TS wrapper. This mirrors how `rpc_append_ledger_event` stays pure-DB in 4A.1 while the TS-side `emitEvent()` owns the Zod validation concern. Clean boundary. Part B directive will spell out the Stripe wrapper in detail.
+Keeping Stripe out of Part A means the RPC is purely atomic — one txn, one state transition, one event emission — and the Stripe concern lives entirely in the TS wrapper. This mirrors how `rpc_append_ledger_event` stays pure-DB in 4A.1 while the TS-side `emitEvent()` owns the Zod validation concern. Clean boundary. The Part B2 directive will spell out the Stripe wrapper in detail.
 
 **4. "Why tighten `rights` in `src/lib/offer/rights.ts` instead of in `src/lib/ledger/schemas.ts`?"**
 
-The ledger schemas surface binds to spec §8 exactly — payload shapes per event type. The spec intentionally left `rights` as an opaque jsonb field (§8.1: "`rights`: jsonb") because the rights template registry is a domain concern that lives above the ledger. Tightening `rights` in the ledger schemas would couple the ledger surface to the offer surface's domain model and make future payload versioning harder (e.g., if `rights` shape changes in v=2, the ledger schema bump drags in the offer domain's schema bump). Keeping them separate: ledger stays `z.unknown()` for `rights`, offer domain owns the validator, route handlers compose them at the boundary via `RightsSchema.and(OfferCreatedPayloadSchema)`-style pattern in Part B.
+The ledger schemas surface binds to spec §8 exactly — payload shapes per event type. The spec intentionally left `rights` as an opaque jsonb field (§8.1: "`rights`: jsonb") because the rights template registry is a domain concern that lives above the ledger. Tightening `rights` in the ledger schemas would couple the ledger surface to the offer surface's domain model and make future payload versioning harder (e.g., if `rights` shape changes in v=2, the ledger schema bump drags in the offer domain's schema bump). Keeping them separate: ledger stays `z.unknown()` for `rights`, offer domain owns the validator, route handlers compose them at the boundary via `RightsSchema.and(OfferCreatedPayloadSchema)`-style pattern in Parts B1/B2.
 
 ---
 
@@ -987,10 +1154,13 @@ The ledger schemas surface binds to spec §8 exactly — payload shapes per even
 
 Checklist before paste:
 
-- [ ] Founder reviewed §A directive body and verdicted D1 (in-RPC retry) and D2 (read-committed + UNIQUE-only). Both resolve 4A.1 exit-report open items.
-- [ ] Founder reviewed the three-part split (Part A = RPCs + lib; Part B = routes + Stripe; Part C = pages + components) and approves the approach.
-- [ ] Founder verdicted D6 (Stripe deferred to Part B) and D12 (`rpc_expire_offer` exists but cron lands in Part D).
-- [ ] Founder approves the rights template registry shape (three counsel-reviewed templates + `custom`, per §F15). If counsel review has not yet finalised the template bodies, the registry ships with placeholder `default_params` and the exit report flags this for P5 closure.
+- [ ] Founder reviewed §A directive body and verdicted D1 (in-RPC retry) and D2 (read-committed + UNIQUE-only). Both resolve `P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT 13(a) and 13(b).
+- [ ] Founder reviewed the six-part split (A → B1 → B2 → C1 → C2 → D) per §Relationship to §9.2 full scope, and approves the sequence. Each part is dispatched only after the prior part's exit report clears verdict.
+- [ ] Founder verdicted D6 (Stripe deferred to Part B2), D12 (`rpc_expire_offer` exists but cron lands in Part D), and D14 (`assignment_deliverables` populate is owned by Part A's `rpc_accept_offer`; 4A.3 owns mutation RPCs on the table).
+- [ ] Founder verdicted D15 (rpc_cancel_offer last-turn guard filters system-actor events; state.ts `lastEventActorRef` contract requires caller-side system-actor filtering) and confirms the new state.test.ts case covering a buyer cancel after a system event.
+- [ ] Founder verdicted R1 (row-lock NOT held across Stripe PaymentIntent RTT — see D1 lock-in clause). Part B2 directive will re-state this constraint.
+- [ ] Founder approves the rights template registry shape for Part A: **identifiers + label + transfer-flag only**. No `default_params`, no clause copy, no legal-bearing body — Part A ships empty-shaped params (`z.record(z.string(), z.unknown())`). **Part C2 dispatch is GATED on counsel-finalised template bodies landing first.** Counsel sign-off on the three v1 template bodies (`editorial_one_time`, `editorial_with_archive_12mo`, `commercial_restricted`) is a prerequisite for drafting the Part C2 directive.
+- [ ] Counsel-finalisation tracker: Part C2 directive MUST NOT be drafted until counsel has delivered the three final template bodies (clauses + default params + jurisdictional notes). Founder confirms this gate is owned outside this directive and is tracked separately.
 - [ ] Commit `e9a0bc0` pushed to origin `feat/p4-economic-cutover` (confirmed earlier in session).
 - [ ] This directive committed to `docs/audits/` on the same branch.
 - [ ] Fresh Claude Code session, working directory is the repo root, no other work in progress.
@@ -1001,4 +1171,13 @@ When all boxes clear, paste §A verbatim into Claude Code. Wait for the exit rep
 
 ## E — Revision history
 
-- **2026-04-21** — Drafted. First slice of design lock §9.2 (offer surface). Covers Postgres business RPC catalogue + `src/lib/offer/*` domain helpers + unit tests. Builds on `e9a0bc0`. Uses migration slot `20260421000011`. Closes 4A.1 exit-report open items (a) retry policy (via in-RPC retry D1), (b) isolation choice (via read-committed + UNIQUE-only D2), and (d) `rights` tightening for the offer surface. Part B (routes + Stripe straddle), Part C (pages + components + AssetRightsModule REWRITE), and Part D (offer expiration cron) follow as separate directives after each exit report clears.
+- **2026-04-21 — Draft 1.** Drafted. First slice of design lock §9.2 (offer surface). Covers Postgres business RPC catalogue + `src/lib/offer/*` domain helpers + unit tests. Builds on `e9a0bc0`. Uses migration slot `20260421000011`. Closes `P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT 13(a) retry policy (via in-RPC retry D1) and 13(b) isolation choice (via read-committed + UNIQUE-only D2), plus `P4_CONCERN_4A_1_DIRECTIVE.md` §EXIT REPORT 10(d) `rights` tightening for the offer surface (via D9). Parts B1/B2/C1/C2/D follow as separate directives after each exit report clears.
+- **2026-04-21 — Draft 2 (verdict revisions).** Founder-commissioned verdict returned Draft 1 for revision with 3 blockers, 2 material risks, 3 secondary fixes. All applied:
+    - **Blocker 1 (fabricated citations).** Rebound D1/D2 citations to `P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT 13(a) and 13(b). Rebound D9 citation to `P4_CONCERN_4A_1_DIRECTIVE.md` §EXIT REPORT 10(d). Rebound D10 canonicalisation citation to `P4_CONCERN_4A_1_DIRECTIVE.md` §EXIT REPORT 10(b) / carried forward to §EXIT REPORT 13(c). Stripped the hallucinated D4 "lazy import for Supabase client" description — 4A.1's D4 is "business RPCs deferred to 4A.2+." All "4A.1 exit-report" body references rewritten with correct filename + section citations.
+    - **Blocker 2 (§F16 → §7).** Corrected the max-3-pending rate-limit citation to spec §7 L152 (application-layer rule) in rpc_create_offer, D7, and the COMMIT template. Retained §F16 only where it belongs: the platform-fee rate-LOCK on `offer.created`. Added explicit disambiguation note on D7 to prevent future conflation.
+    - **Blocker 3 (rights templates).** Stripped `default_params` and all clause-body fields from the Part A `RIGHTS_TEMPLATES` registry. Part A now ships only `{id, label, is_transfer}` per entry. `RightsSchema.params` is `z.record(z.string(), z.unknown())` in Part A; tightens in Part C2 once counsel-final template bodies ship. Added a §D dispatch checkbox gating Part C2 on counsel finalisation.
+    - **R1 (PaymentIntent row-lock scope).** Added a lock-in clause to D1 stating the row-lock held inside each RPC is <150ms and is NOT held across the Stripe PaymentIntent RTT in Part B2. Part B2 directive will re-state this; the naïve straddle is REJECTED up front.
+    - **R2 (part split).** Rewrote §Relationship to §9.2 full scope for a six-part sequence: A → B1 → B2 → C1 → C2 → D. Part B split into B1 (non-accept routes) + B2 (accept route + Stripe straddle). Part C split into C1 (lib-heavy pages + low-copy components) + C2 (composition-heavy + rights-heavy + AssetRightsModule rewrite, gated on counsel copy).
+    - **S1 (cross-phase coupling).** Added precondition 18 verifying `assignment_deliverables` exists at migration `20260421000004` L163. Added D14 acknowledging Part A's atomic populate of the table at `rpc_accept_offer`; 4A.3 owns mutation RPCs. Renumbered prior precondition 18 (offers row count) to 19; updated acceptance criterion 17 and exit-report precondition check accordingly.
+    - **S2 (cancel guard).** Changed `rpc_cancel_offer` last-turn guard to filter `actor_ref != system sentinel` when reading the most-recent-non-system event. Added D15 explaining the rationale. Tightened state.ts `canCancel` contract to require caller-side system-actor filtering on `lastEventActorRef`. Added new state.test.ts case covering the scenario where a system event is the literal last event but the buyer is the last party actor (cancel ALLOWED).
+    - **S3 (DO-block cleanup).** Rewrote the inline DO-block assertion cleanup from "reverse FK order" to sentinel-scoped deletion. Sentinel format `'P4_4A_2_ASSERTION_SENTINEL_' || gen_random_uuid()::text` threaded into `payload.note` and `offers.current_note`; cleanup filters exclusively on sentinel match. Matches the pattern in migration `20260421000006`. Blanket reverse-FK DELETE is REJECTED up front.
