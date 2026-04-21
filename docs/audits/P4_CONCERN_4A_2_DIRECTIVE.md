@@ -2,7 +2,7 @@
 
 **Status.** Drafted 2026-04-21 on top of `feat/p4-economic-cutover` commit `e9a0bc0` (P4 Concern 1 trigger-race + D8 require-actor cleanup). First slice of the `P4_CONCERN_4_DESIGN_LOCK.md` §9.2 offer-surface build. Not yet dispatched. Dispatch readiness in §D.
 
-**Governs.** A single execution session with Claude Code. Ships the Postgres-side business RPC catalogue (5 RPCs + 1 retry helper) for the offer state machine, plus the TS-side `src/lib/offer/*` domain helpers (state, pricing, rights, composer, types) and their unit tests. **No** route handlers, **no** pages, **no** components in this slice — those land in Parts B and C (separate follow-on directives). Intentional narrowing to keep the exit-report surface verdicatable.
+**Governs.** A single execution session with Claude Code. Ships the Postgres-side business RPC catalogue (5 RPCs + 1 retry helper) for the offer state machine, plus the TS-side `src/lib/offer/*` domain helpers (state, pricing, rights, composer, types) and their unit tests. **No** route handlers, **no** pages, **no** components in this slice — those land in Parts B1/B2 and C1/C2 (separate follow-on directives). Intentional narrowing to keep the exit-report surface verdicatable.
 
 **Relationship to §9.2 full scope.** Design lock §9.2 bundles the full offer surface into one sub-phase (routes + pages + components + AssetRightsModule REWRITE + pack composer). One Claude Code session cannot safely land all of it — the diff is ~30+ files and the exit-report surface becomes un-verdicatable in a single pass. This directive splits 4A.2 into **six dispatchable parts** (sequence: **A → B1 → B2 → C1 → C2 → D**):
 
@@ -852,7 +852,7 @@ D10 Canonicalisation (P4_CONCERN_4A_1_DIRECTIVE.md §EXIT
 
 D11 Migration slot is 20260421000011. Groups with the RPC
     block (000010 = rpc_append_ledger_event; 000011 = business
-    RPC catalogue; 000012+ reserved for Parts B/C/D additions).
+    RPC catalogue; 000012+ reserved for Parts B1/B2/C1/C2/D additions).
 
 D12 `rpc_expire_offer` is callable in Part A but has no caller
     yet. The cron lives in Part D. Rationale: having the RPC
@@ -1058,8 +1058,13 @@ Produce a terminal-paste-ready report with these sections:
     domain-specific). One line per RPC.
  6. TS lib summary — for each of the six lib files, cite the
     exports and the test-coverage delta.
- 7. Decisions log — confirm D1-D13 from §A were honoured as
-    written OR cite where you deviated and why.
+ 7. Decisions log — confirm D1-D15 from §A were honoured as
+    written OR cite where you deviated and why. (D14 covers the
+    atomic `assignment_deliverables` populate at `rpc_accept_offer`
+    per S1 resolution; D15 covers the system-actor filter on
+    `rpc_cancel_offer`'s last-turn guard per S2 resolution — both
+    land in this draft-2 pass and require explicit exit-time
+    confirmation.)
  8. Banned-term lint — full output of the rg command.
  9. Acceptance checklist — each of criteria 1-18 with PASS/FAIL.
 10. Test-run output — tail of `bun run test`. Cite the delta
@@ -1083,9 +1088,11 @@ Produce a terminal-paste-ready report with these sections:
         was introduced; if so, list them.
     (d) The 4A.1 `rights_diff` tightening for assignment and
         dispute payloads remains open for 4A.3 / 4A.4.
-16. Suggested next directive — "proceed to P4_CONCERN_4A_2B"
-    (route handlers + Stripe straddle) or "pause for founder
-    review of X" if you spotted anything material.
+16. Suggested next directive — "proceed to P4_CONCERN_4A_2_B1"
+    (non-accept offer route handlers + TS-side error-classification
+    wrapper; the §8.5 Stripe-straddle accept route is Part B2's
+    scope) or "pause for founder review of X" if you spotted
+    anything material.
 ```
 
 ---
