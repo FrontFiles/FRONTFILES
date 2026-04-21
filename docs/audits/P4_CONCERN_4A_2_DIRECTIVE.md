@@ -6,7 +6,7 @@
 
 **Relationship to §9.2 full scope.** Design lock §9.2 bundles the full offer surface into one sub-phase (routes + pages + components + AssetRightsModule REWRITE + pack composer). One Claude Code session cannot safely land all of it — the diff is ~30+ files and the exit-report surface becomes un-verdicatable in a single pass. This directive splits 4A.2 into **six dispatchable parts** (sequence: **A → B1 → B2 → C1 → C2 → D**):
 
-- **Part A** (this directive) — business RPCs + `src/lib/offer/*` + unit tests. ~9 files. One session.
+- **Part A** (this directive) — business RPCs + `src/lib/offer/*` + unit tests. ~11 files. One session.
 - **Part B1** (`P4_CONCERN_4A_2_B1_DIRECTIVE.md`, drafted after Part A exits clean) — the five non-accept offer route handlers (`POST /api/offers`, `POST /api/offers/[id]/counter`, `POST /api/offers/[id]/reject`, `POST /api/offers/[id]/cancel`, `GET /api/offers/[id]`), TS-side error-classification wrapper, route-level integration tests. No Stripe. ~8 files.
 - **Part B2** (`P4_CONCERN_4A_2_B2_DIRECTIVE.md`, drafted after Part B1 exits clean) — the accept route (`POST /api/offers/[id]/accept`) and the §8.5 Stripe PaymentIntent straddle wrapper (outer state read → PaymentIntent create → `rpc_accept_offer` → void-on-failure), Stripe-straddle integration tests, idempotency-key contract. Isolated so the Stripe concern has its own exit report. ~5 files.
 - **Part C1** (`P4_CONCERN_4A_2_C1_DIRECTIVE.md`, drafted after Part B2 exits clean) — `/vault/offers` + `/vault/offers/[id]` pages and the lib-heavy, copy-light components (`OfferInboxList`, `OfferCard`, `OfferDetailView`, `FeeTransparencyPanel`, `ExpirationSelector`, shared `EventTrailViewer`, `StateBadge`, `ActorLabel`). ~12 files.
@@ -219,7 +219,7 @@ PRECONDITIONS (verify in order; stop at first failure)
     production but must be reconciled before this migration's
     inline DO-block assertions run.
 
-DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
+DELIVERABLES (11 files; 1 NEW migration, 10 NEW lib/test files)
 
   NEW  supabase/migrations/20260421000011_rpc_offer_business.sql
        Six RPCs + one internal retry helper.
@@ -446,27 +446,37 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
 
   NEW  src/lib/offer/state.ts
        Pure transition guards; no DB access. Each function takes
-       { offer: OfferRow; actorHandle: string; lastEventActorRef?:
+       { offer: OfferRow; actorUserId: string; lastEventActorRef?:
        string } and returns { allowed: boolean; reason?: string }.
 
-         canCounter({ offer, actorHandle })
-           allowed if offer.state ∈ {'sent','countered'} AND
-           actorHandle ∈ {offer.buyer_handle, offer.creator_handle}.
+       IDENTITY CONTRACT (UUID-native). `actorUserId` is the UUID
+       of the authenticated user (auth.users.id / session.user.id)
+       — NOT a handle, NOT a row in actor_handles. All identity
+       comparisons in this module are UUID-to-UUID against
+       OfferRow.buyer_id / OfferRow.creator_id (which mirror the
+       DB exactly per §F3). Handles are a display concern and
+       live in rendering components; they do not belong in state
+       derivation. `lastEventActorRef` is also a UUID (the
+       `actor_ref` column of ledger_events; see §7.1).
 
-         canAccept({ offer, actorHandle })
+         canCounter({ offer, actorUserId })
+           allowed if offer.state ∈ {'sent','countered'} AND
+           actorUserId ∈ {offer.buyer_id, offer.creator_id}.
+
+         canAccept({ offer, actorUserId })
            same state predicate. Party-only.
 
-         canReject({ offer, actorHandle })
+         canReject({ offer, actorUserId })
            same.
 
-         canCancel({ offer, actorHandle, lastEventActorRef })
+         canCancel({ offer, actorUserId, lastEventActorRef })
            allowed if offer.state ∈ {'sent','countered'} AND
-           actorHandle === offer.buyer_handle AND
+           actorUserId === offer.buyer_id AND
            (lastEventActorRef is undefined OR
-            lastEventActorRef === offer.buyer_handle).
-           CONTRACT: `lastEventActorRef` is the actor_ref of
-           the most recent NON-SYSTEM event on the offer
-           thread (system actor UUID
+            lastEventActorRef === offer.buyer_id).
+           CONTRACT: `lastEventActorRef` is the `actor_ref`
+           (UUID) of the most recent NON-SYSTEM event on the
+           offer thread (system actor UUID
            '00000000-0000-0000-0000-000000000001' filtered
            out). The Part B1 route handler is responsible for
            applying this filter when loading the value — if
@@ -490,7 +500,9 @@ DELIVERABLES (9 files; 1 NEW migration, 8 NEW lib/test files)
        authoritative boundary.
 
        Do NOT load offers, actor_handles, or ledger_events from
-       these functions. Pure over already-loaded rows.
+       these functions. Pure over already-loaded rows. Do NOT
+       accept a handle parameter — UUIDs only; handle→UUID
+       resolution happens upstream in the route handler.
 
   NEW  src/lib/offer/pricing.ts
        - netToCreator(grossFee, platformFeeBps): number
@@ -966,8 +978,8 @@ ACCEPTANCE CRITERIA (all must hold)
     plumbing in the lib. Parts B1/B2 are where auth guards live.
 14. Zero changes to any file outside §DELIVERABLES. Verify
     with `git diff --stat` in the exit report.
-15. Exactly 9 files created per §DELIVERABLES (1 migration +
-    8 lib/test files).
+15. Exactly 11 files created per §DELIVERABLES (1 migration +
+    10 lib/test files).
 16. Single commit, no squash, no amend, on
     feat/p4-economic-cutover.
 17. D1 (in-RPC retry) and D2 (read-committed + UNIQUE-only)
@@ -1054,7 +1066,7 @@ Produce a terminal-paste-ready report with these sections:
     `assignment_deliverables` table-existence check at
     `20260421000004` L163.
  2. File list — every file created with line counts. Must be
-    exactly 9 files.
+    exactly 11 files.
  3. Migration body — paste the helper signature + the six RPC
     signatures (not full bodies; signatures + key guards only).
     Cite the RAISE NOTICE emitted by the inline assertion.
@@ -1197,3 +1209,4 @@ When all boxes clear, paste §A verbatim into Claude Code. Wait for the exit rep
     - **S2 (cancel guard).** Changed `rpc_cancel_offer` last-turn guard to filter `actor_ref != system sentinel` when reading the most-recent-non-system event. Added D15 explaining the rationale. Tightened state.ts `canCancel` contract to require caller-side system-actor filtering on `lastEventActorRef`. Added new state.test.ts case covering the scenario where a system event is the literal last event but the buyer is the last party actor (cancel ALLOWED).
     - **S3 (DO-block cleanup).** Rewrote the inline DO-block assertion cleanup from "reverse FK order" to sentinel-scoped deletion. Sentinel format `'P4_4A_2_ASSERTION_SENTINEL_' || gen_random_uuid()::text` threaded into `payload.note` and `offers.current_note`; cleanup filters exclusively on sentinel match. Matches the pattern in migration `20260421000006`. Blanket reverse-FK DELETE is REJECTED up front.
 - **2026-04-21 — Draft 3 (precondition 3 self-consistency fix).** Dispatched Part A to Claude Code; execution halted at precondition 3 because the original wording ("HEAD is commit e9a0bc0. If HEAD is not e9a0bc0 — or there is any commit beyond e9a0bc0 — stop and report.") is self-inconsistent with §D's requirement that this directive be committed to `docs/audits/` on the same branch before dispatch. Committing the directive itself unavoidably advances HEAD past `e9a0bc0`. Rewrote precondition 3 to allow commits beyond `e9a0bc0` iff they touch ONLY `docs/audits/P4_CONCERN_4A_2_DIRECTIVE.md`, verified via `git diff --name-only e9a0bc0..HEAD`. Any path other than the directive file in the diff still fails the precondition. Exit report §1 must cite the actual output of the diff command. No change to execution scope — drift guard still blocks any code-path commit on top of `e9a0bc0`.
+- **2026-04-21 — Draft 4 (state.ts identity semantics + deliverable count fix).** Mid-dispatch, Claude Code spotted two directive inconsistencies after the Draft 3 precondition fix landed and it resumed cleanly. (a) The state.ts pseudocode used `actorHandle: string` and compared against `offer.buyer_handle` / `offer.creator_handle`, but OfferRow mirrors the DB exactly per §F3 — the DB has `buyer_id` / `creator_id` (UUIDs), not handles. Meanwhile the `canCancel` CONTRACT correctly described `lastEventActorRef` as a UUID (`actor_ref` on ledger_events, with the system-actor sentinel filter). The pseudocode was comparing a handle-typed string against a UUID-typed sibling field — internally type-inconsistent and inconsistent with OfferRow. Rewrote the state.ts block UUID-native: `actorUserId: string` (auth.users.id), compared against `offer.buyer_id` / `offer.creator_id`; added an explicit IDENTITY CONTRACT paragraph at the top of the block stating handles are a display concern and do not belong in state derivation. `lastEventActorRef` remains UUID — made the "UUID" label explicit next to the word `actor_ref`. Added a closing line forbidding handle parameters. Rejected an in-flight proposal to add a joined view type `OfferRowWithHandles` — it would have perpetuated the handle-based mis-vocabulary and forced an unnecessary join at every caller. (b) §DELIVERABLES header claimed "9 files (1 migration + 8 lib/test files)" but the NEW-block enumeration yields 11 (1 migration + 10 lib/test files: types, state, pricing, rights, composer, index, state.test, pricing.test, rights.test, composer.test). Corrected the header, the header-summary line at the top of the directive, exit-report acceptance criterion 15, and exit-report §2. No change to execution scope — same files listed either way.
