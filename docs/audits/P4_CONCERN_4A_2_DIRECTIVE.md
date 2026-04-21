@@ -385,15 +385,45 @@ DELIVERABLES (11 files; 1 NEW migration, 10 NEW lib/test files)
        actor_handle, creates a minimal buyer + creator user pair
        via the existing seed pattern (or references an existing
        seed row if one is already in scope — cite the source),
-       calls rpc_create_offer + rpc_counter_offer + rpc_cancel_offer
-       end-to-end, asserts the ledger_events rows land with
-       correct prev_event_hash chain, and RAISE NOTICE on success.
-       If any step RAISEs, the whole migration txn rolls back.
-       The assertion does NOT exercise rpc_accept_offer (no
-       assignments row infra in an assertion block) or
-       rpc_expire_offer (requires sleep). It covers create →
-       counter → cancel, which is the minimum smoke triad that
-       proves the retry helper + the happy path.
+       calls rpc_create_offer + rpc_counter_offer end-to-end,
+       asserts the ledger_events rows land with correct
+       prev_event_hash chain, and RAISE NOTICE on success. If
+       any step RAISEs, the whole migration txn rolls back. The
+       assertion does NOT exercise rpc_accept_offer (no
+       assignments row infra in an assertion block),
+       rpc_expire_offer (requires sleep), or rpc_cancel_offer
+       (non-deterministic inside a single txn — see TXN-TIME
+       CONSTRAINT below). It covers create → counter, the
+       minimum smoke pair that proves the retry helper + the
+       happy path for party-alternation validation. Cancel
+       coverage lands in Part B1 route integration tests, where
+       each RPC is its own HTTP request (and therefore its own
+       txn) and event ordering is deterministic by construction.
+
+       TXN-TIME CONSTRAINT (why cancel is out of the triad).
+       Postgres `now()` is transaction-pinned: every row
+       inserted inside a single BEGIN...COMMIT receives an
+       identical `created_at` value. The directive's
+       "most-recent event on thread" lookups use
+       `ORDER BY created_at DESC, id DESC LIMIT 1`. Inside a
+       single-txn assertion, identical `created_at` forces
+       fall-through to `id DESC`, and `gen_random_uuid()` IDs
+       are not monotonic — ordering becomes a ~50% coin flip
+       once 2+ events exist on the same thread in the same
+       txn. A 3-event triad (create → counter → cancel) needs
+       the cancel RPC to correctly identify the buyer as the
+       last non-system party actor, which requires this
+       lookup to resolve deterministically against 2 prior
+       events. It doesn't. The 2-event pair (create → counter)
+       only ever exercises lookups against 1 prior event per
+       step, where LIMIT 1 has no ambiguity. In production
+       this constraint never bites because each RPC runs in
+       its own HTTP request / txn, so `now()` advances cleanly
+       between writes. A future mitigation (not in Part A
+       scope) is to switch the helper's INSERT to
+       `created_at = clock_timestamp()`, which advances within
+       a txn. Log this as a Part-B-or-later consideration; do
+       NOT apply it in Part A.
 
        CLEANUP (sentinel-scoped — load-bearing for non-empty
        baselines): the assertion DO-block MUST embed a unique
@@ -696,9 +726,10 @@ Create supabase/migrations/20260421000011_rpc_offer_business.sql:
      `service_role` role only (cron invokes via service-role
      Supabase client; see Part D directive).
 
-  F. Inline DO-block assertion (create → counter → cancel
-     smoke triad). Mirror migration 20260421000006's assertion
-     shape: sentinel-scoped cleanup (see DELIVERABLES
+  F. Inline DO-block assertion (create → counter smoke pair;
+     NOT triad — see §DELIVERABLES TXN-TIME CONSTRAINT for why
+     cancel is excluded). Mirror migration 20260421000006's
+     assertion shape: sentinel-scoped cleanup (see DELIVERABLES
      §CLEANUP block above), disposable actor, disposable
      users if needed (auth.users rows; use gen_random_uuid()
      and the minimal shape), RAISE NOTICE on success, RAISE
@@ -1020,8 +1051,10 @@ Single concern-scoped commit. Template:
     thread emit per §8.5; Stripe straddle lands in Part B2).
     rpc_reject_offer / rpc_cancel_offer / rpc_expire_offer:
     round out the state machine.
-    Inline DO-block asserts the create → counter → cancel
-    triad end-to-end.
+    Inline DO-block asserts the create → counter smoke pair
+    end-to-end. Cancel is excluded from the in-migration
+    assertion per §DELIVERABLES TXN-TIME CONSTRAINT and covered
+    instead by Part B1 route integration tests.
 
   * src/lib/offer/types.ts, state.ts, pricing.ts, rights.ts,
     composer.ts, index.ts — pure-TS domain helpers. state.ts
@@ -1126,7 +1159,7 @@ Part A is the **first of six directives** (A → B1 → B2 → C1 → C2 → D) 
 - Shared `_emit_offer_event_with_retry` helper that closes the hash-chain race at the RPC boundary (resolving `P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` §EXIT REPORT 13(a)).
 - `src/lib/offer/*` TS domain helpers: types, state guards, pricing, rights template registry, composer, barrel.
 - Unit tests per lib module.
-- Inline migration assertion covering the create → counter → cancel smoke triad.
+- Inline migration assertion covering the create → counter smoke pair (cancel excluded — txn-pinned `now()` makes the 3-event assertion non-deterministic inside a single migration txn; cancel coverage moves to Part B1 integration tests).
 
 **Part A does NOT cover:**
 - The five non-accept offer route handlers (`POST /api/offers`, `POST /api/offers/[id]/counter`, `POST /api/offers/[id]/reject`, `POST /api/offers/[id]/cancel`, `GET /api/offers/[id]`). Part B1.
@@ -1210,3 +1243,4 @@ When all boxes clear, paste §A verbatim into Claude Code. Wait for the exit rep
     - **S3 (DO-block cleanup).** Rewrote the inline DO-block assertion cleanup from "reverse FK order" to sentinel-scoped deletion. Sentinel format `'P4_4A_2_ASSERTION_SENTINEL_' || gen_random_uuid()::text` threaded into `payload.note` and `offers.current_note`; cleanup filters exclusively on sentinel match. Matches the pattern in migration `20260421000006`. Blanket reverse-FK DELETE is REJECTED up front.
 - **2026-04-21 — Draft 3 (precondition 3 self-consistency fix).** Dispatched Part A to Claude Code; execution halted at precondition 3 because the original wording ("HEAD is commit e9a0bc0. If HEAD is not e9a0bc0 — or there is any commit beyond e9a0bc0 — stop and report.") is self-inconsistent with §D's requirement that this directive be committed to `docs/audits/` on the same branch before dispatch. Committing the directive itself unavoidably advances HEAD past `e9a0bc0`. Rewrote precondition 3 to allow commits beyond `e9a0bc0` iff they touch ONLY `docs/audits/P4_CONCERN_4A_2_DIRECTIVE.md`, verified via `git diff --name-only e9a0bc0..HEAD`. Any path other than the directive file in the diff still fails the precondition. Exit report §1 must cite the actual output of the diff command. No change to execution scope — drift guard still blocks any code-path commit on top of `e9a0bc0`.
 - **2026-04-21 — Draft 4 (state.ts identity semantics + deliverable count fix).** Mid-dispatch, Claude Code spotted two directive inconsistencies after the Draft 3 precondition fix landed and it resumed cleanly. (a) The state.ts pseudocode used `actorHandle: string` and compared against `offer.buyer_handle` / `offer.creator_handle`, but OfferRow mirrors the DB exactly per §F3 — the DB has `buyer_id` / `creator_id` (UUIDs), not handles. Meanwhile the `canCancel` CONTRACT correctly described `lastEventActorRef` as a UUID (`actor_ref` on ledger_events, with the system-actor sentinel filter). The pseudocode was comparing a handle-typed string against a UUID-typed sibling field — internally type-inconsistent and inconsistent with OfferRow. Rewrote the state.ts block UUID-native: `actorUserId: string` (auth.users.id), compared against `offer.buyer_id` / `offer.creator_id`; added an explicit IDENTITY CONTRACT paragraph at the top of the block stating handles are a display concern and do not belong in state derivation. `lastEventActorRef` remains UUID — made the "UUID" label explicit next to the word `actor_ref`. Added a closing line forbidding handle parameters. Rejected an in-flight proposal to add a joined view type `OfferRowWithHandles` — it would have perpetuated the handle-based mis-vocabulary and forced an unnecessary join at every caller. (b) §DELIVERABLES header claimed "9 files (1 migration + 8 lib/test files)" but the NEW-block enumeration yields 11 (1 migration + 10 lib/test files: types, state, pricing, rights, composer, index, state.test, pricing.test, rights.test, composer.test). Corrected the header, the header-summary line at the top of the directive, exit-report acceptance criterion 15, and exit-report §2. No change to execution scope — same files listed either way.
+- **2026-04-21 — Draft 5 (DO-block triad narrowed to pair).** Mid-dispatch, Claude Code implemented the full Part A surface (migration, types, state, pricing, rights, composer, index, 4 test files; 64 new tests passing) and on the second re-apply of the migration discovered the inline DO-block assertion was flaky: `ERROR: not_last_turn` at `rpc_cancel_offer`. Root cause: Postgres `now()` is transaction-pinned, so every row inserted inside the migration's single BEGIN...COMMIT receives an identical `created_at`, forcing the directive's mandated `ORDER BY created_at DESC, id DESC LIMIT 1` lookups to fall through to `id DESC` tie-break — and `gen_random_uuid()` IDs are not monotonic. First apply passed by luck; second apply failed. Production path is unaffected (each RPC runs in its own HTTP request / txn, so `now()` advances cleanly between writes); the flaw only surfaces when 2+ events land on the same thread inside a single migration txn, which happens in the 3-event triad (create → counter → cancel) at the cancel step's last-non-system-party lookup. Narrowed the assertion to create → counter — the 2-event pair that never needs a tie-break-sensitive lookup. Cancel coverage lands in Part B1 route integration tests (each RPC its own txn → deterministic by construction). Added a TXN-TIME CONSTRAINT paragraph to §DELIVERABLES explaining the mechanics and flagging `created_at = clock_timestamp()` in the helper INSERT as a Part-B-or-later consideration (strictly more correct for an event log; deferred to preserve Part A scope). Updated §F header, acceptance criterion 12, and the deliverables header accordingly. No change to the RPC bodies, helper, state.ts UUID contract, rights registry, pricing, or file count (still 11 files). Rejected in-flight workarounds #2-#5 from the dispatch report (monotonic seq column + trigger change; dblink; retry-on-flake; ctid tie-break) — all expanded scope or hid the bug.
