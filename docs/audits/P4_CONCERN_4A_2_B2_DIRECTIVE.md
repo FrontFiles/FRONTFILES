@@ -20,6 +20,7 @@
 | R9 | Prompt 7 post-F9 red-team | F5 migration's three non-actor RAISE EXCEPTIONs were missing `USING ERRCODE` clauses. PL/pgSQL defaults to SQLSTATE `P0001` when unset; the B1 classifier (rpc-errors.ts) dispatches `offer_not_found` + `invalid_state` on `P0003` (disambiguated by SQLERRM prefix) and `not_party` on `P0004`. Without the clauses, all three raises would emit P0001 at runtime and be mis-classified as `unknown` → 500 INTERNAL. Added `USING ERRCODE = 'P0003'` (offer_not_found, invalid_state) and `USING ERRCODE = 'P0004'` (not_party). One-line inline comment above each raise names the classifier branch it feeds. The L154 actor_mismatch raise was already correct — untouched. SQLERRM strings unchanged (classifier substring match depends on literal `'offer_not_found'` / `'invalid_state'` / `'not_party'` prefixes). Files: `supabase/migrations/20260421000012_offer_accept_stripe.sql`. |
 | R10 | Prompt 7 post-F9 red-team | F4's `OfferAcceptResult.ok: true` success branch omitted `paymentIntentId` and `clientSecret`. F6's route handler needs `clientSecret` to return to the browser so the client-side `stripe.confirmCardPayment()` can complete the charge. Extended the success union with both fields (`clientSecret: string`, non-nullable). Added a defensive null-check on `pi.client_secret` in F4 step 6: if Stripe returns a PI without one (invariant violation; always-present on fresh PIs created without `confirm:true`), the orchestrator routes to `kind: 'stripe_create'`, HTTP 502, `STRIPE_UNAVAILABLE`, with a pino `logger.error` + `Sentry.captureMessage({ level: 'error' })` (not `'fatal'` — DB untouched, PI orphaned not charged, no reconcile needed). F9 Case 1 happy-path assertion extended to match the 7-field success shape; explicit `.toBe` checks added for `paymentIntentId` + `clientSecret`. Files: `src/lib/offer/offer-accept.ts`, `src/lib/offer/tests/offer-accept.test.ts` (Case 1 only). |
 | R11 | Prompt 9 preamble post-F6 red-team | F6 preflight `not_party` HTTP status is 403, not 409 as the directive §F6 error-surface table listed. R2 tightened accept to buyer-only, making `not_party` a role-boundary identity check rather than a state-adjacent denial. The B1 classifier downstream dispatches `NOT_PARTY → 403` for the same condition when the RPC raises it, so preflight + RPC surface coherently at the HTTP layer. B1 counter's uniform 409/409 preflight is a carry-over from counter's either-party semantics and does not transfer to accept's buyer-only shape. §F6 error-surface table updated to `not_party → 403 NOT_PARTY` and `invalid_state → 409 INVALID_STATE`. Files: `docs/audits/P4_CONCERN_4A_2_B2_DIRECTIVE.md`. |
+| R12 | Prompt 11 audit + Prompt 12 formalization | F11 deferred to follow-up concern 4A.2.C per D13 UI-rewrite trigger. Caller audit captured in §F11-AUDIT. |
 
 ---
 
@@ -552,6 +553,8 @@ Coverage:
 
 ### F11 — Retire `/api/special-offer/*` and `src/lib/special-offer/*`
 
+**STATUS: DEFERRED (R12).** This concern no longer retires the legacy surface. See §F11-AUDIT for the caller graph captured during Prompt 11; see §F11-DEFER-RATIONALE for why. The original retirement plan below is preserved for historical continuity.
+
 **Separate commit** inside the same branch. Land F1-F10 as commit N; land F11 as commit N+1.
 
 Pre-deletion audit (MUST COMPLETE BEFORE DELETION):
@@ -571,6 +574,125 @@ Deletion surface (remove entire directories + any imports):
 Commit message for the deletion: `chore(p4/4A.2/B2): retire legacy /api/special-offer mock surface`
 
 If the audit surfaces ambiguity, err toward NOT deleting and flagging for founder review. Reverting an over-eager deletion is harder than shipping F11 as a follow-up.
+
+### §F11-AUDIT
+
+Caller classification table, captured verbatim from Prompt 11. Row numbering preserved.
+
+| # | File | Line(s) | Category | Call-type | Migration complexity | Notes |
+|---|---|---|---|---|---|---|
+| 1 | `src/app/api/special-offer/route.ts` | 1-116 | route-definition | write | trivial (delete) | POST create + GET list. Imports from `@/lib/special-offer/{services,store,api-helpers}`. 116 LoC. |
+| 2 | `src/app/api/special-offer/[id]/accept/route.ts` | 1-46 | route-definition | write | trivial (delete) | Legacy accept endpoint — replaced by `/api/offers/[id]/accept` (B2). 46 LoC. |
+| 3 | `src/app/api/special-offer/[id]/counter/route.ts` | 1-41 | route-definition | write | trivial (delete) | Legacy counter — replaced by `/api/offers/[id]/counter` (B1). 41 LoC. |
+| 4 | `src/app/api/special-offer/[id]/decline/route.ts` | 1-40 | route-definition | write | trivial (delete) | No direct replacement — the new surface uses `/api/offers/[id]/reject`. Call-type rename ('decline' → 'reject'). 40 LoC. |
+| 5 | `src/lib/special-offer/services.ts` | 1-559 | server-caller | declaration | trivial (delete) | Business logic module. `SpecialOfferError`, `createOffer`, `creatorAccept`, `buyerAccept`, `creatorCounter`, `buyerCounter`, `creatorDecline`, `expireOffer`, `autoCancel`, `completeOffer`, `sweepAutoCancel`. 559 LoC. |
+| 6 | `src/lib/special-offer/store.ts` | 1-77 | server-caller | declaration | trivial (delete) | In-memory `Map<string, ...>` stores for threads + events + checkout intents. Not DB-backed. 77 LoC. |
+| 7 | `src/lib/special-offer/guards.ts` | 1-251 | server-caller | declaration | trivial (delete) | State/party guards for the legacy thread model. 251 LoC. |
+| 8 | `src/lib/special-offer/reducer.ts` | 1-40 | server-caller | declaration | trivial (delete) | React-style reducer; orphaned (no UI importer). 40 LoC. |
+| 9 | `src/lib/special-offer/api-helpers.ts` | 1-44 | server-caller | declaration | trivial (delete) | `success`, `errorResponse`, `resolveThread`, `withOfferError` helpers. 44 LoC. |
+| 10 | `src/lib/special-offer/types.ts` | 1-137 | type-definition | declaration | trivial (delete) | `SpecialOfferEngineState`, `SpecialOfferAction`, `VALID_OFFER_TRANSITIONS`. 137 LoC. |
+| 11 | `src/lib/special-offer/index.ts` | 1-4 | type-definition | declaration | trivial (delete) | Barrel. 4 LoC. |
+| 12 | `src/lib/special-offer/__tests__/services.test.ts` | 1-684 | test | declaration | trivial (delete) | 684 LoC of service tests — deletes with the module. |
+| 13 | `src/lib/special-offer/__tests__/guards.test.ts` | 1-386 | test | declaration | trivial (delete) | 386 LoC of guard tests — deletes with the module. |
+| 14 | `src/lib/special-offer/__tests__/helpers.ts` | 1-77 | fixture-or-mock | declaration | trivial (delete) | Test fixture factories (makeThread, makeEvent). 77 LoC. |
+| **15** | **`src/app/vault/offers/page.tsx`** | 7, 9, 14-17, 25, 88, 101, 112, 135-138, 243-249, 260, 275, 278, 333, 385, 413, 446, 532 | **client-caller** | **write** | **semantic (UI rewrite)** | **561 LoC Next.js App Router page. `'use client'`. Imports 6 SpecialOffer* symbols from `@/lib/types`. Uses mockThreads/mockEvents for initial state. Three fetch calls at L333/L385/L446 to `/api/special-offer/[id]/{accept,counter,decline}`. NOT flag-gated (no `notFound()` / `isEconomicV1UiEnabled()` check). THE ONLY LIVE EXTERNAL CALLER OUTSIDE THE SPECIAL-OFFER MODULE ITSELF.** |
+| 16 | `src/lib/types.ts` | 88-108, 653-707, 1002 | type-definition | declaration | mechanical + semantic | Defines `SpecialOfferStatus` (union), `SPECIAL_OFFER_STATUS_LABELS`, `TERMINAL_OFFER_STATUSES`, `SPECIAL_OFFER_MAX_ROUNDS`, `SPECIAL_OFFER_DEFAULT_RESPONSE_MINUTES`, `SPECIAL_OFFER_MIN_RESPONSE_MINUTES`, `SPECIAL_OFFER_MAX_RESPONSE_MINUTES`, `SpecialOfferThread`, `SpecialOfferAutoCancelReason`, `SpecialOfferEventType`, `SpecialOfferEvent`. Also L1002: a `'special_offer'` string literal inside `LicenceSourceType` union. ~100 LoC of type surface; removal cascades into #15. |
+| 17 | `src/lib/db/schema.ts` | 355-379, 415-416 | type-definition | declaration | mechanical | `SpecialOfferThreadRow`, `SpecialOfferEventRow` row-shape interfaces; `TABLE_NAMES.special_offer_threads` + `TABLE_NAMES.special_offer_events`. ~20 LoC. Note: the backing DB tables were DROPPED by `20260421000003_drop_assignment_engine.sql`; these types are orphaned schema. |
+| 18 | `src/lib/entitlement/__tests__/helpers.ts` | 45 | fixture-or-mock | declaration | mechanical | Single line: `source_type: 'special_offer'` inside a licence-grant test fixture. Depends on #16 L1002's enum value. |
+| 19 | `src/lib/offer/offer-accept.ts` | 88 | doc (header comment) | reference | trivial | Header comment: `* - No import from \`@/lib/special-offer\`.` Amended by Prompt 12 to reference 4A.2.C follow-up rather than F11. |
+| 20 | `supabase/migrations/20260421000003_drop_assignment_engine.sql` | 49-50, 77-80 | migration-or-rpc | write | blocked-by-scope | Historical migration that ALREADY drops `special_offer_events` + `special_offer_threads` tables and enum types. Immutable history; do not re-edit. |
+| 21 | `supabase/migrations/20260420010000_rename_direct_offer_to_special_offer.sql` | multi | migration-or-rpc | declaration | blocked-by-scope | Historical rename migration (direct_offer → special_offer). Immutable. References stay. |
+| 22 | `supabase/migrations/20260420020000_refresh_licence_grants_source_type_comment.sql` | 7, 29 | migration-or-rpc | declaration | blocked-by-scope | Historical comment refresh referencing 'special_offer' as an enum value + doc text. Immutable. |
+| 23 | `supabase/migrations/_preflight/20260420010000_rename_introspection.sql` | multi | migration-or-rpc | declaration | blocked-by-scope | Preflight canary for the rename migration. Tool/support file. |
+| 24 | `supabase/migrations/_rollbacks/20260420010000_rename_direct_offer_to_special_offer.DOWN.sql` | multi | migration-or-rpc | declaration | blocked-by-scope | Rollback script for the rename. Tool/support file. |
+| 25 | `docs/specs/ECONOMIC_FLOW_v1.md` | (multi) | doc | reference | trivial (optional) | Spec document mentions. Could add a "sunset" note but no functional requirement. |
+| 26 | `docs/audits/P4_CONCERN_4A_2_B2_DIRECTIVE.md` | §F11 + refs | doc | reference | trivial | This directive itself — mentions F11 retirement. Updated inline as part of this concern. |
+| 27 | `docs/audits/P4_CONCERN_4A_2_B1_DIRECTIVE.md` | (multi) | doc | reference | trivial | Predecessor directive — mentions special-offer as the retiring surface. Historical. |
+| 28 | `docs/audits/P4_CONCERN_4A_2_DIRECTIVE.md` | (multi) | doc | reference | trivial | 4A.2 parent directive. Historical. |
+| 29 | `docs/audits/P4_CONCERN_4A_1_DIRECTIVE.md` | (multi) | doc | reference | trivial | 4A.1 directive. Historical. |
+| 30 | `docs/audits/P4_CONCERN_3_DIRECTIVE.md` | (multi) | doc | reference | trivial | AUTH_WIRED directive — mentions special-offer as legacy. Historical. |
+| 31 | `docs/audits/P4_CONCERN_4_DESIGN_LOCK.md` | (multi) | doc | reference | trivial | Design lock. Historical. |
+| 32 | `docs/audits/P4_CONCERN_1_TRIGGER_RACE_DIRECTIVE.md` | (multi) | doc | reference | trivial | Concern-1 directive. Historical. |
+| 33 | `docs/audits/P4_UI_DEPRECATION_AUDIT.md` | (multi) | doc | reference | trivial | Deprecation audit. Literally lists the 13 retiring routes including special-offer. |
+| 34 | `docs/audits/P4_IMPLEMENTATION_PLAN.md` | (multi) | doc | reference | trivial | Implementation plan. |
+| 35 | `docs/audits/REMEDIATION_PLAN_20260418.md` | (multi) | doc | reference | trivial | Historical audit. |
+| 36 | `docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` | (multi) | doc | reference | trivial | Dedicated decision memo about special-offer — the origin artefact. |
+| 37 | `docs/audits/CODEBASE_AUDIT_20260418.md` | (multi) | doc | reference | trivial | Codebase audit snapshot. |
+| 38 | `INTEGRATION_READINESS.md` | (multi) | doc | reference | trivial | Integration roadmap. |
+| 39 | `FEATURE_APPROVAL_ROADMAP.md` | (multi) | doc | reference | trivial | Roadmap. |
+| 40 | `P5_PAUSED_HANDOFF_20260418.md` | (multi) | doc | reference | trivial | P5 handoff memo. |
+| 41 | `SPECIAL_OFFER_SPEC.md` | full file | doc | reference | trivial (rename or delete) | Standalone spec doc for the legacy surface. |
+| 42 | `CLAUDE_CODE_PROMPT_SEQUENCE.md` | (multi) | doc | reference | trivial | Prompt sequence doc. |
+| 43 | `PLATFORM_REVIEWS.md` | (multi) | doc | reference | trivial | Review doc. |
+| 44 | `.claude/agents/frontfiles-context.md` | (multi) | doc | reference | trivial | Claude Code agent context file. |
+
+**Count by category**
+- route-definition: 4 (#1-4)
+- server-caller: 5 (#5-9, all inside `src/lib/special-offer/`)
+- client-caller: **1** — `src/app/vault/offers/page.tsx` (#15)
+- test: 2 (#12-13)
+- fixture-or-mock: 2 (#14, #18)
+- type-definition: 4 (#10-11 in special-offer, #16-17 shared)
+- migration-or-rpc: 5 (#20-24, all historical)
+- doc: 18 (#19 + #25-44)
+- config-or-env: 0
+- dead-code: 0 strictly; #8 reducer.ts is structurally orphaned (no importer outside the module)
+
+**Count by migration complexity**
+- trivial: 14 (route files, lib files, tests, fixtures, doc comment at #19)
+- mechanical: 3 (#16 types.ts, #17 schema.ts, #18 entitlement fixture)
+- **semantic: 1** — `src/app/vault/offers/page.tsx` (UI rewrite; decisive D13 trigger)
+- blocked-by-scope: 5 (historical migrations; immutable)
+- blocked-by-B1: 0 (AC16-frozen files list does not overlap the graph)
+
+**Blast-radius assessment**
+- **Inside B2's natural edit surface**: none. B2 did not touch any special-offer file.
+- **Outside B2 that would need modification**: `src/app/vault/offers/page.tsx` (semantic rewrite, 561 LoC), `src/lib/types.ts` (remove ~100 LoC of SpecialOffer* surface + 1 enum literal), `src/lib/db/schema.ts` (remove 2 row types + 2 TABLE_NAMES entries), `src/lib/entitlement/__tests__/helpers.ts` (1-line fixture change).
+- **AC16-frozen files in the graph**: **zero**. The special-offer graph does not overlap AC16's narrow freeze list.
+
+**Estimated LoC delta for full retirement**
+
+| Scope | LoC |
+|---|---|
+| Delete 4 route files | 243 |
+| Delete 7 lib files | 1,112 |
+| Delete 3 test/fixture files | 1,147 |
+| **Deletions subtotal** | **2,502** |
+| Edit `src/lib/types.ts` (remove SpecialOffer* + enum value) | ~100 |
+| Edit `src/lib/db/schema.ts` (remove row types + TABLE_NAMES) | ~20 |
+| Edit `src/lib/entitlement/__tests__/helpers.ts` (1-line fixture) | 1 |
+| **Surgical edits subtotal** | **~121** |
+| Rewrite `src/app/vault/offers/page.tsx` (or shell-out + replacement) | **~500-800 (semantic)** |
+| **Total net delta** | **~3,100-3,400 LoC** |
+
+### §F11-DEFER-RATIONALE
+
+Three pillars justify the defer (four bullets — the fourth flags an adjacent architectural gap surfaced during audit):
+
+1. **UI-regression pillar.** `src/app/vault/offers/page.tsx` carries three live POST fetches to `/api/special-offer/[id]/{accept,counter,decline}` at L333, L385, and L446. The page is `'use client'` with no `notFound()` gate, no `isEconomicV1UiEnabled()` check, and no feature-flag short-circuit. Deleting the four legacy route files while the page is still live ships three broken buttons on `/vault/offers` — a user-visible regression on a route buyers can reach. That's not a tidy-commit footprint; it's a deploy-time defect waiting to surface.
+
+2. **LoC-delta pillar.** Full retirement is ~3,100-3,400 LoC of net change (2,502 LoC of deletions + ~121 LoC of surgical cross-module edits + ~500-800 LoC of UI rewrite). Directive §D13 Branch (a) requires "LoC delta below ~200". The actual delta is 15-17× over threshold. Folding this into B2 would push the PR past any sane single-concern reviewing footprint and bury the Stripe accept surface inside a cleanup commit.
+
+3. **Licence-enum pillar.** `licence_source_type` ENUM carries a `'special_offer'` value (migration `20260420010000` L208). Removing the value requires a pre-flight scan of `licence_grants.source_type` for rows still bound to it; any remaining row blocks `ALTER TYPE ... DROP VALUE`. Data-integrity migrations with scan-gates are their own design exercise and sit outside B2's Stripe-accept scope. The safe split is to retire the TS-side surface in the follow-up concern and leave the DB enum value in place (or handle it in a separate migration once a data scan confirms zero live `'special_offer'` grants).
+
+4. **Flags.ts architectural gap (adjacent finding).** `src/lib/flags.ts` L86-93 documents a planned `isEconomicV1UiEnabled()` gate architecture for `/vault/offers`, `/vault/offers/[id]`, `/vault/assignments`, `/vault/assignments/[id]`, `/vault/disputes`, and `/vault/disputes/[id]` — but the gate was never wired into `src/app/vault/offers/page.tsx`. The follow-up concern must build the flag-gated replacement page AND delete the legacy surface atomically, otherwise a half-migrated state ships where the old page still renders but the flag-off short-circuit is missing.
+
+### §F11-FOLLOWUP-SCOPE
+
+**Working name.** `4A.2.C — Legacy special-offer sunset + /vault/offers replacement page`.
+
+**Scope summary** (5 bullets):
+- Delete all 14 special-offer files flagged `trivial` in §F11-AUDIT (4 route files, 7 lib files, 3 test/fixture files). Deletions are idempotent; no orphan imports outside the module itself.
+- Mechanical edits to `src/lib/types.ts` (remove the SpecialOffer* type surface, ~100 LoC), `src/lib/db/schema.ts` (remove 2 orphaned row types + 2 `TABLE_NAMES` entries), and `src/lib/entitlement/__tests__/helpers.ts` (1-line fixture: `source_type: 'special_offer'` → replacement enum value).
+- Build the flag-gated replacement page at `/vault/offers` per the `flags.ts` L86-93 architecture (`isEconomicV1UiEnabled()` short-circuit to `notFound()` when off). The replacement consumes the new `/api/offers/*` surface (B1+B2) and renders against real buyer/creator data, not mock threads.
+- Resolve the `licence_source_type` enum value: either (a) leave the `'special_offer'` value in place with TS-side removal only (zero DB migration, simplest), or (b) ship a new migration with a pre-flight data-scan gate on `licence_grants.source_type`. Path (a) is preferred unless a data scan confirms zero live `'special_offer'` grants.
+- Delete `SPECIAL_OFFER_SPEC.md` (standalone legacy spec doc, row #41). Audit docs and implementation plans (rows #25-44 except #41) may receive inline "superseded" stubs but the core text stays for historical continuity.
+
+**Dependencies.** B2 shipped (commit `98481b7` or its descendant on `main`). `ECONOMIC_V1_UI` flag scaffolding is already present in `src/lib/flags.ts` (L86-93 + `isEconomicV1UiEnabled()` accessor).
+
+**Non-goals.** Does NOT touch any B1/B2 code path. Does NOT modify `/api/offers/*` or `rpc_accept_offer_commit`. Does NOT revisit AC16 freezes. Does NOT alter the Stripe straddle.
+
+**Suggested sizing.** Single concern, single directive, estimated ~3,500 LoC net delta (deletions dominate). Splits naturally into two commits: (1) replacement page + flag-gate wiring, (2) legacy deletion + shared-type surgery. Both land on the same branch.
 
 ---
 

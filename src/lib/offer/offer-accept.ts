@@ -85,8 +85,10 @@
  *   - Stripe `metadata` stays under 500 chars per value + ≤ 50
  *     keys (D9). The five fields here total ~200-300 chars
  *     including JSON overhead — safe.
- *   - No import from `@/lib/special-offer`. That surface is
- *     retired in F11; F4 has no business referencing it.
+ *   - No import from `@/lib/special-offer`. That surface is slated
+ *     for retirement in follow-up concern 4A.2.C (deferred from B2
+ *     per directive §F11-DEFER-RATIONALE); F4 has no business
+ *     referencing it.
  *
  * Reconcile-fail log schema (9 fields, AC11):
  *   offerId, buyerId, creatorId, paymentIntentId, idempotencyKey,
