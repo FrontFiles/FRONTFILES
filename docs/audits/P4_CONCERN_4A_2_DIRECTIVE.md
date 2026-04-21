@@ -132,10 +132,18 @@ attempt workarounds.
 PRECONDITIONS (verify in order; stop at first failure)
  1. On branch feat/p4-economic-cutover. If not, stop.
  2. `git status` is clean (no uncommitted changes, no stray files).
- 3. HEAD is commit e9a0bc0 (P4 Concern 1 trigger-race + D8
-    require-actor cleanup). If HEAD is not e9a0bc0 — or there is
-    any commit beyond e9a0bc0 — stop and report. State has
-    drifted and the directive must be re-validated.
+ 3. Execution-surface state matches commit e9a0bc0 (P4 Concern 1
+    trigger-race + D8 require-actor cleanup). Commits beyond
+    e9a0bc0 are permitted ONLY if they touch
+    `docs/audits/P4_CONCERN_4A_2_DIRECTIVE.md` (docs-only
+    authoring of this directive — required by §D dispatch
+    readiness). Verify via:
+      git diff --name-only e9a0bc0..HEAD
+    The output must be empty OR contain only the single path
+    `docs/audits/P4_CONCERN_4A_2_DIRECTIVE.md`. Any other path
+    in the diff → stop and report. The execution surface has
+    drifted and the directive must be re-validated. Cite the
+    actual output in the exit report §1.
  4. `bun run test` reports 1105 passed | 10 skipped | 0 failed
     (the baseline after e9a0bc0). Any failure or file-load error
     → stop.
@@ -1188,3 +1196,4 @@ When all boxes clear, paste §A verbatim into Claude Code. Wait for the exit rep
     - **S1 (cross-phase coupling).** Added precondition 18 verifying `assignment_deliverables` exists at migration `20260421000004` L163. Added D14 acknowledging Part A's atomic populate of the table at `rpc_accept_offer`; 4A.3 owns mutation RPCs. Renumbered prior precondition 18 (offers row count) to 19; updated acceptance criterion 17 and exit-report precondition check accordingly.
     - **S2 (cancel guard).** Changed `rpc_cancel_offer` last-turn guard to filter `actor_ref != system sentinel` when reading the most-recent-non-system event. Added D15 explaining the rationale. Tightened state.ts `canCancel` contract to require caller-side system-actor filtering on `lastEventActorRef`. Added new state.test.ts case covering the scenario where a system event is the literal last event but the buyer is the last party actor (cancel ALLOWED).
     - **S3 (DO-block cleanup).** Rewrote the inline DO-block assertion cleanup from "reverse FK order" to sentinel-scoped deletion. Sentinel format `'P4_4A_2_ASSERTION_SENTINEL_' || gen_random_uuid()::text` threaded into `payload.note` and `offers.current_note`; cleanup filters exclusively on sentinel match. Matches the pattern in migration `20260421000006`. Blanket reverse-FK DELETE is REJECTED up front.
+- **2026-04-21 — Draft 3 (precondition 3 self-consistency fix).** Dispatched Part A to Claude Code; execution halted at precondition 3 because the original wording ("HEAD is commit e9a0bc0. If HEAD is not e9a0bc0 — or there is any commit beyond e9a0bc0 — stop and report.") is self-inconsistent with §D's requirement that this directive be committed to `docs/audits/` on the same branch before dispatch. Committing the directive itself unavoidably advances HEAD past `e9a0bc0`. Rewrote precondition 3 to allow commits beyond `e9a0bc0` iff they touch ONLY `docs/audits/P4_CONCERN_4A_2_DIRECTIVE.md`, verified via `git diff --name-only e9a0bc0..HEAD`. Any path other than the directive file in the diff still fails the precondition. Exit report §1 must cite the actual output of the diff command. No change to execution scope — drift guard still blocks any code-path commit on top of `e9a0bc0`.
