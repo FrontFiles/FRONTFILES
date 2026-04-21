@@ -45,12 +45,17 @@ import { loadEnvConfig } from '@next/env'
 // Production fail-fast in `src/lib/env.ts` is therefore unaffected: under
 // `NODE_ENV=production` without `.env.local`, the Zod parse still throws
 // at module load exactly as before.
+// `process.env.NODE_ENV` is typed as a readonly literal union by
+// `@types/node`, which makes `next build`'s typecheck reject a direct
+// assignment. The cast preserves the runtime mutation (which is what
+// `@next/env` keys off of inside `loadEnvConfig`) without disabling
+// the broader read-only contract elsewhere.
 const _savedNodeEnv = process.env.NODE_ENV
-process.env.NODE_ENV = 'development'
+;(process.env as { NODE_ENV: string }).NODE_ENV = 'development'
 try {
   loadEnvConfig(process.cwd(), /* dev */ true)
 } finally {
-  process.env.NODE_ENV = _savedNodeEnv ?? 'test'
+  ;(process.env as { NODE_ENV: string }).NODE_ENV = _savedNodeEnv ?? 'test'
 }
 
 // Forward only string-valued env vars; `test.env` is typed as
