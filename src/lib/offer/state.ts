@@ -74,20 +74,25 @@ export function canCounter(args: {
 /**
  * Is the actor allowed to accept this offer?
  *
- * Same state + party predicates as counter. The `rpc_accept_offer`
- * RPC is the authoritative boundary for any additional Stripe-
- * straddle concerns handled in Part B2.
+ * Buyer-only. Accept transitions offers from 'sent' or 'countered'
+ * to 'accepted'. Creators cannot accept their own offers (B2 D12 /
+ * R2 — tightens the previously permissive predicate so the Stripe
+ * PaymentIntent is never created for a caller the inner RPC would
+ * reject with `not_party`).
+ *
+ * Allowed iff:
+ *   - actorUserId === offer.buyer_id; AND
+ *   - offer.state ∈ {'sent','countered'}.
  */
 export function canAccept(args: {
   offer: OfferRow
   actorUserId: string
 }): TransitionGuardResult {
-  const { offer, actorUserId } = args
-  if (!TRANSITIONABLE_STATES.has(offer.state)) {
-    return { allowed: false, reason: `invalid_state: offer is ${offer.state}` }
+  if (args.offer.buyer_id !== args.actorUserId) {
+    return { allowed: false, reason: 'not_party: accept is buyer-only' }
   }
-  if (actorUserId !== offer.buyer_id && actorUserId !== offer.creator_id) {
-    return { allowed: false, reason: 'not_party' }
+  if (args.offer.state !== 'sent' && args.offer.state !== 'countered') {
+    return { allowed: false, reason: `invalid_state: offer is ${args.offer.state}` }
   }
   return { allowed: true }
 }

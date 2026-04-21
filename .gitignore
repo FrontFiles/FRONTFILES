@@ -51,6 +51,12 @@ next-env.d.ts
 .vscode/
 .idea/
 
+# local scratch — audit paste buffers + personal workspace notes
+# Underscore-prefixed files under docs/audits/ are personal dispatch
+# / paste buffers (e.g. _B1_DISPATCH_PASTE.md). They are NOT commit
+# material; never stage them.
+docs/audits/_*.md
+
 # Large binary video assets — exceed GitHub's 100MB file limit.
 # Store externally (Vercel Blob, Cloudflare R2, S3) when referenced
 # from production code. Note: this rule does NOT affect the 11 video

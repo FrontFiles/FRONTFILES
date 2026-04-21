@@ -99,15 +99,16 @@ describe('canAccept', () => {
     expect(r).toEqual({ allowed: true })
   })
 
-  it('allows the creator', () => {
+  it('rejects the creator (buyer-only)', () => {
     const r = canAccept({ offer: baseOffer(), actorUserId: CREATOR_ID })
-    expect(r).toEqual({ allowed: true })
+    expect(r.allowed).toBe(false)
+    if (!r.allowed) expect(r.reason).toBe('not_party: accept is buyer-only')
   })
 
   it('rejects a non-party', () => {
     const r = canAccept({ offer: baseOffer(), actorUserId: THIRD_ID })
     expect(r.allowed).toBe(false)
-    if (!r.allowed) expect(r.reason).toBe('not_party')
+    if (!r.allowed) expect(r.reason).toBe('not_party: accept is buyer-only')
   })
 
   it("rejects on state 'accepted'", () => {
