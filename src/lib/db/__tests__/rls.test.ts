@@ -37,7 +37,14 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-const envPresent = Boolean(url && anonKey && serviceKey)
+// Integration mode is opt-in (P4 concern 2). The three Supabase
+// keys are required to be present for `src/lib/env.ts`'s module-load
+// Zod parse, so their presence alone does NOT signal "run integration
+// tests." The dedicated `FF_INTEGRATION_TESTS=1` flag is the explicit
+// signal. Without it, this suite self-skips even when the keys exist.
+// See docs/audits/P4_CONCERN_2_DECISION_MEMO.md for rationale.
+const integrationMode = process.env.FF_INTEGRATION_TESTS === '1'
+const envPresent = Boolean(url && anonKey && serviceKey) && integrationMode
 const d = envPresent ? describe : describe.skip
 
 d('RLS — anon vs service_role', () => {

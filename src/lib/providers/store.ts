@@ -28,10 +28,27 @@ import type {
 
 // ─── Mode selector (CCP 4) ──────────────────────────────────
 //
-// Decided once at module load from `isSupabaseEnvPresent`.
-// Per-call `isSupabaseConfigured()` branching is retired.
+// Decided per-call from `isSupabaseEnvPresent`, with one
+// test-harness escape: under Vitest (`NODE_ENV === 'test'`) we
+// default to mock unless `FF_INTEGRATION_TESTS=1` is set. This
+// decouples the providers mode decision from whether the
+// Supabase env keys are present — they must be present for
+// `src/lib/env.ts`'s module-load Zod parse, but presence alone
+// should not opt every Vitest run into live-Supabase routing.
+// See docs/audits/P4_CONCERN_2_DECISION_MEMO.md for why.
+//
+// Outside Vitest, the flag has no effect: production and dev
+// servers set `NODE_ENV` to `production` / `development`, never
+// `test`, so the branch is unreachable and the mode derivation
+// is identical to pre-concern-2 behaviour.
 
 function getMode(): 'real' | 'mock' {
+  if (
+    process.env.NODE_ENV === 'test' &&
+    process.env.FF_INTEGRATION_TESTS !== '1'
+  ) {
+    return 'mock'
+  }
   return isSupabaseEnvPresent() ? 'real' : 'mock'
 }
 
