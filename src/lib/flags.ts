@@ -81,3 +81,37 @@ export function isRealUploadEnabled(): boolean {
 export function isAuthWired(): boolean {
   return flags.authWired
 }
+
+/**
+ * ECONOMIC_V1_UI — spec-canonical replacement-page gate.
+ *
+ * When false (the default in deploy 1 and throughout 4A.*
+ * development), the replacement pages at /vault/offers,
+ * /vault/offers/[id], /vault/assignments,
+ * /vault/assignments/[id], /vault/disputes, and
+ * /vault/disputes/[id] call `notFound()` from their page.tsx
+ * server component. When true (flipped at 4B alongside
+ * FFF_AUTH_WIRED), the replacement pages render.
+ *
+ * Server-only flag. Read at the top of each replacement
+ * page.tsx via the pattern:
+ *
+ *   import { isEconomicV1UiEnabled } from '@/lib/flags'
+ *   import { notFound } from 'next/navigation'
+ *
+ *   export default function Page(…) {
+ *     if (!isEconomicV1UiEnabled()) notFound()
+ *     …
+ *   }
+ *
+ * Orthogonal to FFF_AUTH_WIRED, which gates request-surface
+ * route handlers. Deploy 2 flips both flags in the same env
+ * change; rollback flips both back. See
+ * docs/audits/P4_CONCERN_4_DESIGN_LOCK.md §7.3.
+ *
+ * 4A.1 ships the accessor. 4A.2 / 4A.3 / 4A.4 wire it into each
+ * replacement page.tsx.
+ */
+export function isEconomicV1UiEnabled(): boolean {
+  return flags.economicV1Ui
+}

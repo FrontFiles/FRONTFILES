@@ -77,6 +77,13 @@ for (const [key, value] of Object.entries(process.env)) {
 // src/lib/providers/store.ts); both gates coexist.
 forwardedEnv.FFF_AUTH_WIRED = 'true'
 
+// P4 concern 4A.1 — default the spec-canonical ECONOMIC_V1_UI flag
+// to `true` in the test worker env so 4A.2+'s replacement page.tsx
+// server components render through the live path under `bun run
+// test`. Tests that need the `notFound()` branch stub explicitly
+// via `vi.stubEnv('FFF_ECONOMIC_V1_UI', 'false')`.
+forwardedEnv.FFF_ECONOMIC_V1_UI = 'true'
+
 export default defineConfig({
   test: {
     environment: 'node',
@@ -85,6 +92,22 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // `server-only` is a Next.js-ships-as-dependency package that
+      // isn't hoisted to the top-level `node_modules/` (it lives at
+      // `node_modules/next/dist/compiled/server-only/`). Under
+      // `next build` / `next dev` Next's bundler resolves it via
+      // the `react-server` condition to an empty module on the
+      // server and throws on the client. Vitest lacks that
+      // conditional resolution, so import of `server-only` from
+      // any server-side module under test fails to resolve. Alias
+      // the bare specifier to Next's `empty.js` — the same target
+      // Next's server-condition resolution lands on — so the
+      // module import is a no-op under the test harness while the
+      // production behaviour (client-import throws) stays intact.
+      'server-only': path.resolve(
+        __dirname,
+        './node_modules/next/dist/compiled/server-only/empty.js',
+      ),
     },
   },
 })
