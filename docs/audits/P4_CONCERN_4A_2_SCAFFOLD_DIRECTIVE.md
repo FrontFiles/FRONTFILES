@@ -111,6 +111,30 @@ Between P3 and P5, the two new client component files (`OffersListClient.tsx`, `
 
 §D8's file-mutability list remains authoritative per-prompt; no file newly added by this reordering.
 
+R6 (2026-04-22, pre Prompt 3 — client-test infra gap closed) — Claude Code stopped at Prompt 3 with a structural blocker: the repo has zero `@testing-library/react`, zero `jsdom` / `happy-dom`, zero `.test.tsx` files, and `vitest.config.ts` runs under the Node environment. `useSession.ts` source comment at L35-40 explicitly documents this gap. §F7 as drafted assumed Vitest + RTL; that assumption was wrong.
+
+Claude Code proposed three forks: **R6-install** (add RTL + jsdom + setup), **R6-pure** (extract pure render helper, test via `react-dom/server.renderToString` — same pattern AUTH §R3 used), **R6-defer** (ship untested, punt to follow-up).
+
+Founder decision: **R6-pure.** Rationale:
+
+1. **Platform decisions don't belong in scaffolds.** Choosing a client-test stack (RTL vs Playwright CT vs Storybook-first visual) is an architectural commitment for the whole repo — not a footnote inside a scaffold concern. Same principle §R1 invoked when it rejected Path β (SSR auth) for the same reason.
+2. **§D3 is founder-locked, not a Claude-Code interpretation surface.** "No new dependencies. Use what's already in `package.json`" is explicit. Reinterpreting it inline because a later prompt hits friction is the policy drift §D9 was written to prevent.
+3. **AUTH §R3 is the in-family precedent.** Thirty-six hours ago, the same gap surfaced and the founder chose pure-Node state-machine extraction over installing RTL. Flipping that decision now, inside a different scaffold concern, is inconsistent.
+
+R6-pure architecture for §F3 / §F4 client components:
+
+- The React component (`OffersListClient`, `OfferDetailClient`) owns hook wiring and state: `useSession()`, `useEffect` to fetch, and a local state machine that resolves into a **view state** — a plain data shape describing what should render.
+- A **pure render helper** (e.g., `renderOffersListBody(view: OffersListView, selfUserId: string | null): ReactElement`) consumes the view state and emits the JSX tree. No hooks inside the helper. No network.
+- Tests import the helper directly, call it with hand-built view states, and use `react-dom/server.renderToString` (from the already-present `react-dom` dep) to produce a string to assert against. One additional case uses `renderToString` on the component itself with a mocked `useSession` return + `vi.spyOn(globalThis, 'fetch')` to prove no fetch fires during the loading branch.
+
+This mirrors AUTH §R3's precedent and honors §D3 without a new dependency.
+
+Coverage trade accepted: `renderToString` does not execute `useEffect`, so effect-driven state transitions can only be covered by feeding their *resolved* view states through the pure helper. The component's state-reduction logic itself is exercised only at the loading-branch boundary in this concern. Deeper state-transition coverage is a follow-up concern (see below).
+
+New follow-up concern logged (outside this directive, to be opened after the scaffold lands): **"Client testing foundations."** Charter: evaluate RTL vs Playwright Component Testing vs Storybook-first visual regression; decide the standard for Frontfiles client UI; retrofit the scaffold's client components with full state-transition coverage. Owner: founder. Trigger: scaffold concern exits.
+
+§F7's Prompt 3 + Prompt 4 test sections are re-specified by the updated `SCAFFOLD_PROMPT_3.md` / `SCAFFOLD_PROMPT_4.md` working aids — `tests/` / `__tests__/` path stays (repo convention per §R4), case count stays at 3 per component, but each case is now a pure-helper + `renderToString` assertion rather than an RTL render.
+
 ---
 
 ## §F — Functional requirements
