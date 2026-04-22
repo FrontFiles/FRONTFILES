@@ -92,6 +92,25 @@ Corrections locked by this revision:
 
 Prompt 2 committed as a single commit on `feat/p4-scaffold-offers`. Execution continues at Prompt 3.
 
+R5 (2026-04-22, pre Prompt 3 — execution-order correction) — **The §PROMPTS table's original 3→4→5→6 ordering is replaced.** Reason: original Prompt 3 (server-component wrappers) `import`s `<OffersListClient />` and `<OfferDetailClient />`, which are not introduced until Prompts 4 and 5 respectively. Firing the original Prompt 3 as-drafted would produce unresolved-module errors, breaking AC11 (`npm run build`) and trapping the concern in a revise-before-merge loop at Gate 1. Leaves must land before wrappers.
+
+Corrected sequence (scope and LoC budget unchanged; only order shifts):
+
+| # | Title | Why this position |
+|---|---|---|
+| P3 | **`OffersListClient` + smoke tests** (§F3, §F7) | Leaf. No dependency on future prompts. |
+| P4 | **`OfferDetailClient` + smoke tests** (§F4, §F7) | Leaf. No dependency on future prompts. |
+| P5 | **Server-component wrappers** (§F2) — overwrites legacy `src/app/vault/offers/page.tsx` in place; creates new `src/app/vault/offers/[id]/page.tsx` | Now both imports resolve. The overwrite at `vault/offers/page.tsx` naturally retires the legacy 561-LoC mock. |
+| P6 | **Legacy-orphan audit** — grep evidence that `mockThreads` has zero remaining consumers and no other file imported the deleted legacy page. `git rm` only if any orphan file (e.g., a sibling helper) survives. | P5's overwrite is the actual deletion; P6 is evidence-only per §F5's intent. |
+| P7 | Verification pass | Unchanged. |
+| P8 | Exit report | Unchanged. |
+
+Between P3 and P5, the two new client component files (`OffersListClient.tsx`, `OfferDetailClient.tsx`) live as orphans (no server importer yet). TypeScript and ESLint tolerate unreferenced exports; tests cover them; no regression. They are wired up at P5.
+
+§F5's "Remove entirely" language now reads as: the removal is effected at P5 by overwriting `src/app/vault/offers/page.tsx` with the new server-component wrapper. P6 verifies no collateral (`mockThreads` consumers elsewhere, imports of the deleted page) survives.
+
+§D8's file-mutability list remains authoritative per-prompt; no file newly added by this reordering.
+
 ---
 
 ## §F — Functional requirements
@@ -284,11 +303,11 @@ Each prompt is a single Claude Code invocation. Verdict-gated by founder before 
 | # | Title | Output | LoC est. |
 |---|---|---|---|
 | 1 | **Pre-flight audit** — confirm client-side Bearer-token pattern exists (or surface gap); confirm no other consumer of `mockThreads`; re-verify no `@supabase/ssr` or `next/headers` consumers. | Audit memo appended to this directive as `§AUDIT-1`. No code. | **DONE** (see §AUDIT-1, 2026-04-21; AUTH closed via §R3) |
-| 2 | **Add `GET /api/offers`** + tests | route.ts (GET added), get.test.ts (new) | ~150 |
-| 3 | **Add server-component wrappers** (flag-gated) at both routes | page.tsx × 2 | ~30 |
-| 4 | **Build `OffersListClient`** + smoke tests | client component + test | ~200 |
-| 5 | **Build `OfferDetailClient`** + smoke tests | client component + test | ~250 |
-| 6 | **Delete legacy mock** at `/vault/offers/page.tsx` (now superseded by Prompt 3 wrapper) — verify no orphaned imports survive | git rm + grep evidence | ~0 (removal) |
+| 2 | **Add `GET /api/offers`** + tests | route.ts (GET added), get.test.ts (new) | **DONE** (see §AUDIT-2, 2026-04-22; Gate 1 APPROVE WITH CORRECTION per §R4; commit `f34df12`) |
+| 3 | **Build `OffersListClient`** + smoke tests (see §R5) | client component + test | ~200 |
+| 4 | **Build `OfferDetailClient`** + smoke tests (see §R5) | client component + test | ~250 |
+| 5 | **Add server-component wrappers** (flag-gated) at both routes; overwrites legacy `vault/offers/page.tsx` in place; creates new `vault/offers/[id]/page.tsx` (see §R5) | page.tsx × 2 | ~30 |
+| 6 | **Legacy-orphan audit** — grep evidence that `mockThreads` has zero consumers and the deleted legacy page is not imported elsewhere; `git rm` only if any orphan survives (see §R5) | grep evidence + optional git rm | ~0 |
 | 7 | **Verification pass** — run full test suite, build, lint; capture deltas vs baseline | text-only report | 0 |
 | 8 | **Exit report** — `P4_CONCERN_4A_2_SCAFFOLD_EXIT_REPORT.md` mirroring B2's structure | new doc | ~250 |
 
