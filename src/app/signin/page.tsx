@@ -4,28 +4,59 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { SiteHeader } from '@/components/SiteHeader'
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser'
 
 /**
- * Phase B note — signin is still a visual-only mockup. Real auth
- * (Supabase Auth or equivalent) is explicitly out of scope for
- * this phase. The form now at least fails in a coherent way:
- *   - The "Log in" submit routes to /onboarding with a clear
- *     demo-mode hint rather than silently preventing default.
- *   - The dead /signin/forgot link has been removed.
- *   - "Create new account" leads into the new Phase 0 entry
- *     (`/onboarding`) which creates a real users row.
+ * Real email/password signin (P4 concern 4A.2.AUTH §F3). Visual
+ * layout is frozen per §D4 — only submit logic, error state, and
+ * the disabled social buttons are new. See
+ * docs/audits/P4_CONCERN_4A_2_AUTH_DIRECTIVE.md.
  */
 export default function SignInPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    // No real auth backend yet. The submit sends the user into
-    // the onboarding entry point so there is no dead end.
-    router.push('/onboarding')
+    setSubmitting(true)
+    setError(null)
+
+    const supabase = getSupabaseBrowserClient()
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (authError) {
+      // Generic error — never reveal which field was wrong (§D6).
+      setSubmitting(false)
+      setError('Invalid email or password.')
+      return
+    }
+
+    // Idempotent actor_handles provisioning. Runs against the fresh
+    // session's access token so the service-role route can pin the
+    // row to `auth.users.id`. Non-blocking to UX — a 5xx here still
+    // lets the user land on /vault/offers; requireActor will surface
+    // ACTOR_NOT_FOUND on the next call and the client can retry.
+    const session = (await supabase.auth.getSession()).data.session
+    if (session) {
+      try {
+        await fetch('/api/auth/ensure-actor-handle', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+      } catch {
+        // Network hiccup — fall through; requireActor retry path covers it.
+      }
+    }
+
+    setSubmitting(false)
+    router.push('/vault/offers')
   }
 
   return (
@@ -40,12 +71,12 @@ export default function SignInPage() {
             LOG IN
           </h1>
 
-          {/* Social login */}
+          {/* Social login — disabled in this concern; OAuth wiring is a follow-up. */}
           <div className="grid grid-cols-2 gap-3">
-            <SocialButton icon={<GoogleIcon />} label="Google" />
-            <SocialButton icon={<AppleIcon />} label="Apple" />
-            <SocialButton icon={<LinkedInIcon />} label="LinkedIn" />
-            <SocialButton icon={<FacebookIcon />} label="Facebook" />
+            <SocialButton icon={<GoogleIcon />} label="Google" disabled />
+            <SocialButton icon={<AppleIcon />} label="Apple" disabled />
+            <SocialButton icon={<LinkedInIcon />} label="LinkedIn" disabled />
+            <SocialButton icon={<FacebookIcon />} label="Facebook" disabled />
           </div>
 
           {/* Divider */}
@@ -113,18 +144,25 @@ export default function SignInPage() {
               </div>
             </div>
 
-            {/* Demo-mode note — real auth lands later */}
-            <p className="text-[11px] font-medium text-[#6e7a8f]">
-              Demo mode — authentication is not yet wired. Logging in
-              routes you to the new account flow.
-            </p>
+            {/* Error — generic, no field enumeration (§D6). Existing
+                typography stack; reserves space only when populated. */}
+            {error ? (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#0000ff]"
+              >
+                {error}
+              </p>
+            ) : null}
 
             {/* Submit */}
             <button
               type="submit"
-              className="w-full h-14 bg-[#0000ff] text-white text-[13px] font-bold uppercase tracking-[0.16em]  hover:bg-[#0000cc] transition-colors mt-2"
+              disabled={submitting}
+              className="w-full h-14 bg-[#0000ff] text-white text-[13px] font-bold uppercase tracking-[0.16em]  hover:bg-[#0000cc] transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-[#0000ff]"
             >
-              Log in
+              {submitting ? 'Signing in…' : 'Log in'}
             </button>
           </form>
 
@@ -148,11 +186,22 @@ export default function SignInPage() {
 
 // ── Social button ───────────────────────────
 
-function SocialButton({ icon, label }: { icon: React.ReactNode; label: string }) {
+function SocialButton({
+  icon,
+  label,
+  disabled = false,
+}: {
+  icon: React.ReactNode
+  label: string
+  disabled?: boolean
+}) {
   return (
     <button
       type="button"
-      className="flex items-center justify-center gap-3 h-14 border-2 border-[#0b1220]  text-[12px] font-bold uppercase tracking-[0.08em] text-[#0b1220] hover:bg-[#0b1220] hover:text-white transition-all duration-200 group"
+      disabled={disabled}
+      title={disabled ? 'Coming soon' : undefined}
+      aria-disabled={disabled || undefined}
+      className="flex items-center justify-center gap-3 h-14 border-2 border-[#0b1220]  text-[12px] font-bold uppercase tracking-[0.08em] text-[#0b1220] hover:bg-[#0b1220] hover:text-white transition-all duration-200 group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#0b1220]"
     >
       <span className="w-5 h-5 shrink-0">{icon}</span>
       {label}

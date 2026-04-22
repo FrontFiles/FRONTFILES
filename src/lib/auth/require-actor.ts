@@ -55,6 +55,36 @@ import 'server-only'
  * a build error if any client component imports the module —
  * the correct sentinel for an internal helper. Closes 4A.1
  * exit-report open item (g).
+ *
+ * ─── Provisioning contract (P4 concern 4A.2.AUTH §F5) ──────────
+ *
+ * `requireActor` is read-only. It NEVER creates an `actor_handles`
+ * row. Provisioning is owned by `POST /api/auth/ensure-actor-handle`
+ * (`src/app/api/auth/ensure-actor-handle/route.ts`), which the
+ * `/signin` page calls immediately after a successful
+ * `signInWithPassword` and which any other entry point (future
+ * onboarding completion, OAuth callback, magic-link landing) is
+ * expected to call before issuing its first authenticated request.
+ *
+ * Consequence for callers: if a real signed-in user receives
+ * `ACTOR_NOT_FOUND` from this helper, the post-signin provisioning
+ * call has not (yet) succeeded. The recommended client recovery is
+ * to POST `/api/auth/ensure-actor-handle` once with the same Bearer
+ * token, then retry the original request. Repeated `ACTOR_NOT_FOUND`
+ * after a successful provisioning POST indicates a real bug, not a
+ * race — surface it to the user.
+ *
+ * Why provisioning lives outside this helper:
+ *   1. Auditability — provisioning emits its own log line, distinct
+ *      from a routine read miss.
+ *   2. RLS posture — provisioning needs the service-role client to
+ *      bypass the `actor_handles` insert policy (the row doesn't
+ *      exist yet; user-JWT INSERT would be rejected). Concentrating
+ *      that one sanctioned service-role usage in a dedicated route
+ *      keeps `requireActor` strictly user-JWT-friendly.
+ *   3. Contract clarity — `requireActor` stays fail-closed and
+ *      side-effect-free, so its four-outcome union is genuinely
+ *      exhaustive.
  */
 
 import { isAuthWired } from '@/lib/flags'
