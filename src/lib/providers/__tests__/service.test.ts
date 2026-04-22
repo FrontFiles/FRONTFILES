@@ -2,9 +2,19 @@
 // Provider service — create/list/revoke + webhook dedupe
 //
 // These exercise the service layer end-to-end against the
-// mock store. They don't touch Supabase — `isSupabaseConfigured()`
-// returns false in the test env, so every service call routes
-// through the in-memory implementation.
+// in-memory mock store. Mode routing is decided by `store.ts`
+// `getMode()`, which under Vitest defaults to 'mock' unless
+// `FF_INTEGRATION_TESTS=1` is set. See
+// docs/audits/P4_CONCERN_2_DECISION_MEMO.md for why the mode
+// decision is decoupled from `isSupabaseEnvPresent()` (the keys
+// must be present for `src/lib/env.ts`'s module-load Zod parse,
+// but presence alone should not opt every Vitest run into live
+// Supabase calls).
+//
+// The `afterEach` at L51-60 conditions on `isSupabaseEnvPresent()`
+// for teardown — kept as a dual-mode safety net for the future
+// integration-mode case (someone runs this suite with
+// `FF_INTEGRATION_TESTS=1` against a real Supabase).
 //
 // What we cover:
 //
@@ -124,7 +134,13 @@ describe('createConnection', () => {
     expect(second.ok).toBe(false)
     if (second.ok) return
     expect(second.error.code).toBe('INSERT_FAILED')
-    expect(second.error.message).toMatch(/duplicate key/)
+    // Message surface differs by mode: Postgres emits "duplicate key"
+    // via 23505; mock mode throws the friendlier app-land message
+    // from `insertConnection` when its pre-check finds an active row.
+    // Both are legitimate signals that the uniqueness rule fired.
+    expect(second.error.message).toMatch(
+      /duplicate key|active connection already exists/,
+    )
   })
 
   it('a revoked connection does not block a new active one', async () => {

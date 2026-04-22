@@ -45,12 +45,17 @@ import { loadEnvConfig } from '@next/env'
 // Production fail-fast in `src/lib/env.ts` is therefore unaffected: under
 // `NODE_ENV=production` without `.env.local`, the Zod parse still throws
 // at module load exactly as before.
+// `process.env.NODE_ENV` is typed as a readonly literal union by
+// `@types/node`, which makes `next build`'s typecheck reject a direct
+// assignment. The cast preserves the runtime mutation (which is what
+// `@next/env` keys off of inside `loadEnvConfig`) without disabling
+// the broader read-only contract elsewhere.
 const _savedNodeEnv = process.env.NODE_ENV
-process.env.NODE_ENV = 'development'
+;(process.env as { NODE_ENV: string }).NODE_ENV = 'development'
 try {
   loadEnvConfig(process.cwd(), /* dev */ true)
 } finally {
-  process.env.NODE_ENV = _savedNodeEnv ?? 'test'
+  ;(process.env as { NODE_ENV: string }).NODE_ENV = _savedNodeEnv ?? 'test'
 }
 
 // Forward only string-valued env vars; `test.env` is typed as
@@ -63,6 +68,22 @@ for (const [key, value] of Object.entries(process.env)) {
   }
 }
 
+// P4 concern 3 — default the spec-canonical AUTH_WIRED flag to `true`
+// in the test worker env so concern 4's replacement route handlers
+// (each guarded by `if (!isAuthWired()) return errorResponse(...)`)
+// exercise the live path by default. Tests that need the off path
+// stub explicitly via `vi.stubEnv('FFF_AUTH_WIRED', 'false')`.
+// Orthogonal to FF_INTEGRATION_TESTS (mock-vs-integration routing in
+// src/lib/providers/store.ts); both gates coexist.
+forwardedEnv.FFF_AUTH_WIRED = 'true'
+
+// P4 concern 4A.1 — default the spec-canonical ECONOMIC_V1_UI flag
+// to `true` in the test worker env so 4A.2+'s replacement page.tsx
+// server components render through the live path under `bun run
+// test`. Tests that need the `notFound()` branch stub explicitly
+// via `vi.stubEnv('FFF_ECONOMIC_V1_UI', 'false')`.
+forwardedEnv.FFF_ECONOMIC_V1_UI = 'true'
+
 export default defineConfig({
   test: {
     environment: 'node',
@@ -71,6 +92,22 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // `server-only` is a Next.js-ships-as-dependency package that
+      // isn't hoisted to the top-level `node_modules/` (it lives at
+      // `node_modules/next/dist/compiled/server-only/`). Under
+      // `next build` / `next dev` Next's bundler resolves it via
+      // the `react-server` condition to an empty module on the
+      // server and throws on the client. Vitest lacks that
+      // conditional resolution, so import of `server-only` from
+      // any server-side module under test fails to resolve. Alias
+      // the bare specifier to Next's `empty.js` — the same target
+      // Next's server-condition resolution lands on — so the
+      // module import is a no-op under the test harness while the
+      // production behaviour (client-import throws) stays intact.
+      'server-only': path.resolve(
+        __dirname,
+        './node_modules/next/dist/compiled/server-only/empty.js',
+      ),
     },
   },
 })

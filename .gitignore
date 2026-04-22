@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -50,6 +51,12 @@ next-env.d.ts
 # editor / IDE scratch
 .vscode/
 .idea/
+
+# local scratch — audit paste buffers + personal workspace notes
+# Underscore-prefixed files under docs/audits/ are personal dispatch
+# / paste buffers (e.g. _B1_DISPATCH_PASTE.md). They are NOT commit
+# material; never stage them.
+docs/audits/_*.md
 
 # Large binary video assets — exceed GitHub's 100MB file limit.
 # Store externally (Vercel Blob, Cloudflare R2, S3) when referenced
