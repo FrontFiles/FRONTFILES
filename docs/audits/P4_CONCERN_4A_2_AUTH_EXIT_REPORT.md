@@ -20,7 +20,7 @@ The branch carried the full B2 commit chain (`98481b7`, `7469af4`, `550a6da`) at
 | SHA | Subject | Files | LoC delta | AUTH? |
 |---|---|---|---|---|
 | `550a6da` | docs(p4/4A.2/B2): exit report — B2 complete | — | — | No — predecessor (baseline) |
-| _pending_ | feat(p4/4A.2/AUTH): browser auth + actor_handles provisioning + signout no-op | 11 | +1063 / −26 (new) plus +105 / −26 (modified) | **Yes** (F1-F8) |
+| `48ab550` | feat(p4/4A.2/AUTH): browser auth substrate + actor_handles provisioning | 15 | +1983 / −26 | **Yes** (F1-F8) |
 
 Aggregate AUTH delta: **11 files (8 new + 2 modified + this report), +1168 insertions, −26 deletions**.
 
@@ -32,24 +32,25 @@ Aggregate AUTH delta: **11 files (8 new + 2 modified + this report), +1168 inser
 |---|---|---|---|
 | AC1 | `getSupabaseBrowserClient()` exists and returns a singleton | **PASS** | `src/lib/supabase/__tests__/browser.test.ts` — 4 cases green; covers second-call short-circuit, env-var validation, and `auth.*` config defaults. |
 | AC2 | Session subscription helper covers 3 transitions; `useSession` is the React-glue thin wrapper | **PASS** | `src/hooks/__tests__/useSession.test.ts` — 4 cases green against the pure-Node `subscribeToSession` helper (per R3). React wrapper covered manually by AC3 smoke. |
-| AC3 | `/signin` submits via `signInWithPassword` and persists a session | **PENDING-SMOKE** | Sandbox-unverifiable; manual runbook §1 in Gate 2 report. Code path inspected: `src/app/signin/page.tsx` `handleSubmit` calls `supabase.auth.signInWithPassword({ email, password })` then `supabase.auth.getSession()` then `fetch('/api/auth/ensure-actor-handle', ...)` then `router.push('/vault/offers')`. |
-| AC4 | `/signin` shows generic error on failure (no enumeration) | **PENDING-SMOKE** | Code path inspected: `setError('Invalid email or password.')` is the single literal set on every non-null `authError`. Non-enumerable by construction. Gate 2 runbook §2. |
-| AC5 | After successful signin, `POST /api/auth/ensure-actor-handle` is called and returns 200 | **PENDING-SMOKE** | Sandbox-unverifiable. Route + payload pin verified at AC6. Gate 2 runbook §3 + curl path. |
+| AC3 | `/signin` submits via `signInWithPassword` and persists a session | **PASS** | Smoke 2026-04-22 against `frontfiles-dev`: signin with `smoke@frontfiles.test` → redirect to `/vault/offers` → page rendered. Code path: `src/app/signin/page.tsx` `handleSubmit` calls `supabase.auth.signInWithPassword({ email, password })` then `supabase.auth.getSession()` then `fetch('/api/auth/ensure-actor-handle', ...)` then `router.push('/vault/offers')`. |
+| AC4 | `/signin` shows generic error on failure (no enumeration) | **PASS** | Smoke 2026-04-22: both wrong-email and wrong-password produce identical text "Invalid email or password." — non-enumerable. `setError('Invalid email or password.')` is the single literal set on every non-null `authError`. |
+| AC5 | After successful signin, `POST /api/auth/ensure-actor-handle` is called and returns 200 | **PASS** | Smoke 2026-04-22: post-signin DB check on `frontfiles-dev` shows row in `actor_handles` with `auth_user_id = aa1e896a-...`, `handle = 3f0df624-...`, `tombstoned_at = NULL`, `created_at = 2026-04-22 12:09:18+00`. Provisioning fired and persisted. |
 | AC6 | `ensure-actor-handle` is idempotent (second call → `{provisioned: false}`) | **PASS** | `src/app/api/auth/ensure-actor-handle/__tests__/post.route.test.ts` case 5 — Postgres 23505 unique_violation triggers the `{ provisioned: false }` branch. Case 4 verifies first-call `{ provisioned: true }` and that the INSERT payload pins to `auth_user_id` only. |
 | AC7 | `ensure-actor-handle` is the only new user-facing route using service-role | **PASS** | `grep -rln "getSupabaseClient\b" src/app/ --include="route.ts"` → sole hit: `src/app/api/auth/ensure-actor-handle/route.ts`. Pre-existing `requireActor` service-role usage (introduced concern 4A.1) preserved unchanged. |
 | AC8 | `requireActor` source unchanged; only header comment expanded | **PASS** | `git diff src/lib/auth/require-actor.ts` → **30 insertions, 0 deletions**, all inside the JSDoc block (lines 56-87). Implementation lines 90-173 byte-identical. |
-| AC9 | OAuth buttons remain present but disabled | **PENDING-SMOKE** | Code path inspected: `src/app/signin/page.tsx` `SocialButton` instances pass `disabled={true}` with `title="Coming soon"`, `aria-disabled`, and disabled: Tailwind classes. Visual confirmation deferred to runbook §4. |
+| AC9 | OAuth buttons remain present but disabled | **PASS** | Smoke 2026-04-22: all four OAuth buttons (Google, Apple, LinkedIn, Facebook) render with muted styling; Google click confirmed inert (no nav, no popup). Implementation surface is wider than the directive's literal "Google + Apple" — see §3 footnote. `SocialButton` instances pass `disabled={true}` with `title="Coming soon"`, `aria-disabled`, and disabled: Tailwind classes. |
 | AC10 | No SSR auth code added (`@supabase/ssr` and `next/headers` still 0 imports) | **PASS** | `grep -rn "@supabase/ssr\|from ['\"]next/headers['\"]" src/` → 0 hits. The Bearer-only contract (§D1) holds. |
 | AC11 | Vitest baseline + new tests pass; 1248 still green | **PASS** | `npx vitest run` → **1264 pass, 10 skipped, 0 failed** (baseline 1248 + 16 new across 4 new test files: 4 browser, 4 useSession, 6 ensure-actor-handle, 2 signout). Zero new skips. |
-| AC12 | `npm run build` clean | **PENDING-LOCAL** | Sandbox blocks `.next/BUILD_ID` clear (EPERM on existing artefacts under sandbox file ownership). Local-only verification per Gate 2 runbook §5. tsc clean confirmed via `npx tsc --noEmit` → exit 0, zero diagnostics. |
+| AC12 | `npm run build` clean | **PASS** | Local build 2026-04-22: `rm -rf .next && npm run build` → 89 routes generated, zero TS errors, zero ESLint errors, zero boundary warnings. New auth routes appear in inventory: `/api/auth/ensure-actor-handle`, `/api/auth/signout`, plus static `/signin`. |
 | AC13 | No new lint errors beyond pre-existing 67 | **PASS** | `npx eslint . --quiet` → **67 errors, 0 warnings, delta 0 vs baseline**. Two `SUPABASE_SERVICE_ROLE_KEY` literals in `ensure-actor-handle/__tests__/post.route.test.ts` carry inline `eslint-disable-next-line no-restricted-syntax` exemptions with explanation comments — same pattern as every other route test under `src/app/api/**/__tests__/`. |
 | AC14 | `signout/route.ts` exists, returns 204, no other wiring | **PASS** | `src/app/api/auth/signout/__tests__/post.route.test.ts` — 2 cases: flag-on → 204 with empty body; flag-off → 404 `FEATURE_DISABLED`. The flag gate is a sharpening of §F6 — see §3 D-table footnote. |
 | AC15 | `useSession` and `getSupabaseBrowserClient` are both `'use client'`-marked | **PASS** | `head -3 src/lib/supabase/browser.ts` and `head -3 src/hooks/useSession.ts` — both files L1 is `'use client'`. |
 | AC16 | File-set freeze (§D7) honored | **PASS** | `git status --short` enumeration matches the §D7 list 1:1. See §5 for full audit. No out-of-freeze writes. |
 
-**Footnotes for PENDING rows:**
-- **AC3 / AC4 / AC5 / AC9 (PENDING-SMOKE)**: All four are `manual smoke (real Supabase env)` per the directive AC table. Code-path inspection passes; the empirical leg requires `FFF_AUTH_WIRED=true` against a real `auth.users` row, which the sandbox cannot reach. The runbook in `P4_CONCERN_4A_2_AUTH_GATE2_REPORT.md` §1-§4 is build-governing — passing it closes the four ACs. Until that pass, the report is `Status: AUTH complete pending smoke`.
-- **AC12 (PENDING-LOCAL)**: Sandbox `.next` ownership blocks `rm -rf .next` from inside the sandbox. tsc passes; lint passes. The remaining build leg is mechanical and requires a clean host. Runbook §5.
+**Smoke execution notes (2026-04-22):**
+- Smoke ran against `frontfiles-dev` (project ref `kxlromxyhgirdetudrvu`), not `FrontFiles's Project` (`kmwfuvcyuqrxjpzjgcdw`, treated as production). Pre-smoke discovery: `.env.local` was pointed at production; both projects were missing the full P4 migration set (9 unapplied migrations). Resolution: ran `supabase db push` against the linked dev project (applying all 9 P4 migrations including `20260421000004_economic_flow_v1_ddl` which creates `actor_handles`); switched `.env.local` to dev; created `smoke@frontfiles.test` test user in dev; cleaned up an inadvertent same-named user from prod. See §6 open items for the standing recommendation: lock dev/prod env separation in onboarding docs.
+- AC9 sharpening confirmed visually: the implemented OAuth row has **4 buttons** (Google, Apple, LinkedIn, Facebook), not the 2 (Google, Apple) the directive's AC9 line referenced. Both are `disabled={true}` SocialButton instances; the wider surface is consistent with the existing pre-AUTH `/signin` UI and was preserved by the F4 prompt. Recorded as a sharpening, not a deviation.
+- AC12 ran on macOS local host: `rm -rf .next && npm run build` → 89 routes, zero errors.
 
 ---
 
@@ -156,6 +157,7 @@ Every flagged-but-not-fixed item surfaced during AUTH execution. Owner classific
 | 6.6 | Sign-out UI affordance not yet wired | scaffold | Per directive OQ3: this concern ships the `/api/auth/signout` wiring substrate; the visible header/vault sign-out button is a scaffold-concern responsibility. The client wiring is documented in `signout/route.ts` header (line 28-30): `supabase.auth.signOut()` + `fetch('/api/auth/signout')`. |
 | 6.7 | Production cutover is a separate concern | production-cutover | Per §D5 the production default `FFF_AUTH_WIRED=false` is preserved. Dev/staging flips are documented in `.env.example`. The production flip is gated on (a) Supabase project provisioned in production, (b) onboarding flow's first-time `ensureActorHandle` path verified, (c) sign-out UI shipped (6.6). |
 | 6.8 | `'use client'` import-side-effect ordering with `getSupabaseBrowserClient` env validation | AUTH-followup (low) | The browser client throws at first call (not at import time) if `NEXT_PUBLIC_SUPABASE_*` are unset. Server-rendered import paths are blocked by `'use client'`, but a misconfigured Vercel preview without the public envs would surface the throw at first user interaction. Not new — same shape as every other env-validated client-side singleton — but worth documenting in the deploy checklist. |
+| 6.9 | Dev/prod Supabase env separation not enforced in onboarding | next-cycle (ops-hygiene) | Surfaced during 2026-04-22 smoke: `.env.local` was pointed at `FrontFiles's Project` (`kmwfuvcyuqrxjpzjgcdw`, treated as production) instead of `frontfiles-dev` (`kxlromxyhgirdetudrvu`). Both projects existed; neither had the P4 migration set applied. Smoke caught it (created a test user in prod that was then cleaned up), but a setup doc + a `supabase link` check at `npm run dev` boot would prevent recurrence. Track as ops hygiene; not a code defect. |
 
 ---
 
@@ -169,7 +171,7 @@ Gate coverage at present (delta vs B2):
 | `npx tsc --noEmit` | No (local only) | PASS (exit 0) |
 | `npx eslint .` | No | FAIL (exit 1) — 67 pre-existing errors; AUTH delta 0 |
 | `npx vitest run` | No | PASS (1264/10/0) |
-| `npm run build` | Implied by deploy provider | PENDING-LOCAL (sandbox blocks; runbook §5) |
+| `npm run build` | Implied by deploy provider | PASS (local 2026-04-22 — 89 routes, zero errors) |
 
 Same recommendation as B2: a minimal PR workflow (typecheck + test + build) would institutionalize the gates. Tracked under §6.3.
 
@@ -203,8 +205,6 @@ Same recommendation as B2: a minimal PR workflow (typecheck + test + build) woul
 
 ## §END
 
-**Status: AUTH complete pending smoke.** All sixteen AC rows resolved at the sandbox layer (11 PASS, 4 PENDING-SMOKE, 1 PENDING-LOCAL). All nine D rows HELD; one §F-level sharpening recorded explicitly. Three open items inherited from B2; five new ones owned by this concern (one AUTH-followup, two scaffold, one production-cutover, one low-priority deploy hygiene).
+**Status: AUTH complete.** All sixteen AC rows green (16 PASS / 0 PENDING). Smoke executed against `frontfiles-dev` 2026-04-22; clean local build same date. All nine D rows HELD; one §F-level sharpening (signout flag-gating) and one §AC-level sharpening (OAuth row width: 4 not 2) recorded explicitly. Three open items inherited from B2; six new ones owned by this concern (one AUTH-followup, two scaffold, one production-cutover, one low-priority deploy hygiene, one ops-hygiene from the dev/prod env mismatch caught during smoke).
 
-Branch ready for commit + smoke + push pending the runbook in `P4_CONCERN_4A_2_AUTH_GATE2_REPORT.md` §1-§5.
-
-**Exit SHA**: pending — assigned at commit time.
+**Exit SHA**: `48ab550` — `feat(p4/4A.2/AUTH): browser auth substrate + actor_handles provisioning`.
