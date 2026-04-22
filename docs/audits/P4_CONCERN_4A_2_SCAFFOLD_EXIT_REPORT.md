@@ -30,15 +30,16 @@ Retired the 561-LoC legacy Special Offers mock at `src/app/vault/offers/page.tsx
 
 ## File inventory (§D8)
 
-Concern authored or modified exactly 15 paths. Verified against `git diff --name-only main...HEAD` + the P8 commit (which adds 2 meta-bookkeeping files — SCAFFOLD_PROMPT_8.md and this exit report — outside this 15-path inventory).
+Concern authored or modified exactly 17 paths. Verified against `git diff --name-only main...HEAD` + the P8 commit (which adds 2 meta-bookkeeping files — SCAFFOLD_PROMPT_8.md and this exit report — inside this 17-path inventory via post-merge backfill).
 
-### `docs/audits/` (1 path)
+### `docs/audits/` (2 paths)
 
 | Path | Status |
 |---|---|
 | `P4_CONCERN_4A_2_SCAFFOLD_DIRECTIVE.md` | NEW |
+| `P4_CONCERN_4A_2_SCAFFOLD_EXIT_REPORT.md` | NEW (self-reference) |
 
-### `docs/audits/_prompts/` (6 paths)
+### `docs/audits/_prompts/` (7 paths)
 
 | Path | Status |
 |---|---|
@@ -48,6 +49,7 @@ Concern authored or modified exactly 15 paths. Verified against `git diff --name
 | `SCAFFOLD_PROMPT_5.md` | NEW |
 | `SCAFFOLD_PROMPT_6.md` | NEW (committed in P8) |
 | `SCAFFOLD_PROMPT_7.md` | NEW (committed in P8; P8 §2 applied 14→15 typo fix pre-commit) |
+| `SCAFFOLD_PROMPT_8.md` | NEW |
 
 ### `src/app/api/offers/` (2 paths)
 
@@ -67,7 +69,7 @@ Concern authored or modified exactly 15 paths. Verified against `git diff --name
 | `[id]/_components/OfferDetailClient.tsx` | NEW |
 | `[id]/_components/__tests__/OfferDetailClient.test.tsx` | NEW |
 
-Totals: **13 NEW + 2 MODIFIED = 15 paths**. Matches P7's corrected file-inventory count (14→15 typo fix applied in P8 §2).
+Totals: **15 NEW + 2 MODIFIED = 17 paths**. Extends P7's corrected 15-path count (from the P8 §2 14→15 typo fix) with the two P8 meta-bookkeeping files backfilled post-merge.
 
 ## Commit trail
 
@@ -109,4 +111,4 @@ Tree returned to Deploy-1 floor (`FFF_ECONOMIC_V1_UI=false`) after the smoke.
 
 ## Closed
 
-2026-04-22 — concern 4A.2.SCAFFOLD closed against final commit `<P8-COMMIT-SHA>`.
+2026-04-22 — concern 4A.2.SCAFFOLD closed against final commit `a17af72`.
