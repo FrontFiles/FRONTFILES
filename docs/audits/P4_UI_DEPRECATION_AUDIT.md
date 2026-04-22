@@ -1,6 +1,6 @@
 # P4 UI Deprecation Audit
 
-**Status.** Draft 1, 2026-04-20. Companion document to `docs/audits/P4_IMPLEMENTATION_PLAN.md` concern 4. Gate 3 pending founder approval.
+**Status.** Draft 2, 2026-04-22. Companion document to `docs/audits/P4_IMPLEMENTATION_PLAN.md` concern 4. Gate 3 approved — 4A.2.C (retirement) executable.
 
 **Governs.** The UI-layer retirement and replacement work at P4 cutover per ECONOMIC_FLOW_v1 §14.1 (revision 6) and `docs/audits/P4_PREREQUISITES.md` Entry 3. Paired with the master plan; not independently executable.
 
@@ -71,9 +71,9 @@ Rows 1 and 2 share `src/app/api/assignment/route.ts`; rows 7 and 8 are called ou
 
 | # | Path | Purpose | Classification |
 |---|---|---|---|
-| 1 | `src/app/vault/offers/page.tsx` | Buyer-side offer inbox (accept/counter/decline) | **DELETE** — replacement page is a §7 Direct Offer view; entirely new shape under event-sourced offers |
-| 2 | `src/app/vault/assignments/page.tsx` | Assignment list for a user | **DELETE** — replacement is a §8 assignments list view |
-| 3 | `src/app/vault/disputes/page.tsx` | Disputes list for a user | **DELETE** — replacement is a §9 disputes view |
+| 1 | `src/app/vault/offers/page.tsx` | Buyer-side offer inbox (accept/counter/decline) | **DELETE** — replacement page governed by concern 4A.2.C1/C2 against ECONOMIC_FLOW_v1.md §7 (shape), §8.1 (events), §12 (UX surfaces); product-surface name 'Special Offer' per A.0 D1. |
+| 2 | `src/app/vault/assignments/page.tsx` | Assignment list for a user | **DELETE** — replacement governed by concern 4A.3 against ECONOMIC_FLOW_v1.md §5 (state machine) + §12.1 (Assignment view (extended)). |
+| 3 | `src/app/vault/disputes/page.tsx` | Disputes list for a user | **DELETE** — replacement governed by concern 4A.4 against ECONOMIC_FLOW_v1.md §5 (dispute states), §7 (shape), §8.2a (events), §12.4 (UX); five-type classification per ASSIGNMENT_DISPUTE_TAXONOMY.md v1 (governs D-A3). |
 | 4 | `src/app/assignment/page.tsx` | Top-level assignment list (separate from vault/) | **DELETE** — redundant with vault/assignments replacement; route path itself retires |
 | 5 | `src/app/assignment/new/page.tsx` | Create-assignment entry point | **DELETE** — v1 assignments are created from accepted offers per §7.5, not via a standalone new-assignment wizard |
 | 6 | `src/app/assignment/disputes/page.tsx` | Staff dispute console entry | **DELETE** — admin surface out of P4 scope; P7 admin trail viewer replaces as needed |
@@ -233,6 +233,7 @@ Concern 4 of `P4_IMPLEMENTATION_PLAN.md` is the governing section for execution.
 ## 9. Revision history
 
 - **2026-04-20 — Draft 1.** Initial audit. Inventory compiled from direct repo reconnaissance: `ls` of `src/components/assignment/`, `src/lib/assignment/`, `src/lib/special-offer/`, `src/app/api/assignment/`, `src/app/api/special-offer/`; `grep` for `/api/(assignment|special-offer)` across `src/`; inspection of `src/components/asset/AssetRightsModule.tsx` for the OfferModal stub state. Count reconciled against ECONOMIC_FLOW_v1 §17 (13 routes matched). Component-count discrepancy flagged in §1.3 and §7 item 1.
+- **Draft 2, 2026-04-22** — §3.1 row 1/2/3 spec cross-references corrected per Gate-3 red-team; 'Direct Offer' replaced with 'Special Offer' per A.0 D1; no change to inventory, classification, sequencing, or acceptance criteria.
 
 ---
 
