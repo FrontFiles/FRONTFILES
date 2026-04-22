@@ -170,23 +170,52 @@ New follow-up concern logged (outside this directive, to be opened after the sca
 
 ### §F2 — Server-component flag gate (canonical pattern)
 
-**Files:** new outer `page.tsx` at `/vault/offers` and `/vault/offers/[id]`.
+**Files:** new outer `page.tsx` at `/vault/offers` and `/vault/offers/[id]`. The same shape governs the five remaining gated wrappers introduced at 4A.3 / 4A.4 (`/vault/assignments`, `/vault/assignments/[id]`, `/vault/disputes`, `/vault/disputes/[id]`, plus the 4A.4 placeholder).
 
-Each must follow the exact pattern documented at `flags.ts` L100-105:
+Each must follow the exact pattern documented at `flags.ts` L100-105, extended with `export const dynamic = 'force-dynamic'` per the R7 revision below.
+
+**List-route shape** (static segment, e.g. `/vault/offers`):
 
 ```ts
-import { isEconomicV1UiEnabled } from '@/lib/flags'
 import { notFound } from 'next/navigation'
+
+import { isEconomicV1UiEnabled } from '@/lib/flags'
+import OffersListClient from './_components/OffersListClient'
+
+export const dynamic = 'force-dynamic'
 
 export default function Page() {
   if (!isEconomicV1UiEnabled()) notFound()
-  return <OffersListClient />   // or <OfferDetailClient id={…} />
+  return <OffersListClient />
 }
 ```
 
-The server component does **zero** data work — only flag check + child render. This is the only sanctioned bridge between server (flag) and client (data) in this concern.
+**Detail-route shape** (dynamic `[id]` segment, Next 16 async `params`):
 
-**LoC budget:** ~15 LoC per page wrapper × 2 = ~30 LoC.
+```ts
+import { notFound } from 'next/navigation'
+
+import { isEconomicV1UiEnabled } from '@/lib/flags'
+import OfferDetailClient from './_components/OfferDetailClient'
+
+export const dynamic = 'force-dynamic'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  if (!isEconomicV1UiEnabled()) notFound()
+  const { id } = await params
+  return <OfferDetailClient id={id} />
+}
+```
+
+The server component does **zero** data work — only flag check + child render. This is the only sanctioned bridge between server (flag) and client (data) in this concern. Use `await params` (not `use(params)`, which is the client-page shape).
+
+**Why `force-dynamic` is mandatory (R7 rationale).** `isEconomicV1UiEnabled()` resolves at module-load time from the Zod-parsed env schema at `src/lib/env.ts`, which Next 16's static analysis treats as a build-time constant. Without the directive, the list-route variant static-prerenders (`○`) and bakes the flag-off 404 into the build output — defeating the Deploy-2 env-change flip semantic documented at `flags.ts` L107-110 (*"Deploy 2 flips both flags in the same env change; rollback flips both back."*). The detail-route variant is already `ƒ` via `await params`, but the directive is mandatory there too for symmetry and self-documentation. Shipped in flight at Gate 1 review of Prompt 5 (commit `2b109e0`); this R7 amendment locks the shape into the canonical pattern so the remaining five gated wrappers at 4A.3 and 4A.4 inherit it without re-litigating.
+
+**LoC budget:** ~25 LoC (list) + ~31 LoC (detail) = ~56 LoC across the two offer wrappers. Same per-wrapper envelope applies to the five remaining gated wrappers in later concerns.
 
 ### §F3 — `OffersListClient` (NEW client component)
 
