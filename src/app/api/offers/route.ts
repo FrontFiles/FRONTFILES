@@ -44,6 +44,7 @@ import {
   RightsSchema,
   validatePackComposition,
 } from '@/lib/offer'
+import type { OfferRow } from '@/lib/offer'
 import { classifyRpcError } from '@/lib/offer/rpc-errors'
 
 // ─── Zod body schema ────────────────────────────────────────────
@@ -248,5 +249,88 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     },
     { status: 201 },
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GET /api/offers — party-only list (P4 concern 4A.2 §F1)
+//
+// Contract (mirrors GET /api/offers/[id] — see ./[id]/route.ts):
+//   - requireActor() → 404 FEATURE_DISABLED / 401 UNAUTHENTICATED
+//     / 403 ACTOR_NOT_FOUND (directive §D6 surface parity).
+//   - Bearer token re-extracted for getSupabaseClientForUser(t).
+//   - No query params in v1. RLS (`offers_party_select`, migration
+//     20260421000004 L506-508) filters to rows where
+//     auth.uid() ∈ {buyer_id, creator_id}.
+//   - ORDER BY created_at DESC. Hard cap 100 rows — `truncated`
+//     set when the cap is hit; pagination is a follow-up.
+//   - Belt-and-braces party guard from the by-id handler is NOT
+//     needed here: no specific offer to assert against, RLS is
+//     sufficient and correct for a list query (directive §F1).
+//
+// Error surface — must match GET /api/offers/[id] exactly:
+//   404 FEATURE_DISABLED   · flag off (via requireActor)
+//   401 UNAUTHENTICATED    · no/invalid Bearer
+//   403 ACTOR_NOT_FOUND    · valid JWT, no actor_handles row
+//   500 INTERNAL           · Supabase error
+// ═══════════════════════════════════════════════════════════════
+
+const LIST_ROUTE = 'GET /api/offers'
+const LIST_LIMIT = 100
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const actorResult = await requireActor(request)
+  if (!actorResult.ok) {
+    switch (actorResult.reason) {
+      case 'FEATURE_DISABLED':
+        return errorResponse(404, 'FEATURE_DISABLED', 'Feature not enabled.')
+      case 'UNAUTHENTICATED':
+        return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required.')
+      case 'ACTOR_NOT_FOUND':
+        return errorResponse(403, 'ACTOR_NOT_FOUND', 'Actor profile not found.')
+    }
+  }
+  const actor = actorResult.actor
+
+  const accessToken = extractBearerToken(request)
+  if (!accessToken) {
+    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required.')
+  }
+  const supabase = getSupabaseClientForUser(accessToken)
+
+  const { data: rows, error: offersErr } = await supabase
+    .from('offers')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(LIST_LIMIT)
+
+  if (offersErr) {
+    logger.error(
+      {
+        route: LIST_ROUTE,
+        actorHandle: actor.handle,
+        rawCode: offersErr.code,
+      },
+      '[offer.list] offers read error',
+    )
+    return errorResponse(500, 'INTERNAL', 'Internal server error.')
+  }
+
+  const offers = (rows ?? []) as OfferRow[]
+  const truncated = offers.length >= LIST_LIMIT
+
+  logger.info(
+    {
+      route: LIST_ROUTE,
+      actorHandle: actor.handle,
+      count: offers.length,
+      truncated,
+    },
+    '[offer.list] ok',
+  )
+
+  return NextResponse.json(
+    { data: { offers, truncated } },
+    { status: 200 },
   )
 }
