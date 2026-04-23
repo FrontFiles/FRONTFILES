@@ -254,7 +254,7 @@ export const embedMetaFaint =
 
 // Format pill sitting on the thumb corner.
 export const embedFormatPill =
-  'absolute top-1.5 left-1.5 post-type-meta text-[var(--post-text-meta)] bg-[var(--post-surface)]/85 backdrop-blur-sm px-1 py-0.5 rounded-sm uppercase'
+  'absolute top-1.5 left-1.5 post-type-meta text-[var(--post-text-meta)] bg-[var(--post-surface)]/85 backdrop-blur-sm px-1 py-0.5 uppercase'
 
 // Attribution chip (pill) shown at the bottom of the embed.
 export const attributionChip = {

@@ -249,7 +249,7 @@ export function ShareComposer({
                 <span
                   className={
                     tooLong
-                      ? 'font-mono post-type-meta text-red-500'
+                      ? 'font-mono post-type-meta text-black'
                       : 'font-mono post-type-meta text-[var(--post-text-disabled)]'
                   }
                 >
@@ -259,11 +259,11 @@ export function ShareComposer({
 
               {/* Inline error bag */}
               {errors.length > 0 && (
-                <div className="border border-red-300 bg-red-50 rounded-[var(--post-embed-radius)] p-3 flex flex-col gap-1">
+                <div className="border border-dashed border-[var(--post-border)] bg-[var(--post-surface-nested)] rounded-[var(--post-embed-radius)] p-3 flex flex-col gap-1">
                   {errors.map((err) => (
                     <p
                       key={err.code}
-                      className="post-type-body-compact text-red-700"
+                      className="post-type-body-compact text-black"
                     >
                       {err.message}
                     </p>

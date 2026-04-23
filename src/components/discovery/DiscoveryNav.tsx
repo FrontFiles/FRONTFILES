@@ -261,7 +261,7 @@ function CartNavButton() {
     >
       <IconCart className="w-[18px] h-[18px]" />
       {cartItemCount > 0 && (
-        <span className="absolute top-1 right-1 min-w-[14px] h-[14px] bg-blue-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5">
+        <span className="absolute top-1 right-1 min-w-[14px] h-[14px] bg-[#0000ff] text-white text-[8px] font-bold flex items-center justify-center px-0.5">
           {cartItemCount}
         </span>
       )}
