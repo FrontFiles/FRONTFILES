@@ -88,7 +88,7 @@ export function AssetRightsModule({ asset }: AssetRightsModuleProps) {
                   onClick={() => setSelectedMedium(m)}
                   className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 border transition-colors ${
                     selectedMedium === m
-                      ? 'bg-blue-600 text-white border-blue-600'
+                      ? 'bg-[#0000ff] text-white border-[#0000ff]'
                       : 'border-slate-200 text-slate-400 hover:border-black hover:text-black'
                   }`}
                 >
@@ -126,7 +126,7 @@ export function AssetRightsModule({ asset }: AssetRightsModuleProps) {
             <button
               onClick={handleAddToCart}
               disabled={!hasPrice}
-              className="flex items-center justify-center w-full py-2.5 text-[10px] font-bold uppercase tracking-widest bg-blue-600 text-white hover:bg-[#0000cc] transition-colors disabled:bg-slate-200 disabled:text-slate-400"
+              className="flex items-center justify-center w-full py-2.5 text-[10px] font-bold uppercase tracking-widest bg-[#0000ff] text-white hover:bg-[#0000cc] transition-colors disabled:bg-slate-200 disabled:text-slate-400"
             >
               Add to cart
             </button>
@@ -240,7 +240,7 @@ function OfferModal({
                   className="h-12 px-3 border-2 border-slate-200 text-lg font-mono font-bold focus:border-black focus:outline-none"
                   autoFocus
                 />
-                {error && <span className="text-[10px] text-red-500">{error}</span>}
+                {error && <span className="text-[10px] text-black">{error}</span>}
               </div>
 
               {/* Savings preview */}

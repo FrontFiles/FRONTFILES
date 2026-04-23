@@ -114,7 +114,7 @@ export function renderOffersListBody(
                 href={`/vault/offers/${offer.id}`}
                 className="grid grid-cols-5 gap-4 px-6 py-4 text-base text-black focus-visible:outline focus-visible:outline-black"
               >
-                <span className="text-blue-600">{handle}</span>
+                <span className="text-[#0000ff]">{handle}</span>
                 <span>{offer.target_type}</span>
                 <span>{`${offer.gross_fee} ${offer.currency}`}</span>
                 <span>{offer.state}</span>

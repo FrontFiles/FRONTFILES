@@ -27,7 +27,7 @@ interface CheckoutState {
   confirmBeforeSigning: boolean
   priceConfirmed: boolean
   paymentComplete: boolean
-  /** Direct Offer handoff — negotiated amount in EUR cents */
+  /** Special Offer handoff — negotiated amount in EUR cents */
   offerAmount: number | null
   offerThreadId: string | null
 }
@@ -81,7 +81,7 @@ function createInitialCheckout(
   offerLicence: LicenceType | null,
   offerThreadId: string | null,
 ): CheckoutState {
-  // If coming from a Direct Offer, skip licence selection (already agreed)
+  // If coming from a Special Offer, skip licence selection (already agreed)
   const isOfferHandoff = offerAmount != null && offerLicence != null
   return {
     step: isOfferHandoff ? 'declaration_review' : 'licence_selection',
@@ -116,7 +116,7 @@ function CheckoutPageContent({ params }: { params: Promise<{ assetId: string }> 
   const searchParams = useSearchParams()
   const asset = mockVaultAssets.find(a => a.id === assetId)
 
-  // Direct Offer handoff params
+  // Special Offer handoff params
   const offerAmountParam = searchParams.get('offerAmount')
   const offerLicenceParam = searchParams.get('licence') as LicenceType | null
   const offerThreadIdParam = searchParams.get('threadId')
@@ -163,7 +163,7 @@ function CheckoutPageContent({ params }: { params: Promise<{ assetId: string }> 
             {isOfferHandoff ? 'Offer Checkout' : 'Licence Checkout'}
           </h1>
 
-          {/* Direct Offer banner */}
+          {/* Special Offer banner */}
           {isOfferHandoff && (
             <div className="border-2 border-[#0000ff] px-4 py-3 flex items-center gap-3">
               <div className="w-6 h-6 bg-[#0000ff] flex items-center justify-center shrink-0">
