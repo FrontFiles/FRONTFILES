@@ -213,7 +213,7 @@ export function FeedLeftRail({
           FFF Sharing · Private beta
         </p>
         <p className="post-type-empty text-[var(--post-text-meta)] mt-2">
-          The feed surfaces certified Frontfiles work. Provenance and attribution are preserved at every level.
+          The feed surfaces verifiable Frontfiles work. Provenance and attribution are preserved at every level.
         </p>
       </div>
     </aside>

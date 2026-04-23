@@ -112,7 +112,7 @@ export default function FeedPage() {
     const verifiedCreators = creators.filter(
       (c) => c.trustBadge === 'verified',
     ).length
-    const certifiedAssets = publicAssets.filter(
+    const verifiableAssets = publicAssets.filter(
       (a) =>
         a.validationDeclaration === 'fully_validated' ||
         a.validationDeclaration === 'corroborated',
@@ -128,7 +128,7 @@ export default function FeedPage() {
       const t = Date.parse(r.published_at)
       return Number.isFinite(t) && t >= dayAgo
     }).length
-    return { verifiedCreators, certifiedAssets, repostsLast24h }
+    return { verifiedCreators, verifiableAssets, repostsLast24h }
   }, [unifiedRows])
 
   return (

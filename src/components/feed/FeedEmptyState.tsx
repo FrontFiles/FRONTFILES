@@ -55,6 +55,6 @@ const COPY: Record<
     label: 'For you',
     headline: 'No published posts on Frontfiles yet.',
     helper:
-      'Be the first to share a certified asset, Story, Article, or Collection.',
+      'Be the first to share a verifiable asset, Story, Article, or Collection.',
   },
 }
