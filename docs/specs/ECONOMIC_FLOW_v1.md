@@ -1,8 +1,8 @@
 # ECONOMIC_FLOW_v1.md
 
-**Status:** LOCKED 2026-04-20 (revision 6)
+**Status:** LOCKED 2026-04-22 (revision 7: §8.7.1 `public.users` erasure scrub addendum 2026-04-22; §8.7.1 final paragraph rephrased 2026-04-22 to be timeless re: UI scope; revision 8: docs/specs/SPECIAL_OFFER_SPEC.md Path B1 ratification cross-ref 2026-04-22; revision 9: §F15.1 per-template params + render contract inserted 2026-04-22)
 **Governs:** Path A v1 economic layer — offers, assignments, event trail, pack primitives
-**Cross-references:** `docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` §Decisions; `docs/audits/REMEDIATION_PLAN_20260418.md` tiers T1, T4; tier P0–P7 sequencing (see §14)
+**Cross-references:** `docs/specs/SPECIAL_OFFER_SPEC.md` (UI surface + interaction model authority, B1-ratified 2026-04-22); `docs/audits/T0_5_SPECIAL_OFFER_DECISION_MEMO.md` §Decisions; `docs/audits/REMEDIATION_PLAN_20260418.md` tiers T1, T4; tier P0–P7 sequencing (see §14)
 **Terminology:** See §9. Banned: "certified", "tamper-proof", "immutable", "guaranteed immutable". Allowed: "tamper-evident", "independently reviewable", "provenance-aware", "verifiable".
 
 ---
@@ -328,6 +328,27 @@ Consumers dispatch on the `v` field at application layer. Payload shape changes 
 
 **Post-archival portability.** After the 6-year archival rotation (§16), `actor_ref` values in archival rows are replaced by `sha256(actor_ref)`. A portability request from a subject whose handle has been rotated cannot be joined deterministically to their original ledger events. In that case, the platform derives the hash of the subject's (now-tombstoned) handle at request time and returns matching archival rows, with an export header disclosing that subject identity beyond the 6-year window is not platform-resolvable and that the returned hash is the subject's own hash of record. If no match exists (e.g., subject never transacted), the export states this explicitly.
 
+**§8.7.1 — Erasure scrub of `public.users`**
+
+Erasure (Art. 17) tombstones the actor at the identity layer in addition to the pseudonymisation layer (§8.7).
+
+On erasure of a user U:
+
+1. `actor_handles.tombstoned_at = now()` for every handle owned by U (per §8.7).
+2. `public.users` row for U is scrubbed in place — the row is preserved to keep referential integrity for `offers.buyer_id`, `offers.creator_id`, and any other FK pointing at `users.id`. Scrub values:
+   - `username = 'deleted-user-' || substring(id::text, 1, 8)` — preserves the `users_username_format` regex; collision risk is negligible at uuid-prefix entropy and tolerated because the field is no longer user-facing for tombstoned rows.
+   - `display_name = 'Deleted user'`.
+   - `email = 'deleted-user-' || id::text || '@deleted.invalid'` — RFC 2606 reserved TLD; preserves NOT NULL + UNIQUE without constraint relaxation.
+   - `avatar_url = NULL` — column is nullable.
+   - `account_state = 'tombstoned'`.
+3. The `users` row is NOT deleted. FK preservation is mandatory; the offer ledger and counterparty resolution must continue to read scrubbed sentinels indefinitely.
+
+UI read behavior: counterparty endpoints return scrubbed sentinels VERBATIM. Tombstoned rows are NOT omitted from result sets. Renderers treat `account_state = 'tombstoned'` as an explicit display variant (no clickable profile link, no avatar fetch).
+
+Portability interaction (§8.6): export uses pre-erasure `actor_handles.handle` for ledger continuity. The `public.users` scrub is a UI-layer decision and does NOT affect ledger export shape.
+
+Operational ownership: the scrub procedure lives in the GDPR runbook (P6). Schema-side support — the `tombstoned_at` column on `public.users` and any `account_state` enum addition — is forward-compat work owned by P6 and does not block UI work that reads `public.users` under the currently-defined `account_state` values.
+
 ## 9. Terminology discipline
 
 **Tamper-evidence mechanism.** "Tamper-evident" in this spec is backed by the per-thread sha256 hash chain defined in §8 (header) and §8.3: each ledger event row digests (`prev_event_hash`, `payload_version`, `event_type`, canonicalised `payload`, `created_at` ISO-8601, `actor_ref`), so any mutation of a prior row breaks the chain and is detectable on independent replay. The platform makes no claim beyond that — the chain is tamper-evident and independently reviewable, not certified, not tamper-proof, not immutable. Permitted alternatives when describing offer/assignment state locks: "locked at offer creation", "fixed for the life of the offer", "append-only", "hash-chained".
@@ -369,6 +390,136 @@ CI enforcement: grep-based pre-commit hook on `docs/**`, `src/**/*.ts`, `src/**/
 | F14 | Revision rounds for brief-pack | Per-deliverable, tracked in `assignment_deliverables`. Cap negotiated at offer level, applies to each piece separately. |
 | F15 | Pack rights uniformity | Hard-enforced. Different rights per item = separate offers. v2 may allow per-item rights. V1 rights templates: (a) editorial one-time, (b) editorial with archive (12mo), (c) commercial with restrictions. Counsel-reviewed before T4 exit. |
 | F16 | Platform fee rate-lock | `platform_fee_bps` snapshotted on `offer.created`, locked for the life of the offer and its assignment. v1 default **1500 bps (15%)** — **placeholder pending business confirmation before P5**. A platform-wide rate change applies only to offers created after the change. |
+
+## F15.1 — Per-template params + render contract
+
+**Status:** addendum to §F15 (V1 rights templates). Ratified 2026-04-22 alongside SPECIAL_OFFER_SPEC.md Path B1 ratification.
+
+**Scope.** Defines the `params` jsonb shape and canonical UI render contract for each template value enumerated in §7's rights jsonb shape (L94): `editorial_one_time`, `editorial_with_archive_12mo`, `commercial_restricted`, `custom`. Every UI surface that renders rights (offer detail, offer compose modal, standalone composer, future assignment UI, future dispute UI) MUST consume this contract — no per-surface overrides.
+
+**Governs.** UI consumer authority for the rights jsonb; server-side validation rules for `offer.created` and `offer.countered` payloads. Does NOT govern DB-level strict-schema enforcement (unknown-key rejection at the database layer is future DDL work, tracked separately).
+
+**Counsel-review obligation (inherited from §F15).** Every addition to or modification of this registry requires a counsel review pass before T4 exit. Material changes to any template's `params` shape or render contract also require a counsel review pass.
+
+---
+
+### F15.1.a — `editorial_one_time`
+
+**`params` shape:**
+
+| Field | Type | Required | Constraint |
+|---|---|---|---|
+| `publication_name` | string | ✓ | ≤ 120 chars |
+| `publication_issue` | string | — | ≤ 120 chars (e.g. "Spring 2026 print") |
+| `territory` | `'worldwide'` \| ISO-3166-alpha-2 | ✓ | — |
+| `exclusivity_days` | int | — | 0–365; `0` (or omitted) = non-exclusive |
+
+**`is_transfer` (top-level on rights jsonb):** hard-locked `false`. UI and server MUST reject any offer payload submitting `editorial_one_time` with `is_transfer: true`.
+
+**Render shape (lines, in order):**
+
+1. `"Editorial, one-time use"`
+2. `"Publication: {publication_name}"` + (if `publication_issue` present) `" ({publication_issue})"`
+3. `"Territory: "` + (`territory === 'worldwide'` ? `"Worldwide"` : `countryName(territory)`)
+4. `exclusivity_days > 0` ? `"Exclusive for {exclusivity_days} days from publication"` : `"Non-exclusive"`
+
+---
+
+### F15.1.b — `editorial_with_archive_12mo`
+
+**`params` shape:** all `F15.1.a` fields plus:
+
+| Field | Type | Required | Constraint |
+|---|---|---|---|
+| `archive_format` | `'web'` \| `'print'` \| `'both'` | ✓ | — |
+| `archive_territory` | same shape as `territory` | — | defaults to `territory` if omitted |
+
+**`is_transfer`:** hard-locked `false`. Same rejection rule as F15.1.a.
+
+**Render shape:** all F15.1.a lines (1–4), then:
+
+5. `"Archive access: {archive_format} for 12 months from publication"`
+6. `"Archive territory: "` + (`archive_territory === 'worldwide'` ? `"Worldwide"` : `countryName(archive_territory)`)
+
+---
+
+### F15.1.c — `commercial_restricted`
+
+**`params` shape:**
+
+| Field | Type | Required | Constraint |
+|---|---|---|---|
+| `campaign_name` | string | ✓ | ≤ 120 chars |
+| `territory` | `'worldwide'` \| ISO-3166-alpha-2 \| `Array<ISO-3166-alpha-2>` | ✓ | — |
+| `channels` | `Array<'print'` \| `'web'` \| `'ooh'` \| `'social'` \| `'broadcast'>` | ✓ | ≥ 1 entry |
+| `duration_months` | int | ✓ | 1–60 |
+| `exclusive_in_channel` | bool | ✓ | — |
+| `credit_required` | bool | ✓ | — |
+
+**`is_transfer`:** allowed (top-level on rights jsonb, not inside `params`). When `true`, renders an extra line.
+
+**Render shape:**
+
+1. `"Commercial, restricted scope"`
+2. `"Campaign: {campaign_name}"`
+3. `"Territory: {formatTerritory(territory)}"` where `formatTerritory` handles all three territory variants (string `'worldwide'`, single ISO code, ISO code array)
+4. `"Channels: {channels.join(', ')}"`
+5. `"Duration: {duration_months} months"`
+6. `exclusive_in_channel` ? `"Exclusive within listed channels"` : `"Non-exclusive"`
+7. `credit_required` ? `"Creator credit required"` : `"No credit required"`
+8. (conditional on `rights.is_transfer === true`) `"Includes transfer of underlying rights"`
+
+---
+
+### F15.1.d — `custom`
+
+**`params` shape:**
+
+| Field | Type | Required | Constraint |
+|---|---|---|---|
+| `description` | string | ✓ | ≤ 2000 chars |
+| `counsel_note` | string | — | ≤ 500 chars; admin-only write (buyer/creator cannot populate) |
+
+**`is_transfer`:** allowed; rendering parallel to `commercial_restricted` line 8.
+
+**Render shape:**
+
+1. `"Custom rights — admin-flagged for counsel review"` (UI surfaces a visual warning treatment consistent with the brutalist baseline — at minimum, a 1px top-rule and a visually distinct marker; design system owns the exact treatment)
+2. `"Description: {description}"`
+3. `counsel_note` ? `"Counsel notes: {counsel_note}"` : `"Pending counsel review"`
+4. (conditional on `rights.is_transfer === true`) `"Includes transfer of underlying rights"`
+
+---
+
+### F15.1.e — Validation
+
+Server-side at `offer.created` and every `offer.countered`. All errors return HTTP 400 with an enumerated error code:
+
+| Condition | Error code |
+|---|---|
+| Unknown `params` key for the given template | `PARAMS_UNKNOWN_KEY` |
+| Missing required `params` field | `PARAMS_MISSING_FIELD` |
+| `params` field violates its constraint (length, range, enum value) | `PARAMS_INVALID_VALUE` |
+| Template value outside the four names (`editorial_one_time`, `editorial_with_archive_12mo`, `commercial_restricted`, `custom`) | `TEMPLATE_UNKNOWN` |
+| `is_transfer: true` on a template that hard-locks `false` | `TRANSFER_NOT_ALLOWED` |
+
+`custom` template auto-enters the admin review queue on `offer.created`. Queue mechanics and review SLA are specified separately; this spec only mandates the queue-entry behavior.
+
+---
+
+### F15.1.f — Unknown-template render fallback
+
+UI consumers MUST handle the case where the DB returns a `template` value not enumerated in this spec (e.g. during a forward-compat window where DDL extends the enum ahead of UI deployment).
+
+**Fallback render shape:**
+
+1. `"Unrecognized rights template: {template}"`
+2. `"Raw params: "` followed by a pretty-printed JSON block of `params`
+3. (conditional on `rights.is_transfer === true`) `"Flagged: transfer of underlying rights"`
+
+This fallback is a safety net. Its appearance in production is a P1 incident trigger — it means the UI deploy lags DDL by ≥ 1 cycle. The fallback is what C2's rights renderer falls through to in its `default` switch branch.
+
+---
 
 ## 11. Pack mechanics
 
