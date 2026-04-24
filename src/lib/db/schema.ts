@@ -584,3 +584,429 @@ export interface ExternalWebhookEventRow {
   retry_count: number
   error_message: string | null
 }
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000001)
+//
+// Schema foundation for the public newsroom distribution
+// subsystem. See docs/public-newsroom/PRD.md for canonical
+// semantics and docs/public-newsroom/BUILD_CHARTER.md for
+// the primitive-reuse mapping.
+// ══════════════════════════════════════════════
+
+export type NewsroomVerificationTier =
+  | 'unverified'
+  | 'verified_source'
+  | 'verified_publisher'
+
+export type NewsroomVerificationMethod =
+  | 'dns_txt'
+  | 'domain_email'
+  | 'authorized_signatory'
+
+export type NewsroomPackStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'published'
+  | 'archived'
+  | 'takedown'
+
+export type NewsroomPackVisibility =
+  | 'private'
+  | 'restricted'
+  | 'public'
+  | 'tombstone'
+
+export type NewsroomLicenceClass =
+  | 'press_release_verbatim'
+  | 'editorial_use_only'
+  | 'promotional_use'
+  | 'cc_attribution'
+  | 'cc_public_domain'
+
+export type NewsroomAssetKind =
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'document'
+  | 'text'
+
+export interface NewsroomProfileRow {
+  company_id: string
+  verification_tier: NewsroomVerificationTier
+  verified_at: string | null
+  primary_domain: string
+  logo_asset_id: string | null
+  suspended: boolean
+  suspended_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomVerificationRecordRow {
+  id: string
+  company_id: string
+  method: NewsroomVerificationMethod
+  value_checked: string
+  verified_at: string
+  expires_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomPackRow {
+  id: string
+  company_id: string
+  slug: string
+  title: string
+  subtitle: string | null
+  description: string
+  credit_line: string
+  licence_class: NewsroomLicenceClass
+  publish_at: string | null
+  embargo_id: string | null
+  rights_warranty_id: string | null
+  status: NewsroomPackStatus
+  visibility: NewsroomPackVisibility
+  published_at: string | null
+  archived_at: string | null
+  takedown_at: string | null
+  takedown_reason: string | null
+  c2pa_signing_enabled: boolean
+  created_by_user_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomAssetRow {
+  id: string
+  pack_id: string
+  kind: NewsroomAssetKind
+  mime_type: string
+  original_filename: string
+  storage_url: string
+  file_size_bytes: number
+  width: number | null
+  height: number | null
+  duration_seconds: number | null
+  checksum_sha256: string
+  caption: string | null
+  alt_text: string | null
+  is_trademark_asset: boolean
+  c2pa_manifest_stored: boolean
+  created_at: string
+  updated_at: string
+}
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000002)
+//
+// Schema extensions Part A: publish-precondition surface.
+// Scan results, renditions, rights warranty, corrections.
+// See docs/public-newsroom/directives/NR-D2a-asset-pack-
+// extensions.md for canonical semantics.
+// ══════════════════════════════════════════════
+
+export type NewsroomScanResult =
+  | 'pending'
+  | 'clean'
+  | 'flagged'
+  | 'error'
+
+export type NewsroomRenditionKind =
+  | 'thumbnail'
+  | 'web'
+  | 'print'
+  | 'social'
+
+export type NewsroomRenditionFormat =
+  | 'jpeg'
+  | 'webp'
+  | 'png'
+  | 'mp4'
+  | 'gif'
+
+export interface NewsroomAssetScanResultRow {
+  id: string
+  asset_id: string
+  scanner_suite: string
+  scanner_version: string
+  result: NewsroomScanResult
+  flagged_categories: string[]
+  scanned_at: string | null
+  last_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomAssetRenditionRow {
+  id: string
+  asset_id: string
+  kind: NewsroomRenditionKind
+  storage_url: string
+  width: number
+  height: number
+  format: NewsroomRenditionFormat
+  file_size_bytes: number
+  generated_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomRightsWarrantyRow {
+  id: string
+  pack_id: string
+  subject_releases_confirmed: boolean
+  third_party_content_cleared: boolean
+  music_cleared: boolean
+  narrative_text: string | null
+  confirmed_by_user_id: string
+  confirmed_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomCorrectionRow {
+  id: string
+  pack_id: string
+  correction_text: string
+  issued_at: string
+  issued_by_user_id: string
+  created_at: string
+  updated_at: string
+}
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000003)
+//
+// Schema extensions Part B: embargo workflow + consumer
+// identity (Path A email-first Recipient).
+// See docs/public-newsroom/directives/
+//   NR-D2b-embargo-consumer-identity.md for canonical
+//   semantics and Build Charter §4 for primitive mapping.
+// ══════════════════════════════════════════════
+
+export type NewsroomEmbargoState =
+  | 'active'
+  | 'lifted'
+  | 'cancelled'
+
+export interface NewsroomOutletRow {
+  id: string
+  name: string
+  domain: string
+  verified: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomRecipientRow {
+  id: string
+  email: string
+  user_id: string | null
+  outlet_id: string | null
+  name: string | null
+  verified: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomEmbargoRow {
+  id: string
+  pack_id: string
+  lift_at: string
+  policy_text: string
+  state: NewsroomEmbargoState
+  lifted_at: string | null
+  cancelled_at: string | null
+  notify_on_lift: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomEmbargoRecipientRow {
+  id: string
+  embargo_id: string
+  recipient_id: string
+  access_token: string
+  invited_at: string
+  first_accessed_at: string | null
+  last_accessed_at: string | null
+  access_count: number
+  revoked_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000004)
+//
+// Schema extensions Part C-i: provenance stack.
+// Signing keys, distribution events, download receipts.
+// See docs/public-newsroom/directives/
+//   NR-D2c-i-provenance-stack.md for canonical semantics.
+// ══════════════════════════════════════════════
+
+export type NewsroomDistributionEventType =
+  | 'pack_view'
+  | 'asset_view'
+  | 'asset_download'
+  | 'pack_zip_download'
+  | 'embed_render'
+  | 'preview_access'
+
+export type NewsroomDistributionSource =
+  | 'web'
+  | 'embed'
+  | 'api'
+  | 'email_link'
+
+export type NewsroomSigningAlgorithm = 'ed25519'
+
+export type NewsroomSigningKeyStatus =
+  | 'active'
+  | 'rotated'
+  | 'revoked'
+
+export interface NewsroomSigningKeyRow {
+  id: string
+  kid: string
+  algorithm: NewsroomSigningAlgorithm
+  public_key_pem: string
+  private_key_ref: string
+  status: NewsroomSigningKeyStatus
+  rotated_at: string | null
+  revoked_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomDistributionEventRow {
+  id: string
+  pack_id: string
+  asset_id: string | null
+  recipient_id: string | null
+  anon_session_id: string | null
+  event_type: NewsroomDistributionEventType
+  source: NewsroomDistributionSource
+  outlet_domain: string | null
+  user_agent: string | null
+  ip_country: string | null
+  occurred_at: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface NewsroomDownloadReceiptRow {
+  id: string
+  distribution_event_id: string
+  pack_id: string
+  asset_id: string | null
+  recipient_id: string | null
+  licence_class: NewsroomLicenceClass
+  credit_line: string
+  terms_summary: string
+  content_hash_sha256: string
+  signing_key_kid: string
+  signed_at: string
+  signature: string
+  receipt_url: string
+  created_at: string
+}
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000005)
+//
+// Schema extensions Part C-ii: governance + subscriptions.
+// Claims, admin users, admin audit events, beat subscriptions.
+// FINAL schema directive of Phase NR-1.
+// See docs/public-newsroom/directives/
+//   NR-D2c-ii-claims-admin-subscriptions.md for canonical
+//   semantics.
+// ══════════════════════════════════════════════
+
+export type NewsroomClaimReasonCategory =
+  | 'trademark_infringement'
+  | 'copyright'
+  | 'defamation'
+  | 'privacy'
+  | 'embargo_breach'
+  | 'other'
+
+export type NewsroomClaimStatus =
+  | 'submitted'
+  | 'reviewing'
+  | 'upheld'
+  | 'dismissed'
+  | 'withdrawn'
+
+export type NewsroomAdminRole =
+  | 'viewer'
+  | 'reviewer'
+  | 'operator'
+  | 'security'
+
+export type NewsroomAdminTargetType =
+  | 'organization'
+  | 'pack'
+  | 'asset'
+  | 'verification_record'
+  | 'signing_key'
+  | 'claim'
+
+export type NewsroomBeatNotifyOn =
+  | 'new_pack'
+  | 'embargo_lift'
+  | 'update'
+
+export interface NewsroomClaimRow {
+  id: string
+  pack_id: string
+  asset_id: string | null
+  reporter_email: string
+  reporter_name: string | null
+  reason_category: NewsroomClaimReasonCategory
+  reason_text: string
+  status: NewsroomClaimStatus
+  submitted_at: string
+  resolved_at: string | null
+  resolution_note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomAdminUserRow {
+  user_id: string
+  role: NewsroomAdminRole
+  mfa_enabled: boolean
+  assigned_at: string
+  assigned_by_user_id: string | null
+  revoked_at: string | null
+  revoked_by_user_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomAdminAuditEventRow {
+  id: string
+  admin_user_id: string
+  cosigner_admin_user_id: string | null
+  action: string
+  target_type: NewsroomAdminTargetType
+  target_id: string
+  reason: string
+  before_state: Record<string, unknown>
+  after_state: Record<string, unknown>
+  source_ip: string | null
+  occurred_at: string
+  created_at: string
+}
+
+export interface NewsroomBeatSubscriptionRow {
+  id: string
+  recipient_id: string
+  company_id: string
+  notify_on: NewsroomBeatNotifyOn
+  created_at: string
+  updated_at: string
+}
