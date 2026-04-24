@@ -775,3 +775,65 @@ export interface NewsroomCorrectionRow {
   created_at: string
   updated_at: string
 }
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000003)
+//
+// Schema extensions Part B: embargo workflow + consumer
+// identity (Path A email-first Recipient).
+// See docs/public-newsroom/directives/
+//   NR-D2b-embargo-consumer-identity.md for canonical
+//   semantics and Build Charter §4 for primitive mapping.
+// ══════════════════════════════════════════════
+
+export type NewsroomEmbargoState =
+  | 'active'
+  | 'lifted'
+  | 'cancelled'
+
+export interface NewsroomOutletRow {
+  id: string
+  name: string
+  domain: string
+  verified: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomRecipientRow {
+  id: string
+  email: string
+  user_id: string | null
+  outlet_id: string | null
+  name: string | null
+  verified: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomEmbargoRow {
+  id: string
+  pack_id: string
+  lift_at: string
+  policy_text: string
+  state: NewsroomEmbargoState
+  lifted_at: string | null
+  cancelled_at: string | null
+  notify_on_lift: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomEmbargoRecipientRow {
+  id: string
+  embargo_id: string
+  recipient_id: string
+  access_token: string
+  invited_at: string
+  first_accessed_at: string | null
+  last_accessed_at: string | null
+  access_count: number
+  revoked_at: string | null
+  created_at: string
+  updated_at: string
+}
