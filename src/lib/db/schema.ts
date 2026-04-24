@@ -913,3 +913,100 @@ export interface NewsroomDownloadReceiptRow {
   receipt_url: string
   created_at: string
 }
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000005)
+//
+// Schema extensions Part C-ii: governance + subscriptions.
+// Claims, admin users, admin audit events, beat subscriptions.
+// FINAL schema directive of Phase NR-1.
+// See docs/public-newsroom/directives/
+//   NR-D2c-ii-claims-admin-subscriptions.md for canonical
+//   semantics.
+// ══════════════════════════════════════════════
+
+export type NewsroomClaimReasonCategory =
+  | 'trademark_infringement'
+  | 'copyright'
+  | 'defamation'
+  | 'privacy'
+  | 'embargo_breach'
+  | 'other'
+
+export type NewsroomClaimStatus =
+  | 'submitted'
+  | 'reviewing'
+  | 'upheld'
+  | 'dismissed'
+  | 'withdrawn'
+
+export type NewsroomAdminRole =
+  | 'viewer'
+  | 'reviewer'
+  | 'operator'
+  | 'security'
+
+export type NewsroomAdminTargetType =
+  | 'organization'
+  | 'pack'
+  | 'asset'
+  | 'verification_record'
+  | 'signing_key'
+  | 'claim'
+
+export type NewsroomBeatNotifyOn =
+  | 'new_pack'
+  | 'embargo_lift'
+  | 'update'
+
+export interface NewsroomClaimRow {
+  id: string
+  pack_id: string
+  asset_id: string | null
+  reporter_email: string
+  reporter_name: string | null
+  reason_category: NewsroomClaimReasonCategory
+  reason_text: string
+  status: NewsroomClaimStatus
+  submitted_at: string
+  resolved_at: string | null
+  resolution_note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomAdminUserRow {
+  user_id: string
+  role: NewsroomAdminRole
+  mfa_enabled: boolean
+  assigned_at: string
+  assigned_by_user_id: string | null
+  revoked_at: string | null
+  revoked_by_user_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomAdminAuditEventRow {
+  id: string
+  admin_user_id: string
+  cosigner_admin_user_id: string | null
+  action: string
+  target_type: NewsroomAdminTargetType
+  target_id: string
+  reason: string
+  before_state: Record<string, unknown>
+  after_state: Record<string, unknown>
+  source_ip: string | null
+  occurred_at: string
+  created_at: string
+}
+
+export interface NewsroomBeatSubscriptionRow {
+  id: string
+  recipient_id: string
+  company_id: string
+  notify_on: NewsroomBeatNotifyOn
+  created_at: string
+  updated_at: string
+}
