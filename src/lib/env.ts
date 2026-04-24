@@ -96,6 +96,12 @@ const envSchema = z.object({
     .optional()
     .describe('Supabase Storage bucket name when FFF_STORAGE_DRIVER=supabase.'),
 
+  // ─── Required: Newsroom verification (NR-D5b-i) ───────────────
+  NEWSROOM_VERIFICATION_HMAC_SECRET: z.string().min(1, {
+    message:
+      'NEWSROOM_VERIFICATION_HMAC_SECRET is required (256+ bits; generate with `openssl rand -base64 48`). Server-only.',
+  }),
+
   // ─── Optional: Stripe (wired in Phase 5) ──────────────────────
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -180,6 +186,7 @@ const rawEnv = {
   FFF_STORAGE_DRIVER: process.env.FFF_STORAGE_DRIVER,
   FFF_STORAGE_FS_ROOT: process.env.FFF_STORAGE_FS_ROOT,
   FFF_STORAGE_SUPABASE_BUCKET: process.env.FFF_STORAGE_SUPABASE_BUCKET,
+  NEWSROOM_VERIFICATION_HMAC_SECRET: process.env.NEWSROOM_VERIFICATION_HMAC_SECRET,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   STRIPE_CONNECT_CLIENT_ID: process.env.STRIPE_CONNECT_CLIENT_ID,
