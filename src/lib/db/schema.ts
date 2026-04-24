@@ -584,3 +584,194 @@ export interface ExternalWebhookEventRow {
   retry_count: number
   error_message: string | null
 }
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000001)
+//
+// Schema foundation for the public newsroom distribution
+// subsystem. See docs/public-newsroom/PRD.md for canonical
+// semantics and docs/public-newsroom/BUILD_CHARTER.md for
+// the primitive-reuse mapping.
+// ══════════════════════════════════════════════
+
+export type NewsroomVerificationTier =
+  | 'unverified'
+  | 'verified_source'
+  | 'verified_publisher'
+
+export type NewsroomVerificationMethod =
+  | 'dns_txt'
+  | 'domain_email'
+  | 'authorized_signatory'
+
+export type NewsroomPackStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'published'
+  | 'archived'
+  | 'takedown'
+
+export type NewsroomPackVisibility =
+  | 'private'
+  | 'restricted'
+  | 'public'
+  | 'tombstone'
+
+export type NewsroomLicenceClass =
+  | 'press_release_verbatim'
+  | 'editorial_use_only'
+  | 'promotional_use'
+  | 'cc_attribution'
+  | 'cc_public_domain'
+
+export type NewsroomAssetKind =
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'document'
+  | 'text'
+
+export interface NewsroomProfileRow {
+  company_id: string
+  verification_tier: NewsroomVerificationTier
+  verified_at: string | null
+  primary_domain: string
+  logo_asset_id: string | null
+  suspended: boolean
+  suspended_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomVerificationRecordRow {
+  id: string
+  company_id: string
+  method: NewsroomVerificationMethod
+  value_checked: string
+  verified_at: string
+  expires_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomPackRow {
+  id: string
+  company_id: string
+  slug: string
+  title: string
+  subtitle: string | null
+  description: string
+  credit_line: string
+  licence_class: NewsroomLicenceClass
+  publish_at: string | null
+  embargo_id: string | null
+  rights_warranty_id: string | null
+  status: NewsroomPackStatus
+  visibility: NewsroomPackVisibility
+  published_at: string | null
+  archived_at: string | null
+  takedown_at: string | null
+  takedown_reason: string | null
+  c2pa_signing_enabled: boolean
+  created_by_user_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomAssetRow {
+  id: string
+  pack_id: string
+  kind: NewsroomAssetKind
+  mime_type: string
+  original_filename: string
+  storage_url: string
+  file_size_bytes: number
+  width: number | null
+  height: number | null
+  duration_seconds: number | null
+  checksum_sha256: string
+  caption: string | null
+  alt_text: string | null
+  is_trademark_asset: boolean
+  c2pa_manifest_stored: boolean
+  created_at: string
+  updated_at: string
+}
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000002)
+//
+// Schema extensions Part A: publish-precondition surface.
+// Scan results, renditions, rights warranty, corrections.
+// See docs/public-newsroom/directives/NR-D2a-asset-pack-
+// extensions.md for canonical semantics.
+// ══════════════════════════════════════════════
+
+export type NewsroomScanResult =
+  | 'pending'
+  | 'clean'
+  | 'flagged'
+  | 'error'
+
+export type NewsroomRenditionKind =
+  | 'thumbnail'
+  | 'web'
+  | 'print'
+  | 'social'
+
+export type NewsroomRenditionFormat =
+  | 'jpeg'
+  | 'webp'
+  | 'png'
+  | 'mp4'
+  | 'gif'
+
+export interface NewsroomAssetScanResultRow {
+  id: string
+  asset_id: string
+  scanner_suite: string
+  scanner_version: string
+  result: NewsroomScanResult
+  flagged_categories: string[]
+  scanned_at: string | null
+  last_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomAssetRenditionRow {
+  id: string
+  asset_id: string
+  kind: NewsroomRenditionKind
+  storage_url: string
+  width: number
+  height: number
+  format: NewsroomRenditionFormat
+  file_size_bytes: number
+  generated_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomRightsWarrantyRow {
+  id: string
+  pack_id: string
+  subject_releases_confirmed: boolean
+  third_party_content_cleared: boolean
+  music_cleared: boolean
+  narrative_text: string | null
+  confirmed_by_user_id: string
+  confirmed_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomCorrectionRow {
+  id: string
+  pack_id: string
+  correction_text: string
+  issued_at: string
+  issued_by_user_id: string
+  created_at: string
+  updated_at: string
+}
