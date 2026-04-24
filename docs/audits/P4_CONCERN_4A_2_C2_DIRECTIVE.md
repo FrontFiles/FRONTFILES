@@ -2,7 +2,7 @@
 
 **Changelog:** Draft 2 — replaced `'pending'` with `'sent'` in §SCOPE item 5 (Accept and Cancel visibility expressions) to align with the `offer_state` enum (DDL L37-44).
 
-**Status:** DRAFT 3.1, 2026-04-23 — Prompt 1 baseline captured: AC18_floor = 1276, AC20_floor = 68. V9/V10/V11/V13/V14 PASS; V12 SOFT — `/api/offers/party-profiles` (file `src/app/api/offers/party-profiles/route.ts`) + `PartyProfileMap` type absent on `main`; §D10 stub-fallback path active, carry-forward to Gate 2 per §APPROVAL GATES. Gate 0 closed 2026-04-22; Gate 1 pending Prompt 2 entry.
+**Status:** DRAFT 3.2, 2026-04-23 — Prompts 2 + 3 closed (AC1 / AC2 / AC3 PASS; test count 1276 → 1291; lint floor 68 unchanged). V12 SOFT carry-forward remains active to Gate 2 per §APPROVAL GATES. Directive-reality drift micropatches applied per R5. Gate 0 closed 2026-04-22; Gate 1 procedurally clearable from §AUDIT-1 evidence; Prompt 4 (§F4 OfferActions) next.
 **Branch:** `feat/p4-offers-c2-detail` (to be cut from `main` at Gate 0 approval)
 **Predecessor:** P4 Concern 4A.2.SCAFFOLD (minimal `OfferDetailClient`) — closed 2026-04-22
 **Peer concerns (parallel):** 4A.2.C1 (list UI enrichment), 4A.2.D (offer cron)
@@ -27,7 +27,7 @@ The SCAFFOLD concern shipped a brutalist `OfferDetailClient` at `src/app/vault/o
 In scope:
 
 1. **Rights renderer.** Replace the scaffold's `JSON.stringify(rights, null, 2)` with a structured renderer keyed on `rights.template`. Supported templates (locked for v1 per `ECONOMIC_FLOW_v1.md` §F15 + §F15.1.a–d): `editorial_one_time`, `editorial_with_archive_12mo`, `commercial_restricted`, `custom`. Unknown templates fall back to the §F15.1.f render shape (production appearance = P1 incident trigger per §F15.1.f).
-2. **Money + platform-fee display.** One-line money block: `${gross_fee_display} ${currency} · platform fee ${bps_pct}% · you receive ${net_to_creator} ${currency}` (for creator viewers) or `· you pay ${gross_with_buyer_markup} ${currency}` (for buyer viewers). Currency formatting via `Intl.NumberFormat` (stdlib; no new deps). The fee split references `PLATFORM_BUILD.md` Transaction Economics table (Direct 80/20).
+2. **Money + platform-fee display.** One-line money block: `${gross_fee_display} ${currency} · platform fee ${bps_pct}% · you receive ${net_to_creator} ${currency}` (for creator viewers) or `· you pay ${gross_fee_display} ${currency}` (for buyer viewers). Currency formatting via `Intl.NumberFormat` (stdlib; no new deps). The fee split references `PLATFORM_BUILD.md` Transaction Economics table (Direct 80/20).
 3. **Expiry line polish.** Human-relative rendering via a small pure helper: `expires in 3 days, 4 hours`, `expired 2 days ago`, `expires today`. Fallback to `YYYY-MM-DD` if the delta exceeds ±30 days.
 4. **Counterparty display.** Consumes the `/api/offers/party-profiles` endpoint C1 is shipping (explicit dependency on C1 merge or on the endpoint landing on `main` ahead of C2's final merge — see §D10). Renders handle + display_name; falls back to ID prefix if RLS-gated.
 5. **State-transition buttons.** Four buttons, all rendered against the current offer state + current user's role per the authority table at `ECONOMIC_FLOW_v1.md` §4:
@@ -56,6 +56,44 @@ Out of scope (enforced at review):
 
 ---
 
+## §UI_DESIGN_GATE — `/vault/offers/[id]` surface
+
+**Status:** locked 2026-04-23. Resolves the blocking dependency on Prompt 6 previously held by the "C1 party-profiles gate" (see §D10; C1 parallel amendment tracked in §D13).
+
+Per `AGENTS.md` UI/design gate rule, a surface may only receive UI/design work when all three criteria are satisfied. This section locks all three for `/vault/offers/[id]`.
+
+### Criterion 1 — Canonical scope sentence
+
+> *"The Special Offer negotiation detail surface — displays rights scope, money breakdown, expiry, round history, and role-gated action affordances (accept / counter / reject / cancel) per §F2–F5 of this directive; routes to checkout on accept. Bound to the Offer state machine (6 states: sent, countered, accepted, rejected, expired, cancelled per `ECONOMIC_FLOW_v1.md` §4 + `PLATFORM_BUILD.md` §State Machines row 5 as of commit `d09cdba`) and Buyer/Creator role context."*
+
+### Criterion 2 — Authority sources
+
+No higher-authority contradiction found (2026-04-23 audit).
+
+| Authority layer | Source |
+|---|---|
+| Functional (behavior, state, rules) | This directive §F1–§F10 + §AC1–§AC23 |
+| Economic (state machine, fees, pricing) | `docs/specs/ECONOMIC_FLOW_v1.md` §4 + §12.x |
+| Design canon (colors, radius, typography) | `PLATFORM_BUILD.md` (3 colors: `#000` / `oklch(0.546 0.213 264.376)` / `#fff`; radius 0; Neue Haas Grotesk; brutalist-editorial) |
+| Terminology discipline | `CLAUDE.md` §9, `ECONOMIC_FLOW_v1.md` §9, `docs/audits/CERTIFIED_SWEEP_DIRECTIVE.md` Class A/B classifier |
+
+### Criterion 3 — Testable exit criteria
+
+UI/design work on this surface completes when all eight criteria below are green. Each is verifiable by grep, build, test, or runtime visual inspection.
+
+1. Rights display renders per §F2 (consumes `rights-display.ts` — Prompt 2 landed).
+2. Money display renders per §F3 (consumes `money-display.ts` — Prompt 3 landed).
+3. Expiry display renders per §F3 (consumes `expiry-display.ts` — Prompt 3 landed).
+4. Action strip renders correct visibility matrix for each `(state × role)` pair per §F4 AC5 + AC10 (`OfferActions.tsx` — Prompt 4 landed).
+5. Counter composer + Reject confirm dialogs gate per §F5–§F6 using native `<dialog>` per AC17 (Prompt 5 landed).
+6. Round history / event trail renders per §F1 (Prompt 6 in-flight; was blocked on `pending`/`sent` ruling resolved commit `d09cdba` and on C1 party-profiles design authority resolved by this §UI_DESIGN_GATE block).
+7. Loading / empty / error / permission-denied states render per Design Canon (no `text-red-*` / `bg-red-*` / `border-red-*`; radius 0; Neue Haas font stack).
+8. No Class B `certified*` tokens in rendered UI copy per `docs/audits/CERTIFIED_SWEEP_DIRECTIVE.md` §6 decision tree.
+
+Gate passes on all eight green. Currently 5 of 8 landed (criteria 1–5); criteria 6–8 pending completion of Prompt 6 + integration verification.
+
+---
+
 ## §NON-SCOPE — explicit denials
 
 | Request | Refusal reason |
@@ -77,6 +115,7 @@ Out of scope (enforced at review):
 - R2 (2026-04-22) — Draft 2. NEW-B2 fallout from C1 Draft 3 Gate 0: `/api/actors/handles` route retired; C1 now ships `/api/offers/party-profiles` with `PartyProfileMap` response shape. Status: REJECTED at Gate 0 (20 active findings catalogued — see R3).
 - R3 (2026-04-22) — Draft 3.0. Catalog v2.1 applied: 11 blocking + 7 substantive + 2 minor findings closed (NEW-B1-B5, B7-B12, S1-S7, M1-M2). NEW-B6 cleared at Gate 0 verification (`POST /api/offers/[id]/reject` canonical route confirmed). §F15.1 (per-template params + render contract) ratified into `ECONOMIC_FLOW_v1.md` revision 9 before this Draft. Status: APPROVED at Gate 0 (2026-04-22) — §OPEN-Q rows 1-7 ratified per appended decisions.
 - R4 (2026-04-23) — Draft 3.1. Prompt 1 baseline captured: AC18_floor = 1276, AC20_floor = 68. V9/V10/V11/V13/V14 PASS; V12 SOFT trigger — `/api/offers/party-profiles` (file `src/app/api/offers/party-profiles/route.ts`) + `PartyProfileMap` type (`src/lib/offer/`) absent on `main`; §D10 stub-fallback path active, carry-forward to Gate 2 per §APPROVAL GATES. Status: APPROVED at Prompt 1 baseline lock — Gate 1 verdict pending Prompt 2 entry.
+- R5 (2026-04-23) — Draft 3.2. Directive-reality drift micropatches applied post-Prompt-3: (a) §F2 `RightsShape` → `Rights` (repo canonical type at `src/lib/offer/types.ts` L81-85; no `RightsShape` alias shipped); (b) lib-module directive `__tests__/` test-path references → `tests/` (4 sites under `src/lib/offer/` — IP-5 ratification scope; SCAFFOLD-shipped `_components/__tests__/` component-test paths preserved at L299 + L304 per shipped convention); (c) §EXIT CRITERIA E5 appended FLAG-37 carry-forward (`countryName` / `formatTerritory` helpers referenced in spec but absent from repo; v1 renders raw input); (d) §SCOPE item 2 buyer-suffix `${gross_with_buyer_markup}` → `${gross_fee_display}` (v1 is single-rate per ECONOMIC_FLOW_v1 L91; no `buyer_markup_bps` field exists); (e) §F3 expiry note struck time-mock reference (explicit-`now` parameter per IP-M makes `vi.setSystemTime` redundant); (f) §AUDIT-1 appended Prompt 2 + Prompt 3 closure baselines. Status: APPROVED — Draft 3.2 build-governing; Prompt 4 ready to dispatch. FLAGs codified across Prompts 2-3: FLAG-37, FLAG-38, FLAG-39.
 
 ---
 
@@ -156,9 +195,9 @@ Structure (§R6-pure):
 
 ### §F2 — Rights renderer
 
-**File:** `src/lib/offer/rights-display.ts` (new) + `src/lib/offer/__tests__/rights-display.test.ts`.
+**File:** `src/lib/offer/rights-display.ts` (new) + `src/lib/offer/tests/rights-display.test.ts`.
 
-Pure function `renderRights(rights: RightsShape): ReactElement` keyed on `rights.template`. Each supported template's render output MUST match the ordered-line render-shape spec at `ECONOMIC_FLOW_v1.md`:
+Pure function `renderRights(rights: Rights): ReactElement` keyed on `rights.template`. Each supported template's render output MUST match the ordered-line render-shape spec at `ECONOMIC_FLOW_v1.md`:
 
 - `editorial_one_time` → §F15.1.a render-shape (4 lines).
 - `editorial_with_archive_12mo` → §F15.1.b render-shape (6 lines = F15.1.a lines 1–4 + 2 archive lines).
@@ -175,7 +214,7 @@ Server-side `params`-field validation at `offer.created` / `offer.countered` emi
 
 **Files:**
 - `src/lib/offer/money-display.ts` (new) + test — `formatGrossFee(gross_fee, currency, platform_fee_bps, viewer_role)`. ~70 LoC code + ~80 LoC test.
-- `src/lib/offer/expiry-display.ts` (new) + test — `formatExpiry(expires_at: string, now: Date): string`. ~60 LoC code + ~80 LoC test (includes time-mock via `vi.setSystemTime`).
+- `src/lib/offer/expiry-display.ts` (new) + test — `formatExpiry(expires_at: string, now: Date): string`. ~60 LoC code + ~80 LoC test.
 
 ### §F4 — State-transition button strip
 
@@ -247,7 +286,7 @@ Plus paired tests for §F7 REWRITE (1 case) and §F8 composer (3 cases).
 
 | # | Criterion | Verification |
 |---|---|---|
-| AC1 | `OfferDetailClient` renders structured rights per template | unit tests in `src/lib/offer/__tests__/rights-display.test.ts` — one per template (§F15.1.a–d) + unknown fallback (§F15.1.f) |
+| AC1 | `OfferDetailClient` renders structured rights per template | unit tests in `src/lib/offer/tests/rights-display.test.ts` — one per template (§F15.1.a–d) + unknown fallback (§F15.1.f) |
 | AC2 | Money line renders correct viewer-role fee math | test |
 | AC3 | Expiry line renders relative time for ±30d deltas | test |
 | AC4 | Counterparty handle renders (real, not ID prefix) when RLS-visible | integration test: seed `PartyProfileMap` fixture with known `username` / `display_name`; assert `renderOfferDetailBody` output contains those strings |
@@ -284,6 +323,7 @@ Plus paired tests for §F7 REWRITE (1 case) and §F8 composer (3 cases).
 - **§D10 (dependency).** The `/api/offers/party-profiles` endpoint from C1 is a hard dependency for handle rendering. If C1 has not merged by the time C2 reaches Prompt 6, C2 either (a) waits for C1 merge, or (b) renders handles via ID-prefix fallback with a TODO comment and adds a blocking item to the exit report. Founder picks at Gate 2.
 - **§D11 (scope-boundary).** The accept handler surfaces the server's returned state verbatim. If accept transitions to `accepted_pending_checkout`, the UI simply refetches and renders the new state chip. The `/checkout/[asset_id]` handoff, Stripe capture UX, and post-checkout redirect are **out of scope for C2** and belong to a follow-up checkout-UI concern.
 - **§D12 (peer-concern seam).** The "New offer" button on the `/vault/offers` list page is owned by **C1**. C2's responsibility is the compose composer itself + the `/asset/[id]` modal entry point. If C1 merges first, C1 adds the list-page button wired to C2's `/vault/offers/new` route. If C2 merges first, C2's `/vault/offers/new` route is reachable only from `/asset/[id]` until C1 lands.
+- **§D13 (mirror amendment owed to C1).** The `/vault/offers` list-page design authority is C1's equivalent of §UI_DESIGN_GATE on this directive. Owner: C1 directive (`docs/audits/P4_CONCERN_4A_2_C1_DIRECTIVE.md`). Draft scope sentence + exit criteria already prepared by founder (2026-04-23); commit as a parallel amendment to C1 when convenient. Not a C2 blocker. C1 draft available in session history; ship with next C1 commit.
 
 ---
 
@@ -294,8 +334,8 @@ Plus paired tests for §F7 REWRITE (1 case) and §F8 composer (3 cases).
 | # | Title | Output | §F / §AC anchors | Exit artifact | LoC est. |
 |---|---|---|---|---|---|
 | 1 | **Pre-flight audit** — V9–V14 per §PROMPT 1 PREREQUISITES + AC18/AC20 baseline capture (see §PROMPT 1 PREREQUISITES for gate details) | `§AUDIT-1` appended (in-directive) | §PROMPT 1 PREREQUISITES (V9–V14); AC18 + AC20 baseline-capture anchors | in-directive `§AUDIT-1` section | 0 |
-| 2 | **Build `rights-display.ts`** + tests | module + test | §F2; AC1 | `src/lib/offer/rights-display.ts` + `src/lib/offer/__tests__/rights-display.test.ts` | 300 |
-| 3 | **Build `money-display.ts`** + `expiry-display.ts` + tests | 2 modules + 2 tests | §F3; AC2, AC3 | `src/lib/offer/money-display.ts`, `src/lib/offer/expiry-display.ts` + paired `__tests__/*.test.ts` | 290 |
+| 2 | **Build `rights-display.ts`** + tests | module + test | §F2; AC1 | `src/lib/offer/rights-display.ts` + `src/lib/offer/tests/rights-display.test.ts` | 300 |
+| 3 | **Build `money-display.ts`** + `expiry-display.ts` + tests | 2 modules + 2 tests | §F3; AC2, AC3 | `src/lib/offer/money-display.ts`, `src/lib/offer/expiry-display.ts` + paired `tests/*.test.ts` | 290 |
 | 4 | **Build `OfferActions.tsx`** + tests | component + test | §F4; AC5, AC10 | `src/app/vault/offers/[id]/_components/OfferActions.tsx` + paired `__tests__/OfferActions.test.tsx` | 240 |
 | 5 | **Build `CounterComposerDialog.tsx`** + `RejectConfirmDialog.tsx` + tests | 2 components + 2 tests | §F5, §F6; AC7, AC9 | `src/app/vault/offers/[id]/_components/CounterComposerDialog.tsx`, `RejectConfirmDialog.tsx` + paired tests | 410 |
 | 6 | **Rewrite `OfferDetailClient.tsx`** to compose all above + wire mutations + refetch-on-success | full rewrite | §F1; AC4, AC6, AC8 | `src/app/vault/offers/[id]/_components/OfferDetailClient.tsx` (rewrite of existing scaffold) | 520 |
@@ -371,6 +411,7 @@ Directive-level gate closure. Distinct from §AC (exit-report content the Claude
 - **Criterion:** The following items are EXPLICITLY OUT OF SCOPE for Draft 3.0 and carry forward as downstream items:
   1. §F9 styling drift — `max-w-lg` (dialog) vs SCAFFOLD §F6 `max-w-3xl` (page). Deferred to a future §F9 cleanup concern.
   2. Same-amount-counters spec silence — `ECONOMIC_FLOW_v1.md` does not rule on whether offer X → counter X is permitted, blocked, or coerced to accept. Deferred to `ECONOMIC_FLOW_v1.md` amendment cycle.
+  3. FLAG-37 helper stubs — `countryName(territory)` / `formatTerritory(territory)` referenced in `ECONOMIC_FLOW_v1.md` §F15.1.a L3 + §F15.1.b L6 + §F15.1.c L3 are not implemented in the repo. `rights-display.ts` v1 renders raw ISO-2 codes for non-`'worldwide'` territory values and `.join(', ')` for the §F15.1.c array variant (per FLAG-37 discipline floor — render raw input when spec-referenced helper is absent). Future concern to implement proper helpers (likely `src/lib/offer/territory-display.ts` or similar).
 - **Verification:** n/a (documented carve-outs only).
 - **Expected:** Items acknowledged; no Draft 3.0 action required.
 - **Action on failure:** N/A — this criterion cannot fail. Prevents these items from re-surfacing as blockers.
@@ -454,6 +495,25 @@ Claude-Code-side discipline check (distinct from §EXIT CRITERIA, which is found
 - ESLint: v9.39.4
 
 **V12 SOFT — downstream impact:** the `/api/offers/party-profiles` endpoint (file: `src/app/api/offers/party-profiles/route.ts`) is absent on `main`, and `PartyProfileMap` is not exported from `src/lib/offer/`. Per C1 handoff contract, §D10 stub-fallback path is active for this concern. Carry-forward to Gate 2 per §APPROVAL GATES.
+
+### Prompt 2 closure — 2026-04-23
+
+- **AC1 verdict:** PASS (5/5 test cases green: `editorial_one_time`, `editorial_with_archive_12mo`, `commercial_restricted`, `custom`, unknown-template fallback).
+- **AC18 delta:** +5 → 1281 passing / 10 skipped (1291 total).
+- **AC20:** 68 errors / 346 warnings unchanged.
+- **Build:** exit 0.
+- **Working-tree artifacts (untracked):** `src/lib/offer/rights-display.ts`, `src/lib/offer/tests/rights-display.test.ts`.
+- **FLAGs codified this prompt:** FLAG-37 (spec forward-references to undefined helpers), FLAG-38 (no speculative type-literal inference at cast boundary).
+
+### Prompt 3 closure — 2026-04-23
+
+- **AC2 verdict:** PASS (4/4 test cases green: buyer-EUR, buyer-USD, creator-EUR, creator-USD).
+- **AC3 verdict:** PASS (6/6 test cases green: past bundle, future multi-unit, today, day-plural, hour singular past, fallback).
+- **AC18 delta:** +10 → 1291 passing / 10 skipped (1301 total).
+- **AC20:** 68 errors / 346 warnings unchanged.
+- **Build:** exit 0.
+- **Working-tree artifacts (untracked):** `src/lib/offer/money-display.ts`, `src/lib/offer/expiry-display.ts`, `src/lib/offer/tests/money-display.test.ts`, `src/lib/offer/tests/expiry-display.test.ts`.
+- **FLAGs codified this prompt:** FLAG-39 (silent resolution of dispatch-vs-IP contradiction — floor requires HALT, not silent repick).
 
 ---
 
