@@ -1,8 +1,8 @@
 # Frontfiles — Feature Approval Roadmap
 
 **Status:** draft v1 · **Date:** 2026-04-18 · **Owner:** João Nuno Martins
-**Scope:** governs the 10-feature approval chain → design / layout / tuning-agents pass → resumed infrastructure phase.
-**Relation to other governance docs:** companion to `PLATFORM_REVIEWS.md`, `INTEGRATION_READINESS.md`, `ROADMAP.md`, `ASSIGNMENT_DISPUTE_TAXONOMY.md`, and `SPECIAL_OFFER_SPEC.md`.
+**Scope:** governs the 11-feature approval chain → design / layout / tuning-agents pass → resumed infrastructure phase.
+**Relation to other governance docs:** companion to `PLATFORM_REVIEWS.md`, `INTEGRATION_READINESS.md`, `ROADMAP.md`, `ASSIGNMENT_DISPUTE_TAXONOMY.md`, and `docs/specs/SPECIAL_OFFER_SPEC.md`.
 **Does not supersede** any of the above; **reuses** their locks as gate evidence. Useful unfinished work in those docs is preserved and folded into the relevant gate below.
 
 ---
@@ -11,7 +11,7 @@
 
 Lock the sequence, artifacts, and sign-off criteria for the three work phases that follow the post-KD-9 close:
 
-- **Phase A** — confirm or define each of the 10 core product features with explicit approval gates.
+- **Phase A** — confirm or define each of the 11 core product features with explicit approval gates.
 - **Phase B** — apply a design / layout / tuning-agents pass across Phase-A surfaces.
 - **Phase C** — resume the infrastructure and external-clock work deferred during the feature chain (Phase 1 Foundation gating, KD closures, Vercel env, micro-queue, CI hardening).
 
@@ -23,14 +23,15 @@ Each feature gate in Phase A produces a signed, dated decision. Each phase trans
 
 | # | Decision | Rationale |
 |---|---|---|
-| D1 | **"SPECIAL OFFER" is canonical.** The prior product alias is retired. Doc artifacts (`SPECIAL_OFFER_SPEC.md`, `D-SO1`, any UI copy, any route handler naming) rename under A.0. | Founder brand/product canonical; retiring the alias prevents downstream drift. |
+| D1 | **"SPECIAL OFFER" is canonical.** The prior product alias is retired. Doc artifacts (`docs/specs/SPECIAL_OFFER_SPEC.md`, `D-SO1`, any UI copy, any route handler naming) rename under A.0. | Founder brand/product canonical; retiring the alias prevents downstream drift. |
 | D2 | **Track split accepted.** Phase A splits into Track 1 (approval gates on existing spec + code) and Track 2 (definition gates from partial or zero material). **FFF added as the 10th feature**, distinct from FRONTFOLIO. | Four of the original nine were spec-first, not approval-first; bundling them as a single chain would produce fake approvals. |
 | D3 | **Roadmap reuses `PLATFORM_REVIEWS.md` v2 locks** and preserves useful unfinished work across all existing gov docs. | Avoid duplicate decisions; protect continuity; keep the locks already earned. |
 | D4 | **FRONTFOLIO scope = BOTH the public creator page (`/u/[handle]`) AND the back-of-house composition tool.** | Single coherent scope; the UI-chrome locks in `PLATFORM_REVIEWS.md` (D-F1 / D-F2) cover one side and extend naturally to the other. |
+| D5 | **COLLECTION added to Phase A as A.11 (Track 1 partial).** Live at `/collection/[id]` (`src/app/collection/[id]/page.tsx`), defined in `src/lib/types.ts:599` per Spec §6, shareable in FFF via `PostAttachmentKind: 'collection'` (`src/lib/types.ts:1143`). Scope sentence: *"A Collection is a Frontfiler-curated, ordered set of Frontfiles assets with its own privacy model, viewable at `/collection/[id]` and shareable as an FFF attachment kind."* Privacy-visibility interaction rule: **strict match at attach time** — post validator rejects attach when `Collection.privacy != PUBLIC` and `Post.visibility == 'public'`, consistent with the existing `attachment_not_public` validator pattern (`src/lib/post/types.ts:39-46`); later privacy changes fail closed via hydration placeholder. **Locked 2026-04-23 under O-A0-2; count-propagation landed in the same batch** (Line 4 "11-feature"; §Scope table row 11; §Phases-at-a-glance line for A.11; §Dependency graph node; §Parallel-safe branches; §Phase A exit criteria `G-F1 through G-F11` / "eleven gates"). | Discovered during A.5 FFF code-ground-truth audit (2026-04-23); missing from the original 10-feature enumeration. Shipping in live UI without an approval gate violates the "no approval on ambiguous identifiers" principle that motivates A.0. |
 
 ---
 
-## Scope — 10 features in Phase A
+## Scope — 11 features in Phase A
 
 | # | Feature | Track | Canonical status |
 |---|---|---|---|
@@ -38,12 +39,13 @@ Each feature gate in Phase A produces a signed, dated decision. Each phase trans
 | 2 | ASSIGNMENTS | 1 — approval | Locked v2 (D-A1 / A2 / A3). Dispute taxonomy v1 → v2 and G-T1…G-T4 are the open blockers. |
 | 3 | SPECIAL OFFER | 1 — approval | Locked v1.0 under its prior alias — retire alias under A.0, then confirm lock. |
 | 4 | FRONTFOLIO | 1 — approval | Partial — D-F1 / F2 cover UI chrome; extend to full scope (public page + composer) inside the gate. |
-| 5 | FFF | 1 — approval | Partial — prior UI/decision work exists in `PLATFORM_REVIEWS.md`; scope-confirmation substep folded into the gate. |
-| 6 | SHARE | 2 — definition | Currently three overlapping concepts (signed-URL delivery / public share / collaborator invite). Disambiguate into primitives before approval. |
+| 5 | FFF | 1 — approval | Scope sentence locked 2026-04-23; partial (O-FFF2 partial; O-FFF3, O-FFF5 open). |
+| 6 | SHARE | 2 — definition | Four overlapping concepts (signed-URL delivery / public share / collaborator invite / share-to-feed). Disambiguate into primitives before approval. |
 | 7 | COLLAB | 2 — definition | Zero code, zero spec. Needs full product definition before it can sit in a sequence. |
 | 8 | HOME PAGE | 2 — definition | Surface exists but uses mock data. Needs content model, IA, ranking, real data bindings. |
 | 9 | LIGHTBOX | 2 — definition | Minimal; collides with asset-viewer and preview surfaces. Disambiguate and scope. |
 | 10 | COMPOSER | 2 — definition | Name collides with at least two existing composer surfaces. Disambiguate and scope. |
+| 11 | COLLECTION | 1 — approval | Partial — scope sentence + privacy-visibility rule locked 2026-04-23 (D5 / O-A0-2); Spec §6 upstream, `interface Collection` in-repo, `/collection/[id]` route + FFF attachability live. |
 
 ---
 
@@ -58,6 +60,7 @@ Phase A — Feature chain (serial within-track; A.0 first, blocks all others)
   A.3  SPECIAL OFFER                                           [engineering]
   A.4  FRONTFOLIO                                              [engineering + design]
   A.5  FFF                                                     [engineering + design]
+  A.11 COLLECTION                                              [engineering]
   ── Track 2 (definition gates — write the spec, then approve) ──
   A.6  SHARE                                                   [product + engineering]
   A.7  COLLAB                                                  [product]
@@ -82,7 +85,7 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 
 ## Phase A — detail
 
-### A.0 — Terminology lock *(blocks A.1 through A.10)*
+### A.0 — Terminology lock *(blocks A.1 through A.11)*
 
 **Estimated sessions:** 4–6 (P0–P6).
 
@@ -90,9 +93,9 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 
 **Work:**
 
-1. Land the canonical name across docs: spec file → `SPECIAL_OFFER_SPEC.md`; decision code → `D-SO1` in `PLATFORM_REVIEWS.md`; all UI copy, route handler names, API path comments.
+1. Land the canonical name across docs: spec file → `docs/specs/SPECIAL_OFFER_SPEC.md`; decision code → `D-SO1` in `PLATFORM_REVIEWS.md`; all UI copy, route handler names, API path comments.
 2. Confirm "FRONTFOLIO" scope sentence: *"The creator's identity surface on Frontfiles — both the public page at `/u/[handle]` and the back-of-house composition tool used to assemble it."*
-3. Confirm "FFF" scope sentence — founder to provide a one-line definition *(open item O-A0-1 below)*.
+3. Confirm "FFF" scope sentence — **LOCKED 2026-04-23** per §A.5 scope sentence (O-A0-1 resolved; see open items below for the follow-on O-A0-2…O-A0-5 items surfaced during the code-ground-truth audit).
 4. Agree naming rule for ambiguous Track-2 features: "SHARE", "LIGHTBOX", "COMPOSER" may each resolve to multiple named primitives in their definition gates, not a single feature.
 
 **Artifacts produced:**
@@ -104,7 +107,11 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 
 **Open items:**
 
-- O-A0-1 — founder confirms FFF scope sentence in one line.
+- **O-A0-1 [RESOLVED 2026-04-23]** — FFF scope sentence locked; see §A.5 scope sentence. Anchored to code ground-truth (`src/lib/types.ts:1139-1161`, `src/lib/post/types.ts`, `src/components/discovery/DiscoveryNav.tsx:104-170`).
+- **O-A0-2 [RESOLVED 2026-04-23]** — Collection 4-part lock landed per D5: **(a) Slot** = new A.11 slot (Track 1); **(b) Track** = Track 1 partial (Spec §6 + working route + FFF integration present); **(c) Scope sentence** = *"A Collection is a Frontfiler-curated, ordered set of Frontfiles assets with its own privacy model, viewable at `/collection/[id]` and shareable as an FFF attachment kind."*; **(d) Privacy-visibility rule** = strict match at attach time (post rejects attach when `Collection.privacy != PUBLIC` and `Post.visibility == 'public'`, per `attachment_not_public` validator pattern in `post/types.ts:39-46`). Full A.11 section added below. Count-propagation landed in same batch (scope table, phases-at-a-glance, dependency graph, exit criteria).
+- **O-A0-3 [RESOLVED 2026-04-23]** — A.6 SHARE Problem statement expanded from 3 to 4 primitives: (a) signed-URL delivery (`/api/media/[id]`), (b) public share link (`/share/[token]`), (c) collaborator invite (no live code yet), **(d) share-to-feed** — top-nav "Share" button (`DiscoveryNav.tsx:160-170`) creators-only, gated by `isFffSharingEnabled()`, fires `useDraftStore().openComposer()` → `GlobalShareComposer` → creates FFF post. O-SH1 naming choice now spans 4 options. A.5 O-FFF5 remains a deferred-or-reorder question at A.5 sign-off time.
+- **O-A0-4 [RESOLVED 2026-04-23]** — "Explore" wins (locked at doc level). Top-nav label unchanged (`DiscoveryNav.tsx:135`); `FeedLeftRail.tsx:191` "Discover" label to be renamed to "Explore" in a one-line code edit (queued outside this amendment). Rationale: "Explore" fits Frontfiles' editorial-curatorial positioning; "Discover" has social-media-algorithm connotations that clash with the brutalist-editorial discipline locked in `PLATFORM_BUILD.md` Design Canon.
+- **O-A0-5** — "certified" terminology sweep. 40+ hits across `src/data/` (creators bios 18+ standardized template, spotlight 5, social 5, posts 4, users bio, `certifiedAssets` identifier in `index.ts:126`), `src/components/onboarding/` (PhaseLaunch 2, PhaseReaderMinimal 2, PhaseRolePicker 1), and `src/components/feed/FeedLeftRail.tsx:216` (the live feed footer copy visible in founder 2026-04-23 screenshot). Violates `ECONOMIC_FLOW_v1.md` §9 banned-terms list. **Handled as a separate directive outside this amendment** — composes after batch applies. Replacement vocabulary per `CLAUDE.md` §9 + Economic Flow §9: `verifiable`, `provenance-aware`, `independently reviewable`, `tamper-evident`.
 
 **P1 status (2026-04-18, this commit):** docs-layer rename landed. Spec filename, in-doc references, and decision code now read `Special Offer` / `D-SO1`. Code (`src/app/api/direct-offer/*`, `src/lib/direct-offer/*`, `DirectOffer*` identifiers) and DB (`direct_offer` table + columns) keep legacy names until P2–P5 of A.0 lands the code + schema rename. Legacy-name references in source and migrations therefore remain accurate to current implementation; doc-layer references describe the intended canonical state.
 
@@ -112,7 +119,7 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 - Code module renamed: `src/lib/direct-offer/` → `src/lib/special-offer/` (git mv, history preserved).
 - Module-owned TS identifiers renamed: `DirectOfferEngineState`, `DirectOfferAction`, `DirectOfferError`, `initialDirectOfferState`, `directOfferReducer` → `SpecialOffer*` equivalents.
 - Imports updated across 7 files: 4 route files (12 external-path import lines in `src/app/api/direct-offer/{,[id]/accept,[id]/counter,[id]/decline}/route.ts`) and 3 intra-module import lines (`reducer.ts`, `api-helpers.ts`, `__tests__/services.test.ts`) whose identifier names changed.
-- Stale doc refs to the old module path updated in `PLATFORM_REVIEWS.md` and `SPECIAL_OFFER_SPEC.md` as part of this commit.
+- Stale doc refs to the old module path updated in `PLATFORM_REVIEWS.md` and `docs/specs/SPECIAL_OFFER_SPEC.md` as part of this commit.
 - Still pending under A.0: route paths `/api/direct-offer/*` (P3), shared types in `src/lib/types.ts` + `src/lib/schema.ts` (`DirectOfferThread`, `DirectOfferEvent`, `DirectOfferStatus`, `DIRECT_OFFER_MAX_ROUNDS`, etc.) (P4), DB schema `direct_offer_*` (P5), canonical terminology registry `TERMINOLOGY_LOCK.md` (P6).
 - In-module docstrings (`Direct Offer Engine — ...` headers) deferred to P2.x sweep.
 - Commit SHA: see `git log --grep="P2 rename"` (self-referential fill deferred — amending the commit to inject its own SHA changes the SHA, making the doc lie; kept as a git-log pointer instead).
@@ -123,7 +130,7 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 - Client callers updated: 1 file (`src/app/vault/offers/page.tsx`) — 3 `fetch()` sites (accept/counter/decline endpoints on lines 333, 385, 446).
 - Integration/e2e tests updated: 0 (no `__tests__` exist for these routes; no Playwright/Cypress config in repo).
 - Middleware/config: none — no `middleware.ts`; `next.config.ts` is empty `{}` with no rewrites/redirects/matchers; typed routes not enabled.
-- Stale doc refs updated: `PLATFORM_REVIEWS.md` (2 refs, lines 293 + 313), `SPECIAL_OFFER_SPEC.md` (6 refs — API surface table lines 569–573 + closing note line 646), `INTEGRATION_READINESS.md` (1 ref, line 59, KD-8 closure note — path updated to post-P3 location; trade: retains grep cleanliness at minor cost to historical specificity about where the zod-import file lived at fix time).
+- Stale doc refs updated: `PLATFORM_REVIEWS.md` (2 refs, lines 293 + 313), `docs/specs/SPECIAL_OFFER_SPEC.md` (6 refs — API surface table lines 569–573 + closing note line 646), `INTEGRATION_READINESS.md` (1 ref, line 59, KD-8 closure note — path updated to post-P3 location; trade: retains grep cleanliness at minor cost to historical specificity about where the zod-import file lived at fix time).
 - Next.js 16.2.2 convention check: folder-rename of route segments + `route.ts` filename confirmed idiomatic per `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md` — no deprecations.
 - Deferred (out of P3 scope): `actionType: 'direct-offer.create'` in `route.ts:65` (rate-limit namespace key, not a path — deferred to cross-cutting consistency pass); in-route comment `route.ts:24` mentions "D-DO lock decisions" (stale code comment, not identifier/path); `CreateDirectOfferBody` Zod schema identifier in `route.ts:40` (route-local, not path).
 - Still pending under A.0: shared types in `src/lib/types.ts` + `src/lib/schema.ts` (`DirectOfferThread`, `DirectOfferEvent`, `DirectOfferStatus`, `DIRECT_OFFER_MAX_ROUNDS`, etc.) (P4), DB schema `direct_offer_*` (P5), canonical terminology registry `TERMINOLOGY_LOCK.md` (P6).
@@ -136,7 +143,7 @@ Phase C — Infrastructure resume (parallel-safe after B signed)
 - User-visible UI copy updated: 2 strings across 2 files — `<h1>Direct Offers</h1>` in `src/app/vault/offers/page.tsx:178`; `'Direct Offers are only available for PUBLIC assets.'` error `reason` in `src/lib/special-offer/guards.ts:28` (flows to API response body via `errorResponse`).
 - Test files updated: 2 (`__tests__/services.test.ts`, `__tests__/helpers.ts`) — identifier imports follow P4 rename; no copy-string assertions required.
 - Consumers updated across `src/**`: 12 files — the 2 source-of-truth files (`types.ts`, `db/schema.ts`) + `route.ts` + `page.tsx` + all 8 files under `src/lib/special-offer/`.
-- Stale doc refs updated (4): `SPECIAL_OFFER_SPEC.md` lines 301 (`DIRECT_OFFER_STATUS_LABELS`), 623 (`DirectOfferThread` data-model name), 625 (`DirectOfferEvent` data-model name); `CLAUDE_CODE_PROMPT_SEQUENCE.md` line 636 (`DirectOfferMade` email-template name).
+- Stale doc refs updated (4): `docs/specs/SPECIAL_OFFER_SPEC.md` lines 301 (`DIRECT_OFFER_STATUS_LABELS`), 623 (`DirectOfferThread` data-model name), 625 (`DirectOfferEvent` data-model name); `CLAUDE_CODE_PROMPT_SEQUENCE.md` line 636 (`DirectOfferMade` email-template name).
 - Type-annotation comments and section headers that reference the renamed identifier travel with the identifier rename (P4 scope). Narrative comments (behavior descriptions, rationale) remain deferred to P6 sweep.
 - Deferred to P5 (DB rename): DB identifier literals `direct_offer`, `direct_offer_*` in code (4 hits — `db/schema.ts:415-416` `TABLES` keys+values, `types.ts:1002` union-member string, `entitlement/__tests__/helpers.ts:45` test data), plus snake_case property names on `SpecialOfferThreadRow`/`SpecialOfferEventRow` interfaces (they mirror DB columns).
 - Deferred to P6 consolidated sweep: developer-facing prose strings (~14 — JSDoc file headers in `src/lib/special-offer/*.ts` (7 files), inline/JSX comments in `src/app/checkout/[assetId]/page.tsx`), `'direct-offer.create'` rate-limit namespace key in `route.ts:65`, stale `D-DO lock decisions` code comment in `route.ts:24`.
@@ -203,7 +210,7 @@ Each Track-1 gate runs the same five-step template:
 #### A.3 — SPECIAL OFFER
 
 - **Scope sentence.** *Buyer proposes a below-list price to a creator for a vault asset; up to three rounds of counter; accepted offer routes to checkout and mints a licence grant.*
-- **Evidence pack.** `SPECIAL_OFFER_SPEC.md` v1.0 *(post-A.0 rename)*; `PLATFORM_REVIEWS.md` §D-SO1 *(post-A.0 rename)*; API routes `/api/special-offer/*` *(post-A.0 rename)*; state machine: `buyer_offer_pending_creator → creator_counter_pending_buyer → buyer_counter_pending_creator → accepted_pending_checkout → completed` + terminals (`declined`, `expired`, `auto_cancelled`).
+- **Evidence pack.** `docs/specs/SPECIAL_OFFER_SPEC.md` v1.0 *(post-A.0 rename)*; `PLATFORM_REVIEWS.md` §D-SO1 *(post-A.0 rename)*; API routes `/api/special-offer/*` *(post-A.0 rename)*; state machine: `buyer_offer_pending_creator → creator_counter_pending_buyer → buyer_counter_pending_creator → accepted_pending_checkout → completed` + terminals (`declined`, `expired`, `auto_cancelled`).
 - **Open items.**
   - **O-SO1 — Confirm v1.0 still current.** No silent drift since v1.0 lock.
   - **O-SO2 — Expiry windows.** Confirm the per-round expiry constants locked in v1.0 still hold.
@@ -227,16 +234,31 @@ Each Track-1 gate runs the same five-step template:
 
 #### A.5 — FFF
 
-- **Scope sentence.** *[To be locked at A.0 under O-A0-1 by founder.]*
-- **Evidence pack.** `PLATFORM_REVIEWS.md` §FFF UI (D-F1 / D-F2 — UI chrome). Preserve all partial work.
+- **Scope sentence.** *"FFF (Frontfiles Feed) is the feed surface where Frontfilers share Frontfiles work — assets, Stories, Articles, and Collections — to a public or connections-only audience via Following / Relevant / For You views; posts are attribution-preserving wrappers carrying optional body commentary and quote-repost chains, with no licence, rights, or transaction semantics."* **Locked 2026-04-23** per code ground-truth audit. Every clause sourced: attachment kinds (`src/lib/types.ts:1139-1143`), visibility model (`types.ts:1161`, `db/schema.ts:451`), feed views (`/feed` UI), attribution preservation (`types.ts:1149` comment), repost chain (`types.ts:1160`), no transaction semantics (no licence/rights/price fields on `Post`; attachment gated by `attachment_not_public` / `attachment_not_published` validators per `src/lib/post/types.ts:39-46`). "Frontfiler" per canonical term definition in `.claude/agents/frontfiles-context.md:104`.
+- **Evidence pack.** `PLATFORM_REVIEWS.md` §FFF UI (D-F1 broadcast-v1/social-v2; D-F2 quote-repost-only); `src/lib/types.ts` §Post (`PostAttachmentKind`, `PostAttachmentRef`, `Post` interface with `visibility: 'public' | 'connections'` + `repostOfPostId`); `src/lib/db/schema.ts:451` (`PostVisibility` canonical enum); `src/lib/post/` module (store, validator, hydrator, feed-ranking, draft-store, styles); `src/lib/flags.ts` `isFffSharingEnabled()` build-time constant; `/feed`, `/post/[id]`, `/creator/[handle]/posts` routes; `GlobalShareComposer.tsx` + `ShareComposer.tsx` + `ShareComposerSearch.tsx`; `DiscoveryNav.tsx` FFF nav button wiring (lines 142-170).
 - **Open items.**
-  - **O-FFF1 — Founder scope sentence** (paired with O-A0-1).
-  - **O-FFF2 — Relationship to FRONTFOLIO.** Confirm FFF is distinct; define the boundary.
-  - **O-FFF3 — Relationship to HOME PAGE** *(if any; resolved alongside A.8)*.
-  - **O-FFF4 — State machine presence.** Does FFF carry a lifecycle (draft / published / archived) or is it derived from underlying assets?
+  - **O-FFF1 [RESOLVED 2026-04-23]** — scope sentence above.
+  - **O-FFF2 — Relationship to FRONTFOLIO.** *Partially resolved.* Code ground-truth: Frontfolio (`/creator/[handle]/frontfolio`) and Posts (`/creator/[handle]/posts`) already exist as **sibling creator-page subroutes**, so FFF posts do not surface inside the Frontfolio asset grid. Frontfolio = identity + reputation + asset-portfolio IA; FFF = feed IA + share-graph; posts reference underlying Frontfiles objects via `PostAttachmentRef` with `creatorUserId` denormalized at post-time so attribution survives source removal (`types.ts:1149` comment). **Still open:** does `/creator/[handle]/frontfolio` reference posts at all (recent-posts strip? "also shares" teaser? none?), or is the boundary strictly "frontfolio = assets-only; posts = separate sibling subroute"? Resolve in A.4 FRONTFOLIO gate.
+  - **O-FFF3 — Relationship to HOME PAGE** *(if any; resolved alongside A.8)*. Still open — awaits A.8 scope lock. Code signal: HOME PAGE is `/` (per `PLATFORM_BUILD.md` route map), currently on mock data per Area 8 roadmap note.
+  - **O-FFF4 [RESOLVED 2026-04-23]** — minimal state model, code-anchored: posts carry `visibility: 'public' | 'connections'` plus implicit exists/deleted. No draft/published/archived lifecycle. Posts are thin wrappers; state weight lives on the underlying attachment.
+  - **O-FFF5 (new) — Dependency on A.6 SHARE.** The "Share" nav label assignment is governed by A.6's primitive enumeration (per O-A0-3); A.5 cannot sign off until A.6 resolves which primitive owns the "Share" top-nav label (currently wired to fire `openComposer()` per `DiscoveryNav.tsx:160-170`, i.e. the FFF share-to-feed primitive). Roadmap sequencing has A.5 (Track 1) before A.6 (Track 2); this dependency either reorders A.6 ahead of A.5 or accepts O-FFF5 as a deferred open item on A.5's gate. Founder to pick at A.5 sign-off time.
 - **Sign-off gate.** `G-F5`.
 - **Dependencies.** A.0 (name + scope sentence); may require coordination with A.4 (FRONTFOLIO) and A.8 (HOME PAGE) if boundaries overlap.
 - **Estimated sessions.** 1–2 (ramps up if scope sentence opens new product surface).
+
+#### A.11 — COLLECTION
+
+- **Scope sentence.** *"A Collection is a Frontfiler-curated, ordered set of Frontfiles assets with its own privacy model, viewable at `/collection/[id]` and shareable as an FFF attachment kind."* **Locked 2026-04-23** per code ground-truth audit. Every clause sourced: `interface Collection` declaration (`src/lib/types.ts:599`), curator/contributor model (`src/app/collection/[id]/page.tsx:36-38` — `curatorId + creatorIds[] + assetIds[]`), privacy field (`types.ts:603` — `PrivacyState: PUBLIC | PRIVATE | RESTRICTED`), FFF attachability (`PostAttachmentKind: 'collection'` at `types.ts:1143`).
+- **Evidence pack.** `src/lib/types.ts:599` (Spec §6 `Collection` interface — upstream Canonical Spec section number cited in comment); `src/app/collection/[id]/page.tsx` (viewer + curator reorder via localStorage `collection-order-${id}`); `collectionMap` in `src/data/` (mock fixtures); `PostAttachmentKind: 'collection'` wiring through FFF validator + hydrator; upstream Canonical Spec §6 (Notion, per authority chain in `.claude/agents/frontfiles-context.md:25`).
+- **Open items.**
+  - **O-COL1 — Upstream Spec §6 in-repo.** Canonical Spec §6 lives upstream in Notion; in-repo `interface Collection` is the operational truth but lacks full spec clauses. Either (a) land Spec §6 in-repo as part of the gate, or (b) accept upstream-authority reference with inline interface citation.
+  - **O-COL2 — Contributor model.** Code shows `curatorId` (single) + `creatorIds[]` (multi) + `assetIds[]`. How are contributor permissions defined — can they modify the collection, or just contribute assets? Does contributor consent exist as a workflow?
+  - **O-COL3 — Reorder persistence.** Current code persists ordering to `localStorage` (`collection-order-${id}`), client-only. Decide: per-viewer view-state (stays local), or per-collection canonical ordering (persisted server-side, curator-owned)?
+  - **O-COL4 — Cross-creator rights aggregation.** Collections can span creators (unlike Special Offers which enforce same-creator-only via DB trigger). Does Collection need a cross-creator rights-aggregation rule, or is it purely presentational (each asset retains its own licence terms; collection just groups them)?
+  - **O-COL5 [RESOLVED 2026-04-23]** — Privacy × FFF visibility interaction: **strict match at attach time.** Post validator rejects attach when `Collection.privacy != PUBLIC` and `Post.visibility == 'public'`, consistent with existing `attachment_not_public` validator (`post/types.ts:39-46`). Later privacy changes fail closed via hydration placeholder (`post/types.ts:82-98`).
+- **Sign-off gate.** `G-F11` (Feature gate 11 — COLLECTION).
+- **Dependencies.** A.0; partial on A.1 (asset primitives); partial on A.5 (FFF attach semantics).
+- **Estimated sessions.** 2–3.
 
 ---
 
@@ -253,8 +275,8 @@ Each Track-2 gate runs a different six-step template — the spec is written *du
 
 #### A.6 — SHARE
 
-- **Problem statement.** "Share" currently denotes at least three different primitives: (a) signed-URL delivery of licensed assets, (b) a public share link for a vault asset or frontfolio, (c) a collaborator invite surface. Merging them produces unusable UX and ambiguous rights semantics.
-- **Disambiguation required.** Enumerate the three (or more) primitives; decide whether the product keeps them as distinct named features or unifies them behind a single model with flags.
+- **Problem statement.** "Share" currently denotes at least four different primitives (enumeration locked 2026-04-23 per O-A0-3): (a) signed-URL delivery of licensed assets (the `/api/media/[id]` entitlement path), (b) a public share link for a vault asset or frontfolio (`/share/[token]` signed-token external delivery), (c) a collaborator invite surface (no live code yet), (d) share-to-feed — creates an FFF post wrapping a Frontfiles object (top-nav "Share" button, creators-only, fires `GlobalShareComposer`). Merging them produces unusable UX and ambiguous rights semantics.
+- **Disambiguation required.** Enumerate the four (or more) primitives; decide whether the product keeps them as distinct named features or unifies them behind a single model with flags.
 - **Spec output.** `SHARE_PRIMITIVES_SPEC.md` — one doc, one row per primitive, each with scope sentence, state machine (if any), rights/licence semantics, expiry model.
 - **Open items.**
   - **O-SH1 — Naming.** Retain "Share" as umbrella or retire it in favour of three separate names.
@@ -323,7 +345,7 @@ Each Track-2 gate runs a different six-step template — the spec is written *du
 
 ## Phase B — Design / Layout / Tuning Agents
 
-Runs only after `G-F1…G-F10` all signed.
+Runs only after `G-F1…G-F11` all signed.
 
 ### B.1 — Design system application pass
 
@@ -334,7 +356,7 @@ Runs only after `G-F1…G-F10` all signed.
 
 ### B.2 — Layout / IA consistency pass
 
-- **Purpose.** Ensure hierarchy, spacing, navigation, and information density are consistent across the ten Phase-A surfaces. No surface has an outlier IA.
+- **Purpose.** Ensure hierarchy, spacing, navigation, and information density are consistent across the eleven Phase-A surfaces. No surface has an outlier IA.
 - **Work.** IA diagram per surface; cross-surface consistency review; layout corrections.
 - **Artifact.** `LAYOUT_IA_CONSISTENCY_REVIEW.md`.
 - **Sign-off.** `G-B2`.
@@ -430,6 +452,7 @@ A.0 ─────────────────────────�
   ├── A.4 FRONTFOLIO ──── A.10 frontfolio composer
   │
   ├── A.5 FFF ──┬── A.8 HOME PAGE relationship (O-FFF3 / O-H4)
+  │            └── A.11 COLLECTION (FFF attach semantics; O-FFF5 reorder dep on A.6)
   │
   ├── A.6 SHARE ──── A.9 signed-URL primitive
   │
@@ -439,7 +462,9 @@ A.0 ─────────────────────────�
   │
   ├── A.9 LIGHTBOX (low coupling once A.1 watermark + A.6 signed-URL resolved)
   │
-  └── A.10 COMPOSER (multi-coupling; runs late)
+  ├── A.10 COMPOSER (multi-coupling; runs late)
+  │
+  └── A.11 COLLECTION (Track 1 partial; cross-creator rights aggregation open — O-COL4)
 
 Phase B waits on all of Phase A.
 Phase C waits on Phase B; C.4 serial; C.1–C.3 parallel-safe.
@@ -454,6 +479,7 @@ Within Track 1 and Track 2, the following pairs can proceed in parallel once A.0
 - A.3 (SPECIAL OFFER rename) ‖ A.1 (UPLOAD)
 - A.5 (FFF) ‖ A.4 (FRONTFOLIO) — once scope sentences are locked
 - A.6 (SHARE) ‖ A.9 (LIGHTBOX) — coordinate on signed-URL primitive
+- A.11 (COLLECTION) ‖ A.3 (SPECIAL OFFER) — low coupling; both Track-1 partial-to-approval
 - A.7 (COLLAB) is **not** parallel-safe; its coupling to A.2 is high
 
 Default assumption: **serial execution.** Parallel only if two workstreams (founder + engineering) are actually active and the coordination cost is lower than the coupling cost. Serial is the safe default given the current single-founder cadence.
@@ -464,20 +490,24 @@ Default assumption: **serial execution.** Parallel only if two workstreams (foun
 
 | # | Open item | Blocks |
 |---|---|---|
-| O-A0-1 | FFF scope sentence (one line) | A.5; also unblocks O-H4 relationship mapping |
+| O-A0-1 | ~~FFF scope sentence~~ **RESOLVED 2026-04-23** — see §A.5 | — |
+| O-A0-2 | ~~Collection 4-part lock~~ **RESOLVED 2026-04-23** — A.11 / Track 1 / scope sentence / strict privacy rule | — |
+| O-A0-3 | ~~"Share" primitive enumeration (3 → 4)~~ **RESOLVED 2026-04-23** — A.6 Problem statement updated | — |
+| O-A0-4 | ~~"Explore" vs "Discover" label~~ **RESOLVED 2026-04-23** — "Explore" locked; one-line code rename queued | — |
+| O-A0-5 | "certified" terminology sweep (40+ hits, separate directive) | Phase A readiness (spec §9 compliance) |
 | O-U1 | Blue Protocol 5-vs-7 state drift resolution path | A.1 |
 | O-A1 | Dispute taxonomy T1–T4 (4 decisions) | A.2 |
 | O-A2 | Dispute taxonomy G-T1…G-T4 (4 sign-off gates) | A.2 |
 | O-C1 | COLLAB one-pager — problem, user, differentiator | A.7 |
 | O-B3-1 | "Tuning agents" — (a) / (b) / (c) scope decision | B.3 |
 
-The first three must resolve before `A.1` begins. `O-C1` must resolve before `A.7` begins but does not block earlier items.
+**Gating order:** O-U1 is the last remaining A.1 blocker (O-A0-2 / O-A0-3 / O-A0-4 all resolved 2026-04-23). O-A0-5 is parallel-safe (separate "certified" sweep directive — doesn't block A.1 start). O-A1 / O-A2 block `A.2`. O-C1 blocks `A.7`.
 
 ---
 
 ## Exit criteria per phase
 
-- **Phase A exits when:** `G-F1` through `G-F10` are signed; `ROADMAP.md` changelog reflects all ten gates; all Track-2 spec docs exist.
+- **Phase A exits when:** `G-F1` through `G-F11` are signed; `ROADMAP.md` changelog reflects all eleven gates; all Track-2 spec docs exist.
 - **Phase B exits when:** `G-B1`, `G-B2`, `G-B3` signed; `TUNING_AGENTS_SPEC.md` locked; the first agent (if any) passes its eval harness.
 - **Phase C exits when:** `G-C1` through `G-C4` signed and `G2 → G6` fully walked.
 
