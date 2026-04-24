@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { AssetData } from '@/data'
 import { creatorMap } from '@/data'
+import { useSession } from '@/hooks/useSession'
 import { useTransaction } from '@/lib/transaction/context'
 import { ValidationBadge } from '@/components/discovery/ValidationBadge'
 import { LICENCE_MEDIUM_LABELS } from '@/lib/documents/types'
@@ -158,6 +159,7 @@ export function AssetRightsModule({ asset }: AssetRightsModuleProps) {
           assetId={asset.id}
           assetTitle={asset.title}
           listedPrice={asset.price}
+          creatorId={asset.creatorId}
           onClose={() => setShowOfferModal(false)}
         />
       )}
@@ -173,28 +175,72 @@ function OfferModal({
   assetId,
   assetTitle,
   listedPrice,
+  creatorId,
   onClose,
 }: {
   assetId: string
   assetTitle: string
   listedPrice: number
+  creatorId: string
   onClose: () => void
 }) {
+  const router = useRouter()
+  const { accessToken } = useSession()
   const [offerAmount, setOfferAmount] = useState('')
   const [message, setMessage] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const parsedAmount = parseFloat(offerAmount)
   const isValid = !isNaN(parsedAmount) && parsedAmount > 0 && parsedAmount < listedPrice
 
-  const handleSubmit = () => {
+  // Prompt 7 (C2 §F7 / AC11) — rewire submit handler to POST /api/offers.
+  // Previous shape set `submitted: true` in local state only; this shape
+  // calls the production endpoint and redirects to the new offer's
+  // detail page on success. §D8 preserves the modal shell, form fields,
+  // and visual layout — only this handler changes.
+  const handleSubmit = async (): Promise<void> => {
     if (!isValid) {
       setError(`Offer must be between €0.01 and €${(listedPrice - 0.01).toFixed(2)}`)
       return
     }
+    if (accessToken === null) {
+      setError('Sign in to submit an offer.')
+      return
+    }
     setError(null)
-    setSubmitted(true)
+    setSubmitting(true)
+    try {
+      const body = buildCreateOfferBody({
+        assetId,
+        creatorId,
+        grossFee: parsedAmount,
+        note: message,
+      })
+      const res = await fetch('/api/offers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const errBody = (await res.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null
+        setError(errBody?.error?.message ?? 'Could not submit offer.')
+        setSubmitting(false)
+        return
+      }
+      const result = (await res.json()) as { data: { offerId: string } }
+      setSubmitted(true)
+      router.push(`/vault/offers/${result.data.offerId}`)
+    } catch {
+      setError('Could not submit offer.')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -280,10 +326,10 @@ function OfferModal({
               {/* Submit */}
               <button
                 onClick={handleSubmit}
-                disabled={!offerAmount}
+                disabled={!offerAmount || submitting}
                 className="h-10 w-full text-xs font-bold uppercase tracking-wide bg-[#0000ff] text-white hover:bg-[#0000cc] transition-colors disabled:bg-slate-200 disabled:text-slate-400"
               >
-                Submit offer
+                {submitting ? 'Submitting…' : 'Submit offer'}
               </button>
             </div>
           ) : (
@@ -311,4 +357,67 @@ function OfferModal({
       </div>
     </div>
   )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// buildCreateOfferBody — pure body assembler (§F7 / AC11)
+//
+// Extracted as a named export so the §R6-pure test suite can
+// assert the POST /api/offers payload shape without mocking fetch.
+// Targets the CreateOfferBody Zod schema at src/app/api/offers/route.ts
+// (see L57-69). Defaults for fields the modal does not collect:
+//   - targetType: 'single_asset' (this modal is per-asset).
+//   - platformFeeBps: 2000 (Direct channel 20% per PLATFORM_BUILD.md).
+//   - currency: 'EUR' (v1 locks to EUR per SPECIAL_OFFER_SPEC.md §F.2).
+//   - rights: editorial_one_time default template; params placeholder
+//     until the rights-editor concern lands (C2 §EXIT CRITERIA E5).
+//   - expiresAt: now + 4 hours per SPECIAL_OFFER_SPEC.md §C.5 default.
+//
+// `now` parameter is clock-injected for deterministic tests.
+// ═══════════════════════════════════════════════════════════════
+
+export interface BuildCreateOfferBodyInput {
+  assetId: string
+  creatorId: string
+  grossFee: number
+  note: string
+  /** Clock injection for tests. Defaults to Date.now() at call time. */
+  now?: Date
+}
+
+export function buildCreateOfferBody(input: BuildCreateOfferBodyInput): {
+  creatorId: string
+  targetType: 'single_asset'
+  grossFee: number
+  platformFeeBps: number
+  currency: 'EUR'
+  rights: {
+    template: 'editorial_one_time'
+    params: { publication_name: string; territory: 'worldwide' }
+    is_transfer: boolean
+  }
+  expiresAt: string
+  note: string
+  items: string[]
+} {
+  const nowMs = input.now?.getTime() ?? Date.now()
+  const expiresAt = new Date(nowMs + 4 * 60 * 60 * 1000).toISOString()
+  return {
+    creatorId: input.creatorId,
+    targetType: 'single_asset',
+    grossFee: input.grossFee,
+    platformFeeBps: 2000,
+    currency: 'EUR',
+    rights: {
+      template: 'editorial_one_time',
+      params: {
+        publication_name: 'Frontfiles Standard',
+        territory: 'worldwide',
+      },
+      is_transfer: false,
+    },
+    expiresAt,
+    note: input.note,
+    items: [input.assetId],
+  }
 }
