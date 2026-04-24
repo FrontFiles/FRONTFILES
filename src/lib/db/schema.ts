@@ -1010,3 +1010,19 @@ export interface NewsroomBeatSubscriptionRow {
   created_at: string
   updated_at: string
 }
+
+// ═══════════════════════════════════════════════════════════════
+// NEWSROOM — Domain-email OTP storage (NR-D5b-ii)
+// ═══════════════════════════════════════════════════════════════
+
+export interface NewsroomEmailOtpRow {
+  id: string
+  company_id: string
+  email: string
+  code_hash: string
+  attempts: number
+  expires_at: string
+  consumed_at: string | null
+  created_at: string
+  updated_at: string
+}

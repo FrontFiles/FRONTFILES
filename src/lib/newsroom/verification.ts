@@ -46,7 +46,7 @@
 
 import 'server-only'
 
-import { createHmac } from 'node:crypto'
+import { createHmac, randomInt, timingSafeEqual } from 'node:crypto'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -206,4 +206,102 @@ export async function recomputeTier(
   }
 
   return { before, after }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NR-D5b-ii — Domain-email OTP helpers
+//
+// Three pure helpers for the second verification method:
+//
+//   5. generateOtpCode()
+//      Six-digit numeric OTP. Uses crypto.randomInt for unbiased
+//      selection in [0, 1_000_000) and zero-pads to 6 chars.
+//      The code is emailed once, never stored or logged.
+//
+//   6. hashOtpCode(code)
+//      HMAC-SHA256(NEWSROOM_VERIFICATION_HMAC_SECRET, code) as
+//      lowercase hex digest. Same secret as deriveDnsTxtToken
+//      (no new env var). 64 hex chars output.
+//
+//   7. verifyOtpCode(code, storedHash)
+//      Constant-time comparison of a plaintext code against a
+//      stored hash. Returns boolean. Length-mismatched inputs
+//      short-circuit to false (timingSafeEqual throws on
+//      different-length buffers, so we pre-check).
+//
+// All three reuse loadSecret() for fail-fast env-secret access.
+//
+// Spec cross-references:
+//   - docs/public-newsroom/PRD.md §5.1 P2 (domain-email card)
+//   - docs/public-newsroom/directives/
+//     NR-D5b-ii-domain-email-otp.md §F4
+// ═══════════════════════════════════════════════════════════════
+
+const OTP_LENGTH = 6
+const OTP_MAX_EXCLUSIVE = 1_000_000
+const OTP_HASH_ALGO = 'sha256'
+const OTP_HASH_HEX_LENGTH = 64 // SHA-256 hex digest
+
+/**
+ * Generates a 6-digit numeric OTP as a zero-padded string.
+ *
+ * crypto.randomInt(0, 1_000_000) is unbiased over the full range;
+ * the modulo-bias trap that affects naive (Math.random() * N) does
+ * not apply. The result is padded to 6 chars so codes like '00042'
+ * render correctly — no truncation or interpretation as a 2-digit
+ * number on the consumer side.
+ */
+export function generateOtpCode(): string {
+  return randomInt(0, OTP_MAX_EXCLUSIVE)
+    .toString()
+    .padStart(OTP_LENGTH, '0')
+}
+
+/**
+ * HMAC-SHA256 of an OTP code, returned as lowercase hex.
+ *
+ * Same secret as deriveDnsTxtToken — both helpers derive their
+ * cryptographic identity from NEWSROOM_VERIFICATION_HMAC_SECRET,
+ * so a single env-var rotation invalidates all in-flight DNS
+ * tokens AND OTP hashes simultaneously. Persisted verification
+ * records carry their own value_checked snapshot, so prior
+ * verifications remain auditable across rotations.
+ */
+export function hashOtpCode(code: string): string {
+  if (typeof code !== 'string') {
+    throw new TypeError('hashOtpCode: code must be a string')
+  }
+  const secret = loadSecret()
+  return createHmac(OTP_HASH_ALGO, secret).update(code).digest('hex')
+}
+
+/**
+ * Constant-time comparison of a plaintext code against a stored
+ * hash. Returns true only on exact match.
+ *
+ * Implementation note: crypto.timingSafeEqual throws synchronously
+ * if the two buffers have different lengths — which would itself
+ * leak length information to a timing attacker. We pre-check the
+ * hex-string lengths and short-circuit to false on mismatch, so
+ * the throw never fires in production. Empty input hashes to a
+ * deterministic 64-hex value that does not match any real OTP's
+ * hash, so verifyOtpCode('', ...) returns false safely.
+ */
+export function verifyOtpCode(code: string, storedHash: string): boolean {
+  if (typeof code !== 'string' || typeof storedHash !== 'string') {
+    throw new TypeError(
+      'verifyOtpCode: code and storedHash must be strings',
+    )
+  }
+  if (storedHash.length !== OTP_HASH_HEX_LENGTH) {
+    return false
+  }
+  const computed = hashOtpCode(code)
+  if (computed.length !== storedHash.length) {
+    return false
+  }
+  return timingSafeEqual(
+    Buffer.from(computed, 'hex'),
+    Buffer.from(storedHash, 'hex'),
+  )
 }
