@@ -287,6 +287,7 @@ Surfaced during NR-D* execution. Tracked here; addressed after NR-G5.
 | 2026-04-24 | NR-D1 cleared (approve) | Exit report clean across 7 sections; `idx_newsroom_vr_active` divergence approved and reflected back into directive file; v1.1 backlog opened |
 | 2026-04-24 | NR-D2a cleared (approve) | Exit report clean across 7 sections; no divergence; 8 newsroom_* tables now live in dev; 3 named CHECKs + DO-block VERIFY 8 + tightened `newsroom_corrections_select_public` from the pre-dispatch redline pass all landed as authored |
 | 2026-04-24 | NR-D2b cleared (approve) | Exit report clean across 7 sections; no divergence; 12 newsroom_* tables now live in dev; route-count baseline corrected to 91 (was stale "96" in directive); stale `.next/types/validator.ts` cache noted as pre-existing Next 16 artefact (`rm -rf .next` fix pattern); embargo_id FK validated; state-coherence CHECK fires as designed |
+| 2026-04-24 | NR-D2c-i cleared (approve) | Exit report clean across 7 sections; no divergence; 15 newsroom_* tables now live in dev; provenance stack (signing keys, distribution events, download receipts) landed; at-most-one-active signing key invariant enforced via partial unique index; route-count baseline further corrected 91 → 90 (rebase-onto-main delta, no newsroom route changes); both partial-index predicates enum-constant (no SQLSTATE 42P17 risk) |
 
 ---
 

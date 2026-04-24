@@ -837,3 +837,79 @@ export interface NewsroomEmbargoRecipientRow {
   created_at: string
   updated_at: string
 }
+
+// ══════════════════════════════════════════════
+// NEWSROOM — v1 (migration 20260425000004)
+//
+// Schema extensions Part C-i: provenance stack.
+// Signing keys, distribution events, download receipts.
+// See docs/public-newsroom/directives/
+//   NR-D2c-i-provenance-stack.md for canonical semantics.
+// ══════════════════════════════════════════════
+
+export type NewsroomDistributionEventType =
+  | 'pack_view'
+  | 'asset_view'
+  | 'asset_download'
+  | 'pack_zip_download'
+  | 'embed_render'
+  | 'preview_access'
+
+export type NewsroomDistributionSource =
+  | 'web'
+  | 'embed'
+  | 'api'
+  | 'email_link'
+
+export type NewsroomSigningAlgorithm = 'ed25519'
+
+export type NewsroomSigningKeyStatus =
+  | 'active'
+  | 'rotated'
+  | 'revoked'
+
+export interface NewsroomSigningKeyRow {
+  id: string
+  kid: string
+  algorithm: NewsroomSigningAlgorithm
+  public_key_pem: string
+  private_key_ref: string
+  status: NewsroomSigningKeyStatus
+  rotated_at: string | null
+  revoked_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsroomDistributionEventRow {
+  id: string
+  pack_id: string
+  asset_id: string | null
+  recipient_id: string | null
+  anon_session_id: string | null
+  event_type: NewsroomDistributionEventType
+  source: NewsroomDistributionSource
+  outlet_domain: string | null
+  user_agent: string | null
+  ip_country: string | null
+  occurred_at: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface NewsroomDownloadReceiptRow {
+  id: string
+  distribution_event_id: string
+  pack_id: string
+  asset_id: string | null
+  recipient_id: string | null
+  licence_class: NewsroomLicenceClass
+  credit_line: string
+  terms_summary: string
+  content_hash_sha256: string
+  signing_key_kid: string
+  signed_at: string
+  signature: string
+  receipt_url: string
+  created_at: string
+}
