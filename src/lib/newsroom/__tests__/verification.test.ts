@@ -22,6 +22,9 @@ import {
   computeTier,
   deriveDnsTxtToken,
   expectedDnsTxtRecord,
+  generateOtpCode,
+  hashOtpCode,
+  verifyOtpCode,
 } from '../verification'
 
 describe('deriveDnsTxtToken', () => {
@@ -112,5 +115,96 @@ describe('computeTier', () => {
         { method: 'authorized_signatory' },
       ]),
     ).toBe('unverified')
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// NR-D5b-ii — Domain-email OTP helper tests
+// ═══════════════════════════════════════════════════════════════
+
+describe('generateOtpCode', () => {
+  it('returns 6 digits, all numeric', () => {
+    const code = generateOtpCode()
+    expect(code).toMatch(/^\d{6}$/)
+  })
+
+  it('produces a reasonable distribution across calls', () => {
+    // 10 calls × 1-in-10^6 codespace ⇒ collision odds of any pair
+    // ≈ 4.5e-5; "at least 5 distinct" is astronomically certain
+    // unless randomness is broken outright. This catches the
+    // classic regression "someone replaced randomInt with a
+    // constant for testing and forgot to revert".
+    const codes = new Set<string>()
+    for (let i = 0; i < 10; i++) {
+      codes.add(generateOtpCode())
+    }
+    expect(codes.size).toBeGreaterThanOrEqual(5)
+  })
+})
+
+describe('hashOtpCode', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('is deterministic for the same input', () => {
+    const a = hashOtpCode('123456')
+    const b = hashOtpCode('123456')
+    expect(a).toBe(b)
+  })
+
+  it('differs across inputs', () => {
+    const a = hashOtpCode('123456')
+    const b = hashOtpCode('123457')
+    expect(a).not.toBe(b)
+  })
+
+  it('returns 64 lowercase hex chars (SHA-256 hex)', () => {
+    expect(hashOtpCode('000000')).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('throws if env secret is missing', () => {
+    vi.stubEnv('NEWSROOM_VERIFICATION_HMAC_SECRET', '')
+    expect(() => hashOtpCode('123456')).toThrow(
+      /NEWSROOM_VERIFICATION_HMAC_SECRET/,
+    )
+  })
+})
+
+describe('verifyOtpCode', () => {
+  it('matches when input matches', () => {
+    const code = '482917'
+    const stored = hashOtpCode(code)
+    expect(verifyOtpCode(code, stored)).toBe(true)
+  })
+
+  it('rejects when input differs by one char', () => {
+    const stored = hashOtpCode('482917')
+    expect(verifyOtpCode('482918', stored)).toBe(false)
+  })
+
+  it('rejects empty input', () => {
+    const stored = hashOtpCode('482917')
+    expect(verifyOtpCode('', stored)).toBe(false)
+  })
+
+  it('rejects when storedHash length is wrong (defense-in-depth)', () => {
+    // Short-circuits before timingSafeEqual, which would
+    // otherwise throw on length mismatch.
+    expect(verifyOtpCode('482917', 'too-short')).toBe(false)
+  })
+
+  it('throws on non-string code (type mismatch)', () => {
+    expect(() =>
+      // @ts-expect-error — deliberate type violation for guard test
+      verifyOtpCode(123456, hashOtpCode('123456')),
+    ).toThrow(TypeError)
+  })
+
+  it('throws on non-string storedHash (type mismatch)', () => {
+    expect(() =>
+      // @ts-expect-error — deliberate type violation for guard test
+      verifyOtpCode('123456', null),
+    ).toThrow(TypeError)
   })
 })
