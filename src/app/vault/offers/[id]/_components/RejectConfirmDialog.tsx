@@ -20,6 +20,7 @@
 
 import {
   forwardRef,
+  useCallback,
   useImperativeHandle,
   useRef,
   type ReactElement,
@@ -81,9 +82,20 @@ export const RejectConfirmDialog = forwardRef<
     [],
   )
 
+  const close = useCallback(() => {
+    dialogRef.current?.close()
+  }, [])
+
+  // The factory stores `close` inside the handler closure;
+  // .current is read only when the confirm button fires, never
+  // during render. The react-hooks/refs rule traces through the
+  // useCallback-stable closure and fires a false positive — safe
+  // to suppress. Symmetric with the suppression in
+  // OfferDetailClient.tsx (Prompt 6, handlers useMemo).
+  // eslint-disable-next-line react-hooks/refs
   const handleConfirm = buildRejectConfirmHandler({
     onConfirm: props.onConfirm,
-    close: () => dialogRef.current?.close(),
+    close,
   })
 
   return (
