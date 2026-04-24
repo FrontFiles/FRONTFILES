@@ -71,7 +71,7 @@ Every user has exactly one **username** — the human-readable public identifier
 | Privacy | 3: PUBLIC, PRIVATE, RESTRICTED | Spec S6.5 |
 | Validation Declaration | 7: fully_validated, provenance_pending, manifest_invalid, corroborated, under_review, disputed, invalidated | Spec S7.4-7.5 |
 | Publication | 3: PUBLISHED, DRAFT, UNPUBLISHED | Spec S6 |
-| Offer | 6: pending, countered, accepted, rejected, expired, cancelled | Spec S10.4 |
+| Offer | 6: sent, countered, accepted, rejected, expired, cancelled | Spec S10.4 |
 | Assignment | 7: brief_issued, escrow_captured, in_progress, delivered, confirmed, disputed, cancelled | Spec S10.7-10.9 |
 | Dispute | 5: filed, under_review, upheld, not_upheld, escalated_external | Spec S13 |
 | Payout | 4: queued, processing, settled, failed | Spec S8.8 |
