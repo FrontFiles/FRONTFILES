@@ -5,9 +5,9 @@
 //
 //   1. Suggested creators — verified Frontfilers the viewer
 //      does NOT currently follow, ordered by trust badge then
-//      number of certified assets they have on the platform.
+//      number of verifiable assets they have on the platform.
 //   2. Trust signals — a short panel of platform-level numbers
-//      (verified creators, certified assets, reposts today).
+//      (verified creators, verifiable assets, reposts today).
 //      Editorial typography, subdued numerals — NOT a vanity
 //      counter.
 //   3. Disclaimer — a one-liner reminder that ranking is based
@@ -27,7 +27,7 @@ interface FeedRightRailProps {
   suggestedCreators: Creator[]
   signals: {
     verifiedCreators: number
-    certifiedAssets: number
+    verifiableAssets: number
     repostsLast24h: number
   }
 }
@@ -57,8 +57,8 @@ export function FeedRightRail({
             value={signals.verifiedCreators.toLocaleString('en-US')}
           />
           <SignalRow
-            label="Certified assets"
-            value={signals.certifiedAssets.toLocaleString('en-US')}
+            label="Verifiable assets"
+            value={signals.verifiableAssets.toLocaleString('en-US')}
           />
           <SignalRow
             label="Reposts · 24h"

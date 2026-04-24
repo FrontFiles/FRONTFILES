@@ -128,14 +128,17 @@
   --post-accent-tint-hover: rgb(0 0 255 / 0.14);
   --post-focus-ring: #0000ff;
 
-  /* ── Radii — scoped, does NOT touch global --radius: 0rem ── */
-  --post-card-radius: 14px;
-  --post-nested-radius: 10px;
-  --post-embed-radius: 12px;
-  --post-thumb-radius: 10px;
-  --post-thumb-radius-compact: 8px;
-  --post-chip-radius: 9999px;               /* pill */
-  --post-avatar-radius: 0px;                /* square — matches Frontfiles profile chrome */
+  /* ── Radii — Canon-aligned (Design Canon 4.3: radius 0 everywhere,
+         no pill shapes, no chips-with-curves). All post-scoped radius
+         tokens resolve to 0. Do not set any of these to a non-zero
+         value without a PLATFORM_BUILD.md Canon amendment. ── */
+  --post-card-radius: 0px;
+  --post-nested-radius: 0px;
+  --post-embed-radius: 0px;
+  --post-thumb-radius: 0px;
+  --post-thumb-radius-compact: 0px;
+  --post-chip-radius: 0px;
+  --post-avatar-radius: 0px;
 
   /* ── Border widths ──────────────────────────────────────── */
   --post-border-width: 1px;
