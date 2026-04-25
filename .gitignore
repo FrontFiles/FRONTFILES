@@ -66,3 +66,9 @@ docs/audits/_*.md
 /public/assets/videos/*.mp4
 /public/assets/videos/*.mov
 *.tsbuildinfo*
+
+# Working memory — session handoff scratch, not committed
+SESSION_STATE_*.md
+
+# npm lockfile — project is bun-managed; package-lock.json is contamination
+package-lock.json
