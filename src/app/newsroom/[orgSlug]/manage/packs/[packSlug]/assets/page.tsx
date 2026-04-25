@@ -34,6 +34,7 @@ import type {
 
 import { PackEditorShell } from '../_components/pack-editor-shell'
 import { AssetRow } from './_components/asset-row'
+import { ScanPoller } from './_components/scan-poller'
 import { UploadZone } from './_components/upload-zone'
 
 export default async function NewsroomPackAssetsPage({
@@ -119,6 +120,16 @@ export default async function NewsroomPackAssetsPage({
     scanResultsByAssetId = new Map(rows.map((r) => [r.asset_id, r]))
   }
 
+  // NR-D7b F11: live state-transition polling. Mount the
+  // <ScanPoller> while at least one asset has a pending
+  // scan_result; the poller calls router.refresh() every 5s and
+  // the next render unmounts the poller once no pending rows
+  // remain. Auto-stop is server-driven via this conditional, not
+  // via the poller's internal logic.
+  const hasPending = Array.from(scanResultsByAssetId.values()).some(
+    (s) => s.result === 'pending',
+  )
+
   return (
     <PackEditorShell
       orgSlug={orgSlug}
@@ -145,6 +156,7 @@ export default async function NewsroomPackAssetsPage({
           ))}
         </ul>
       ) : null}
+      {hasPending ? <ScanPoller hasPending={hasPending} /> : null}
     </PackEditorShell>
   )
 }
