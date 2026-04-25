@@ -34,7 +34,6 @@ import Link from 'next/link'
 import type { NewsroomPackRow } from '@/lib/db/schema'
 
 const PUBLISH_CTA_TOOLTIP = 'Publishing ships in NR-D9. Save draft for now.'
-const EMBARGO_TAB_TOOLTIP = 'Available in NR-D8.'
 
 const SAVE_STATE_LABEL: Record<
   'idle' | 'saving' | 'saved',
@@ -92,15 +91,20 @@ export function PackEditorShell({
       </header>
 
       {/* ── Tab nav ──
-       *  NR-D7a F2 EDIT: Assets tab is now an active <Link>. The
-       *  active-state styling for "are we currently on Assets vs
-       *  Details vs Embargo" is intentionally not encoded here —
-       *  Next 16 doesn't expose the current pathname to server
-       *  components without an extra wrapper, and the visual-polish
-       *  pass owns selected-tab indicators. Both Details and Assets
-       *  render aria-current="page" so an admin can see they ARE on
-       *  the editor; routing differentiates the actual content.
-       *  Embargo stays disabled until NR-D8.
+       *  NR-D7a activated the Assets tab; NR-D8 activates Embargo.
+       *  Both follow the same shape: rendered as <Link> when a
+       *  saved pack exists (path takes pack.slug), or as a
+       *  disabled <span> in create mode (no slug yet — admin
+       *  saves the draft first via the Details tab, then the
+       *  other tabs become reachable).
+       *
+       *  Active-state styling for "currently on Details vs Assets
+       *  vs Embargo" is intentionally not encoded here — Next 16
+       *  doesn't expose the current pathname to server components
+       *  without an extra wrapper, and the visual-polish pass owns
+       *  selected-tab indicators. All three tabs render
+       *  aria-current="page" so the editor surface itself is
+       *  signalled; routing differentiates the actual content.
        */}
       <nav aria-label="Pack editor tabs">
         <Link href={detailsHref} aria-current="page">
@@ -121,9 +125,21 @@ export function PackEditorShell({
             Assets
           </span>
         )}
-        <span aria-disabled="true" title={EMBARGO_TAB_TOOLTIP}>
-          Embargo
-        </span>
+        {pack ? (
+          <Link
+            href={`/${orgSlug}/manage/packs/${pack.slug}/embargo`}
+            aria-current="page"
+          >
+            Embargo
+          </Link>
+        ) : (
+          <span
+            aria-disabled="true"
+            title="Save the pack first to set up an embargo."
+          >
+            Embargo
+          </span>
+        )}
       </nav>
 
       {/* ── Active tab content (DetailsForm) ── */}
