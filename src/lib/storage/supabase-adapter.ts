@@ -25,8 +25,17 @@ import { originalPath, derivativePath, validateStorageRef } from './paths'
 import type {
   PutOriginalInput,
   PutDerivativeInput,
+  SignedPutUrlInput,
+  SignedPutUrlOutput,
   StorageAdapter,
 } from './types'
+
+// Supabase Storage's createSignedUploadUrl currently uses a fixed
+// ~2 hour lifetime at the time of writing; the SDK does not expose
+// a TTL parameter. The caller's `ttlSeconds` hint is honoured as
+// the smaller of (caller hint, provider default) — see signedPutUrl
+// below.
+const SUPABASE_SIGNED_UPLOAD_DEFAULT_TTL_SECONDS = 2 * 60 * 60
 
 export class SupabaseStorageAdapter implements StorageAdapter {
   private readonly client: SupabaseClient
@@ -95,6 +104,42 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       throw new Error(
         `SupabaseStorageAdapter.delete failed for ${storageRef}: ${error.message}`,
       )
+    }
+  }
+
+  async signedPutUrl(
+    input: SignedPutUrlInput,
+  ): Promise<SignedPutUrlOutput> {
+    validateStorageRef(input.storageRef)
+    const { data, error } = await this.client.storage
+      .from(this.bucket)
+      .createSignedUploadUrl(input.storageRef)
+    if (error || !data) {
+      throw new Error(
+        `SupabaseStorageAdapter.signedPutUrl failed for ${input.storageRef}: ${
+          error?.message ?? 'no signed URL returned'
+        }`,
+      )
+    }
+
+    // Caller's TTL hint vs Supabase's enforced lifetime: take the
+    // smaller. Supabase's createSignedUploadUrl does not expose a
+    // TTL parameter on the SDK at the time of writing; the bucket
+    // setting + provider default control the actual expiry. We
+    // record the smaller of the two so callers don't over-promise
+    // freshness to their UI consumers.
+    const ttlSeconds =
+      input.ttlSeconds && input.ttlSeconds > 0
+        ? Math.min(
+            input.ttlSeconds,
+            SUPABASE_SIGNED_UPLOAD_DEFAULT_TTL_SECONDS,
+          )
+        : SUPABASE_SIGNED_UPLOAD_DEFAULT_TTL_SECONDS
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString()
+
+    return {
+      url: data.signedUrl,
+      expiresAt,
     }
   }
 

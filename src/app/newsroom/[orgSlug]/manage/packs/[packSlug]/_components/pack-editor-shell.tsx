@@ -34,7 +34,6 @@ import Link from 'next/link'
 import type { NewsroomPackRow } from '@/lib/db/schema'
 
 const PUBLISH_CTA_TOOLTIP = 'Publishing ships in NR-D9. Save draft for now.'
-const ASSETS_TAB_TOOLTIP = 'Available in NR-D7.'
 const EMBARGO_TAB_TOOLTIP = 'Available in NR-D8.'
 
 const SAVE_STATE_LABEL: Record<
@@ -92,14 +91,36 @@ export function PackEditorShell({
         </div>
       </header>
 
-      {/* ── Tab nav ── */}
+      {/* ── Tab nav ──
+       *  NR-D7a F2 EDIT: Assets tab is now an active <Link>. The
+       *  active-state styling for "are we currently on Assets vs
+       *  Details vs Embargo" is intentionally not encoded here —
+       *  Next 16 doesn't expose the current pathname to server
+       *  components without an extra wrapper, and the visual-polish
+       *  pass owns selected-tab indicators. Both Details and Assets
+       *  render aria-current="page" so an admin can see they ARE on
+       *  the editor; routing differentiates the actual content.
+       *  Embargo stays disabled until NR-D8.
+       */}
       <nav aria-label="Pack editor tabs">
         <Link href={detailsHref} aria-current="page">
           Details
         </Link>
-        <span aria-disabled="true" title={ASSETS_TAB_TOOLTIP}>
-          Assets
-        </span>
+        {pack ? (
+          <Link
+            href={`/${orgSlug}/manage/packs/${pack.slug}/assets`}
+            aria-current="page"
+          >
+            Assets
+          </Link>
+        ) : (
+          <span
+            aria-disabled="true"
+            title="Save the pack first to upload assets."
+          >
+            Assets
+          </span>
+        )}
         <span aria-disabled="true" title={EMBARGO_TAB_TOOLTIP}>
           Embargo
         </span>
