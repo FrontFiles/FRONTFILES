@@ -102,6 +102,46 @@ const envSchema = z.object({
       'NEWSROOM_VERIFICATION_HMAC_SECRET is required (256+ bits; generate with `openssl rand -base64 48`). Server-only.',
   }),
 
+  // ─── Optional: Scanner pipeline (NR-D7b) ──────────────────────
+  // Image moderation: GCV SafeSearch fires when both PROJECT_ID
+  // and API_KEY are set; otherwise the stub adapter runs.
+  SCANNER_GCV_PROJECT_ID: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'Google Cloud project ID for the GCV SafeSearch adapter. Pair with SCANNER_GCV_API_KEY.',
+    ),
+  SCANNER_GCV_API_KEY: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'GCV API key (vision.googleapis.com). Pair with SCANNER_GCV_PROJECT_ID.',
+    ),
+  SCANNER_STUB_DELAY_MS: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe(
+      'Synthetic latency in ms for the stub scanner. Default 5000 in factory.',
+    ),
+  // Cron secret: required in production. The schema declares it
+  // optional so dev environments without the secret don't fail
+  // env-load (the cron route returns 401 in that case). Production
+  // deploys MUST set this — manual gate at NR-G2 / launch hardening.
+  SCANNER_CRON_SECRET: z
+    .string()
+    .min(32, {
+      message:
+        'SCANNER_CRON_SECRET must be 32+ chars. Generate with `openssl rand -base64 48` (NR-D5b-i precedent).',
+    })
+    .optional()
+    .describe(
+      'Bearer secret on the /api/cron/newsroom-scan endpoint. Required in production.',
+    ),
+
   // ─── Optional: Stripe (wired in Phase 5) ──────────────────────
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -187,6 +227,10 @@ const rawEnv = {
   FFF_STORAGE_FS_ROOT: process.env.FFF_STORAGE_FS_ROOT,
   FFF_STORAGE_SUPABASE_BUCKET: process.env.FFF_STORAGE_SUPABASE_BUCKET,
   NEWSROOM_VERIFICATION_HMAC_SECRET: process.env.NEWSROOM_VERIFICATION_HMAC_SECRET,
+  SCANNER_GCV_PROJECT_ID: process.env.SCANNER_GCV_PROJECT_ID,
+  SCANNER_GCV_API_KEY: process.env.SCANNER_GCV_API_KEY,
+  SCANNER_STUB_DELAY_MS: process.env.SCANNER_STUB_DELAY_MS,
+  SCANNER_CRON_SECRET: process.env.SCANNER_CRON_SECRET,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   STRIPE_CONNECT_CLIENT_ID: process.env.STRIPE_CONNECT_CLIENT_ID,
