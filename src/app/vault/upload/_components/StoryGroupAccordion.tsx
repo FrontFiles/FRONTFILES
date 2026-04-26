@@ -37,6 +37,14 @@ export default function StoryGroupAccordion({ cluster, assets }: Props) {
   // V3 UX: drop needs_story from "ready" computation per UX-BRIEF v3 §4.5
   // (Story groups are opt-in in V3; SELECTOR returns needs_story for parity,
   // but V3 ready-count must not treat it as blocking).
+  //
+  // P3 (C2.6) — note for future debuggers: a "0 READY" header on a populated
+  // cluster is TRUTHFUL, not a bug. After hydration, dev fixtures leave
+  // assets at NEEDS PRIVACY / NEEDS PRICE / NEEDS LICENCES (blocking
+  // exceptions OTHER than needs_story). The user must accept proposals
+  // and set privacy before assets become "ready". The cluster bulk-accept
+  // applies caption + tags + geography only — privacy + price stay manual
+  // per spec §9.2 (price never bulk-acceptable).
   const readyCount = assets.filter(
     a =>
       !a.excluded &&

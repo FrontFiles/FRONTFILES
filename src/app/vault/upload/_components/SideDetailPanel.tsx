@@ -177,7 +177,14 @@ function Thumbnail({ asset }: { asset: V2Asset }) {
   }, [url])
 
   return (
-    <div className="border-b border-black bg-slate-100 aspect-square flex items-center justify-center overflow-hidden flex-shrink-0">
+    {/*
+     * P1 (C2.6): Thumbnail height capped at 192px (h-48). The previous
+     * aspect-square design ate the entire visible panel viewport on a
+     * 480px-wide panel, pushing the field editor below the fold and
+     * making the panel read as "empty" at first glance. Fixed-height
+     * frame with object-contain preserves aspect on the actual image.
+     */}
+    <div className="border-b border-black bg-slate-100 h-48 flex items-center justify-center overflow-hidden flex-shrink-0">
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt={asset.filename} className="w-full h-full object-contain" />
@@ -525,8 +532,11 @@ function AcceptRow({
   regenerating: boolean
   acceptTitle: string
 }) {
+  // P6 (C2.6): horizontal layout (was flex-col). The vertical stack
+  // pushed adjacent fields apart and added unnecessary visual rhythm
+  // noise inside the panel. Horizontal pair sits flush beside the input.
   return (
-    <div className="flex flex-col gap-1 flex-shrink-0">
+    <div className="flex flex-row gap-1 flex-shrink-0">
       <button
         type="button"
         onClick={onAccept}

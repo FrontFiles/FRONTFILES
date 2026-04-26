@@ -42,8 +42,13 @@ const ACCEPT_BTN =
   'border border-black px-2 py-0.5 text-[10px] font-bold uppercase text-black hover:bg-black hover:text-white transition-colors'
 const REGEN_BTN =
   'border border-black px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600 hover:bg-slate-200 transition-colors'
+// P5 (C2.6): per-row "Accept all suggestions" reads as a button, not a
+// text link, so it sits visually beside the ✕ Exclude button at brutalist
+// weight. Bordered + uppercase + tracking matches the cluster-header bulk
+// action affordance without competing with the per-field ✓ buttons (which
+// are black-bordered).
 const ACCEPT_ALL_LINK =
-  'text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline'
+  'border border-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:bg-blue-600 hover:text-white transition-colors'
 
 const REGEN_FEEDBACK_MS = 600
 

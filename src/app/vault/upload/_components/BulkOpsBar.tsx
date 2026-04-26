@@ -55,11 +55,15 @@ export default function BulkOpsBar() {
     })
   }
 
+  // P2 (C2.6): grouped layout with vertical-rule separators instead of
+  // bullet points. When the bar wraps (e.g., side panel open), the
+  // separators visually preserve the group boundaries rather than reading
+  // as undifferentiated noise. Tighter row gap (gap-y-2) when wrapped.
   return (
-    <div className="border-b border-black bg-white px-4 py-2 flex items-center gap-3 flex-wrap min-w-0 sticky top-0 z-10">
+    <div className="border-b border-black bg-white px-4 py-2 flex items-center gap-x-4 gap-y-2 flex-wrap min-w-0 sticky top-0 z-10">
       <span className={LABEL}>{selectedCount} selected</span>
 
-      <span className="text-black">•</span>
+      <Sep />
 
       <label className="flex items-center gap-2">
         <span className={LABEL}>Set price:</span>
@@ -83,7 +87,7 @@ export default function BulkOpsBar() {
         </button>
       </label>
 
-      <span className="text-black">•</span>
+      <Sep />
 
       <label className="flex items-center gap-2">
         <span className={LABEL}>Set privacy:</span>
@@ -105,12 +109,14 @@ export default function BulkOpsBar() {
         </select>
       </label>
 
-      <span className="text-black">•</span>
+      <Sep />
 
-      <span className={LABEL}>Apply to selected:</span>
-      <ApplyButton field="caption" open={openPopover === 'caption'} onToggle={() => setOpenPopover(openPopover === 'caption' ? null : 'caption')} onClose={() => setOpenPopover(null)} />
-      <ApplyButton field="tags" open={openPopover === 'tags'} onToggle={() => setOpenPopover(openPopover === 'tags' ? null : 'tags')} onClose={() => setOpenPopover(null)} />
-      <ApplyButton field="geo" open={openPopover === 'geo'} onToggle={() => setOpenPopover(openPopover === 'geo' ? null : 'geo')} onClose={() => setOpenPopover(null)} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={LABEL}>Apply to selected:</span>
+        <ApplyButton field="caption" open={openPopover === 'caption'} onToggle={() => setOpenPopover(openPopover === 'caption' ? null : 'caption')} onClose={() => setOpenPopover(null)} />
+        <ApplyButton field="tags" open={openPopover === 'tags'} onToggle={() => setOpenPopover(openPopover === 'tags' ? null : 'tags')} onClose={() => setOpenPopover(null)} />
+        <ApplyButton field="geo" open={openPopover === 'geo'} onToggle={() => setOpenPopover(openPopover === 'geo' ? null : 'geo')} onClose={() => setOpenPopover(null)} />
+      </div>
 
       <button
         type="button"
@@ -122,6 +128,11 @@ export default function BulkOpsBar() {
       </button>
     </div>
   )
+}
+
+/** Vertical-rule separator for grouping. Brutalist 1px black line. */
+function Sep() {
+  return <span className="self-stretch border-l border-black" aria-hidden />
 }
 
 /**
