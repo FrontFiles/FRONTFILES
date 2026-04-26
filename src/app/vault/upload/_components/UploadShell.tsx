@@ -31,6 +31,7 @@ import type { ScenarioId } from '@/lib/upload/v2-scenario-registry'
 import type { V3State } from '@/lib/upload/v3-types'
 import { UploadContextProvider } from './UploadContext'
 import AssetList from './AssetList'
+import SideDetailPanel from './SideDetailPanel'
 
 interface Props {
   batchId: string
@@ -66,20 +67,26 @@ export default function UploadShell({ batchId, devScenarioId }: Props) {
           </div>
         </div>
 
-        {/* Region 2 — Asset list (LIVE per C2.2) */}
-        <div data-region="asset-list" className="flex-1 overflow-auto min-w-0">
-          <AssetList />
-        </div>
-
-        {/* Region 3 — Side detail panel (overlay-from-right, conditional) */}
-        {state.ui.sidePanelOpenAssetId && (
-          <div data-region="side-panel" className="border-l border-black p-6 min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Side detail panel — placeholder for C2.3 (asset:{' '}
-              {state.ui.sidePanelOpenAssetId})
-            </div>
+        {/* Region 2 + Region 3 (side panel) — push layout per UX-SPEC-V3 §7.
+         *
+         * Asset list and side panel sit side-by-side in a horizontal flex.
+         * The panel is push-style (NOT overlay) so multi-row context stays
+         * visible to the left when a single asset is being edited (spec §7:
+         * "overlay would obscure context for multi-row workflows").
+         *
+         * Note on the C2-PLAN drift corrected at C2.3 land: §4.1 of
+         * C2-PLAN.md and an earlier placeholder comment here both said
+         * "overlay-from-right". UX-SPEC-V3 §7 is canonical and says push.
+         *
+         * SideDetailPanel renders nothing when sidePanelOpenAssetId is null,
+         * so the asset-list takes the full width by default and shrinks left
+         * by 480px when the panel mounts. */}
+        <div className="flex flex-row flex-1 min-w-0 min-h-0">
+          <div data-region="asset-list" className="flex-1 overflow-auto min-w-0">
+            <AssetList />
           </div>
-        )}
+          <SideDetailPanel />
+        </div>
 
         {/* Region 3 (bottom, sticky) — commit bar */}
         <div

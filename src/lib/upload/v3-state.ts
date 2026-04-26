@@ -27,6 +27,7 @@ import type {
   V2Defaults,
   AssetEditableFields,
 } from './v3-types'
+import { getFilteredSortedSearchedAssets } from './upload-selectors'
 
 // ── ID Generator ──────────────────────────────────────────────────
 
@@ -274,18 +275,39 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
       return { ...state, ui: { ...state.ui, sidePanelOpenAssetId: null } }
 
     case 'NAVIGATE_SIDE_PANEL': {
-      // Per IP-8: scope is filtered visible assets (matches user mental model).
-      // For C2.1, "filtered visible" defaults to assetOrder until C2.2 wires
-      // the filter selectors. This handler will be revisited in C2.2.
-      const visible = state.assetOrder
+      // Per IP-8 + IPIII-11: scope is filtered+sorted+searched visible assets,
+      // not raw assetOrder. C2.1 stubbed this with assetOrder pending the
+      // C2.2 selector landing; C2.3 finishes the wire to
+      // getFilteredSortedSearchedAssets.
+      //
+      // Special case (IPIII-11): if the open asset id is NOT in the filtered
+      // visible list (e.g., user changed the filter while panel was open and
+      // the open asset got hidden), start from index 0 instead of bailing.
+      const visible = getFilteredSortedSearchedAssets({
+        assetsById: state.assetsById,
+        assetOrder: state.assetOrder,
+        filter: state.ui.filter,
+        searchQuery: state.ui.searchQuery,
+        sortField: state.ui.sortField,
+        sortDirection: state.ui.sortDirection,
+      }).map(a => a.id)
+
+      if (visible.length === 0) return state
+
       const currentIdx = state.ui.sidePanelOpenAssetId
         ? visible.indexOf(state.ui.sidePanelOpenAssetId)
         : -1
-      if (currentIdx === -1) return state
-      const nextIdx =
-        action.direction === 'next'
-          ? Math.min(currentIdx + 1, visible.length - 1)
-          : Math.max(currentIdx - 1, 0)
+
+      let nextIdx: number
+      if (currentIdx === -1) {
+        // Open id is filtered out (or unset). Start at the first visible.
+        nextIdx = 0
+      } else {
+        nextIdx =
+          action.direction === 'next'
+            ? Math.min(currentIdx + 1, visible.length - 1)
+            : Math.max(currentIdx - 1, 0)
+      }
       const nextId = visible[nextIdx]
       if (!nextId) return state
       return {

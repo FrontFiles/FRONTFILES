@@ -183,6 +183,89 @@ describe('side panel actions', () => {
     s = v3Reducer(s, { type: 'NAVIGATE_SIDE_PANEL', direction: 'prev' })
     expect(s.ui.sidePanelOpenAssetId).toBe('a')
   })
+
+  // ── C2.3 — filter-aware navigation (per IPIII-11) ────────────────
+  //
+  // The C2.1 placeholder used assetOrder; C2.3 wires
+  // getFilteredSortedSearchedAssets so J/K respect the active filter.
+  // Setup: three assets [a,b,c], add a search query that matches only
+  // 'a.jpg' and 'c.jpg'. Visible scope becomes [a, c]; J from a should
+  // skip b and land on c.
+
+  it('NAVIGATE_SIDE_PANEL respects searchQuery filter (skips hidden)', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ['alpha.jpg', 'beta.jpg', 'aleph.jpg'].map((filename, i) => ({
+        id: `id_${i}`,
+        filename,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+    // Search 'al' — matches 'alpha.jpg' and 'aleph.jpg', not 'beta.jpg'.
+    s = v3Reducer(s, { type: 'SET_SEARCH_QUERY', query: 'al' })
+    s = v3Reducer(s, { type: 'OPEN_SIDE_PANEL', assetId: 'id_0' })
+    s = v3Reducer(s, { type: 'NAVIGATE_SIDE_PANEL', direction: 'next' })
+    // Visible after filter+sort (filename A→Z asc): aleph, alpha → ids id_2, id_0.
+    // From id_0 'next' → clamped at last visible = id_0 (still). Test prev instead.
+    // Easier: filter setup + test prev/next around a known index.
+    // Pick the asserted-on hop based on actual sort. The filename-ascending
+    // sort puts 'aleph' before 'alpha', so visible = [id_2, id_0].
+    // From id_0 (last), 'next' clamps → id_0; 'prev' → id_2.
+    expect(s.ui.sidePanelOpenAssetId).toBe('id_0') // clamped
+    s = v3Reducer(s, { type: 'NAVIGATE_SIDE_PANEL', direction: 'prev' })
+    expect(s.ui.sidePanelOpenAssetId).toBe('id_2') // skipped 'beta'
+  })
+
+  it('NAVIGATE_SIDE_PANEL with hidden open id starts from first visible', () => {
+    // Trap to avoid: getFilteredSortedSearchedAssets matches search query
+    // against filename OR title OR tags OR FORMAT. The format string for
+    // every asset here is 'photo'. So a search query like 'p' (or 'h', 'o',
+    // 't') matches via format and hides nothing — defeating the test.
+    // Pick a query letter that is NOT in 'photo'. Letters in 'photo':
+    // p, h, o, t. Anything else is safe. Use 'e'.
+    //
+    // Filename design: 'apple', 'kiwi', 'cherry'. 'kiwi' has no 'e';
+    // 'apple' and 'cherry' do. Filename-asc sort: apple, cherry → so
+    // visible[0] = id_0 (apple) once 'kiwi' (id_1) is hidden.
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ['apple.jpg', 'kiwi.jpg', 'cherry.jpg'].map((filename, i) => ({
+        id: `id_${i}`,
+        filename,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+    // Open kiwi first (no filter, freely accessible).
+    s = v3Reducer(s, { type: 'OPEN_SIDE_PANEL', assetId: 'id_1' })
+    // Apply filter that hides kiwi (kiwi has no 'e'; 'photo' has no 'e').
+    s = v3Reducer(s, { type: 'SET_SEARCH_QUERY', query: 'e' })
+    // Visible (filename-asc): apple (id_0), cherry (id_2). kiwi (id_1) hidden.
+    s = v3Reducer(s, { type: 'NAVIGATE_SIDE_PANEL', direction: 'next' })
+    // Since open id_1 is not in visible, start at visible[0] = id_0 (apple).
+    expect(s.ui.sidePanelOpenAssetId).toBe('id_0')
+  })
+
+  it('NAVIGATE_SIDE_PANEL is a no-op when no assets match the filter', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ['a.jpg'].map(filename => ({
+        id: 'a',
+        filename,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+    s = v3Reducer(s, { type: 'OPEN_SIDE_PANEL', assetId: 'a' })
+    s = v3Reducer(s, { type: 'SET_SEARCH_QUERY', query: 'zzzzzz_no_match' })
+    const before = s.ui.sidePanelOpenAssetId
+    s = v3Reducer(s, { type: 'NAVIGATE_SIDE_PANEL', direction: 'next' })
+    expect(s.ui.sidePanelOpenAssetId).toBe(before)
+  })
 })
 
 // ── UI toggles ───────────────────────────────────────────────────
@@ -281,6 +364,94 @@ describe('asset field editing', () => {
     expect(s.assetsById.a.editable.title).toBe('Hello')
   })
 
+  // ── C2.3 — UPDATE_ASSET_FIELD shape coverage for SideDetailPanel ──
+  //
+  // Per C2.3-DIRECTIVE.md option-C extension. SideDetailPanel dispatches
+  // UPDATE_ASSET_FIELD for each of: title, description, tags, geography,
+  // price, privacy, licences. The reducer is generic on field key, so a
+  // type-level guarantee already exists — but verifying that each shape
+  // round-trips through the reducer to the expected editable slot
+  // catches any future refactor of v3-state.ts that breaks per-field
+  // semantics. Belt-and-suspenders for the panel dispatch contract.
+
+  it('UPDATE_ASSET_FIELD: description', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'description',
+      value: 'Caption text',
+    })
+    expect(s.assetsById.a.editable.description).toBe('Caption text')
+  })
+
+  it('UPDATE_ASSET_FIELD: tags (array)', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'tags',
+      value: ['protest', 'climate', 'lisbon'],
+    })
+    expect(s.assetsById.a.editable.tags).toEqual(['protest', 'climate', 'lisbon'])
+  })
+
+  it('UPDATE_ASSET_FIELD: geography (array)', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'geography',
+      value: ['Lisbon', 'Portugal'],
+    })
+    expect(s.assetsById.a.editable.geography).toEqual(['Lisbon', 'Portugal'])
+  })
+
+  it('UPDATE_ASSET_FIELD: price (cents)', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'UPDATE_ASSET_FIELD', assetId: 'a', field: 'price', value: 24000 })
+    expect(s.assetsById.a.editable.price).toBe(24000)
+    s = v3Reducer(s, { type: 'UPDATE_ASSET_FIELD', assetId: 'a', field: 'price', value: null })
+    expect(s.assetsById.a.editable.price).toBeNull()
+  })
+
+  it('UPDATE_ASSET_FIELD: privacy', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'UPDATE_ASSET_FIELD', assetId: 'a', field: 'privacy', value: 'PUBLIC' })
+    expect(s.assetsById.a.editable.privacy).toBe('PUBLIC')
+    s = v3Reducer(s, { type: 'UPDATE_ASSET_FIELD', assetId: 'a', field: 'privacy', value: null })
+    expect(s.assetsById.a.editable.privacy).toBeNull()
+  })
+
+  it('UPDATE_ASSET_FIELD: licences (array)', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'licences',
+      value: ['editorial', 'web'],
+    })
+    expect(s.assetsById.a.editable.licences).toEqual(['editorial', 'web'])
+  })
+
   it('TOGGLE_ASSET_EXCLUDED flips excluded', () => {
     let s = v3Reducer(freshState(), {
       type: 'ADD_FILES',
@@ -289,6 +460,49 @@ describe('asset field editing', () => {
     expect(s.assetsById.a.excluded).toBe(false)
     s = v3Reducer(s, { type: 'TOGGLE_ASSET_EXCLUDED', assetId: 'a' })
     expect(s.assetsById.a.excluded).toBe(true)
+  })
+
+  // ── C2.3 — RESOLVE_CONFLICT shape coverage for SideDetailPanel ──
+  //
+  // The ConflictResolver inside SideDetailPanel dispatches RESOLVE_CONFLICT
+  // with the chosen value (embedded or AI). Verify the handler marks the
+  // conflict as resolved-by-creator AND writes the value into the editable
+  // field, both in one transition (per v3-state.ts case at line 546).
+
+  it('RESOLVE_CONFLICT marks conflict resolved AND writes editable field', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    // Inject a conflict directly so we can exercise the resolver.
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          conflicts: [
+            {
+              field: 'title',
+              embeddedValue: 'IPTC headline',
+              aiValue: 'AI suggested title',
+              aiConfidence: 0.85,
+              resolvedBy: null,
+              resolvedValue: null,
+            },
+          ],
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'RESOLVE_CONFLICT',
+      assetId: 'a',
+      field: 'title',
+      value: 'IPTC headline',
+    })
+    expect(s.assetsById.a.conflicts[0].resolvedBy).toBe('creator')
+    expect(s.assetsById.a.conflicts[0].resolvedValue).toBe('IPTC headline')
+    expect(s.assetsById.a.editable.title).toBe('IPTC headline')
   })
 })
 
