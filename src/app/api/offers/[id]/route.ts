@@ -30,8 +30,15 @@ import * as z from 'zod'
 import { parseParams } from '@/lib/api/validation'
 import { requireActor } from '@/lib/auth/require-actor'
 import { getSupabaseClientForUser } from '@/lib/db/client'
+import { SYSTEM_ACTOR_HANDLE } from '@/lib/ledger/system-actor'
 import { logger } from '@/lib/logger'
-import type { OfferAssetRow, OfferBriefRow, OfferRow } from '@/lib/offer'
+import type {
+  OfferAssetRow,
+  OfferBriefRow,
+  OfferEventActorRole,
+  OfferEventViewRow,
+  OfferRow,
+} from '@/lib/offer'
 
 const ParamsSchema = z.object({ id: z.string().uuid() })
 
@@ -169,18 +176,85 @@ export async function GET(
     briefs = (briefRows ?? []) as OfferBriefRow[]
   }
 
+  // 4. Load the offer thread's ledger events. RLS restricts visibility
+  //    to parties via the `ledger_events_party_select` policy.
+  //    Returned chronological (oldest first) so the UI can render
+  //    §UI_DESIGN_GATE criterion 6 (round history / event trail)
+  //    directly and derive `lastEventActorRef` by filtering out the
+  //    system sentinel.
+  type RawEventRow = {
+    id: string
+    event_type: string
+    actor_ref: string
+    created_at: string
+    payload: unknown
+  }
+  const { data: eventRows, error: eventsErr } = await supabase
+    .from('ledger_events')
+    .select('id, event_type, actor_ref, created_at, payload')
+    .eq('thread_type', 'offer')
+    .eq('thread_id', offer.id)
+    .order('created_at', { ascending: true })
+
+  if (eventsErr) {
+    logger.error(
+      {
+        route: ROUTE,
+        actorHandle: actor.handle,
+        offerId: offer.id,
+        rawCode: eventsErr.code,
+      },
+      '[offer.get] ledger_events read error',
+    )
+    return errorResponse(500, 'INTERNAL', 'Internal server error.')
+  }
+
+  // Viewer's party role on THIS offer. RLS already enforced the
+  // party check above; this is pure routing into the role label.
+  const viewerRole: 'buyer' | 'creator' =
+    actor.authUserId === offer.buyer_id ? 'buyer' : 'creator'
+  const counterpartyRole: 'buyer' | 'creator' =
+    viewerRole === 'buyer' ? 'creator' : 'buyer'
+
+  const events: OfferEventViewRow[] = ((eventRows ?? []) as RawEventRow[]).map(
+    (row) => {
+      let actor_role: OfferEventActorRole
+      if (row.actor_ref === SYSTEM_ACTOR_HANDLE) {
+        actor_role = 'system'
+      } else if (row.actor_ref === actor.handle) {
+        actor_role = viewerRole
+      } else {
+        // Under RLS + the party guard above, the only non-system
+        // actor_ref that is NOT the viewer's handle must be the
+        // counterparty's. Any other value would indicate a policy
+        // misconfiguration and is labelled by role-inversion rather
+        // than failing the request — the event itself remains part
+        // of the audit trail.
+        actor_role = counterpartyRole
+      }
+      return {
+        id: row.id,
+        event_type: row.event_type,
+        actor_role,
+        created_at: row.created_at,
+        payload: row.payload,
+      }
+    },
+  )
+
   logger.info(
     {
       route: ROUTE,
       actorHandle: actor.handle,
       offerId: offer.id,
       targetType: offer.target_type,
+      eventCount: events.length,
     },
     '[offer.get] ok',
   )
 
   return NextResponse.json(
-    { data: { offer, assets, briefs } },
+    { data: { offer, assets, briefs, events } },
     { status: 200 },
   )
 }

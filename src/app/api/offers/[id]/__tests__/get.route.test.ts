@@ -54,6 +54,7 @@ const mockState = vi.hoisted(() => ({
   offerError: null as { code?: string; message: string } | null,
   assetRows: [] as unknown[],
   briefRows: [] as unknown[],
+  eventRows: [] as unknown[],
 }))
 
 vi.mock('@/lib/db/client', () => {
@@ -77,6 +78,8 @@ vi.mock('@/lib/db/client', () => {
             return { data: mockState.assetRows, error: null }
           if (table === 'offer_briefs')
             return { data: mockState.briefRows, error: null }
+          if (table === 'ledger_events')
+            return { data: mockState.eventRows, error: null }
           return { data: [], error: null }
         },
         maybeSingle: async () => {
@@ -155,6 +158,7 @@ beforeEach(() => {
   mockState.offerError = null
   mockState.assetRows = []
   mockState.briefRows = []
+  mockState.eventRows = []
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost:54321')
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon')
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service')
@@ -291,5 +295,72 @@ describe('GET /api/offers/[id] — read outcomes', () => {
     expect(body.data.offer.target_type).toBe('brief_pack')
     expect(body.data.briefs).toHaveLength(1)
     expect(body.data.assets).toBeNull()
+  })
+})
+
+describe('GET /api/offers/[id] — events field (Prompt 6 §UI_DESIGN_GATE crit 6)', () => {
+  beforeEach(() => {
+    vi.stubEnv('FFF_AUTH_WIRED', 'true')
+    setAuthedActor()
+  })
+
+  const COUNTERPARTY_HANDLE = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+  const SYSTEM_SENTINEL = '00000000-0000-0000-0000-000000000001'
+
+  it('returns events with actor_role resolved — buyer viewer, buyer + counterparty + system events', async () => {
+    mockState.offerRow = makeOffer({ target_type: 'asset_pack' })
+    // Chronological: (1) buyer opened, (2) creator countered, (3) system expiry-reminder.
+    mockState.eventRows = [
+      {
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1',
+        event_type: 'offer.created',
+        actor_ref: ACTOR_HANDLE, // viewer is buyer = ACTOR_HANDLE
+        created_at: '2026-04-21T00:00:00.000Z',
+        payload: { v: 1, amount: 1000 },
+      },
+      {
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2',
+        event_type: 'offer.countered',
+        actor_ref: COUNTERPARTY_HANDLE,
+        created_at: '2026-04-22T00:00:00.000Z',
+        payload: { v: 1, amount: 1200, note: 'reasonable' },
+      },
+      {
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3',
+        event_type: 'offer.expired_warning',
+        actor_ref: SYSTEM_SENTINEL,
+        created_at: '2026-04-23T00:00:00.000Z',
+        payload: { v: 1 },
+      },
+    ]
+    const res = await GET(
+      makeRequest('Bearer ok') as unknown as Parameters<typeof GET>[0],
+      ctxFor(OFFER_ID),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data.events).toHaveLength(3)
+    expect(body.data.events[0].event_type).toBe('offer.created')
+    expect(body.data.events[0].actor_role).toBe('buyer')
+    expect(body.data.events[1].actor_role).toBe('creator')
+    expect(body.data.events[2].actor_role).toBe('system')
+    // Payload passes through verbatim (consumer extracts notes by type).
+    expect(body.data.events[1].payload).toEqual({
+      v: 1,
+      amount: 1200,
+      note: 'reasonable',
+    })
+  })
+
+  it('returns empty events[] when the thread has no ledger rows (defensive shape)', async () => {
+    mockState.offerRow = makeOffer({ target_type: 'asset_pack' })
+    mockState.eventRows = []
+    const res = await GET(
+      makeRequest('Bearer ok') as unknown as Parameters<typeof GET>[0],
+      ctxFor(OFFER_ID),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data.events).toEqual([])
   })
 })
