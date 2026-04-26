@@ -1,7 +1,22 @@
 # Upload Rebuild — Session Resume Script
 
+> **STALE — superseded by `docs/SESSION-WRAP-2026-04-26.md`.**
+>
+> This doc was written 2026-04-25 covering only Phase A of the upload rebuild.
+> The 2026-04-26 session ratified Phase A, shipped Phase B backend (PRs 1.3 + 3 + 4),
+> shipped the BP/Watermark trust-language defensive pass, and composed Phase C C1 +
+> Phase E1 + Phase F1 architecture briefs. None of that progress is captured below.
+>
+> **For a fresh session, use `docs/SESSION-WRAP-2026-04-26.md` §6 RESUME PROMPT.**
+>
+> The content below is preserved for historical reference (the Phase A audit findings
+> remain accurate; just note that the "awaiting founder decision on UX direction" gate
+> is closed and most subsequent gates have also resolved).
+
+---
+
 **Last updated:** 2026-04-25
-**State:** Audit complete; awaiting founder decision on UX direction
+**State:** Audit complete; awaiting founder decision on UX direction (NOTE: this gate is now closed; see SESSION-WRAP-2026-04-26.md)
 **Audit location:** `docs/audits/UPLOAD-AUDIT-2026-04-25.md`
 **Branch context:** `feat/newsroom-phase-nr-2` (HEAD: `378eb79`) — separate concern from upload work; Phase NR-2 distributor build closed but not yet PR'd to main
 
