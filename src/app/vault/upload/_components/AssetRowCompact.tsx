@@ -24,7 +24,10 @@ interface Props {
 export default function AssetRowCompact({ asset }: Props) {
   const { state, dispatch } = useUploadContext()
   const isSelected = state.ui.selectedAssetIds.includes(asset.id)
-  const exceptions = getAssetExceptions(asset)
+  // V3 UX: drop needs_story from rendered exceptions per UX-BRIEF v3 §4.5
+  // (Story groups are opt-in in V3; the SELECTOR still emits needs_story
+  // for parity contract continuity, but the UI filters it before render).
+  const exceptions = getAssetExceptions(asset).filter(e => e.type !== 'needs_story')
   const blocking = exceptions.filter(e => e.severity === 'blocking')
   const advisory = exceptions.filter(e => e.severity === 'advisory')
   const isReady = !asset.excluded && blocking.length === 0

@@ -34,8 +34,15 @@ export default function StoryGroupAccordion({ cluster, assets }: Props) {
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState(cluster.name)
 
+  // V3 UX: drop needs_story from "ready" computation per UX-BRIEF v3 §4.5
+  // (Story groups are opt-in in V3; SELECTOR returns needs_story for parity,
+  // but V3 ready-count must not treat it as blocking).
   const readyCount = assets.filter(
-    a => !a.excluded && getAssetExceptions(a).filter(e => e.severity === 'blocking').length === 0,
+    a =>
+      !a.excluded &&
+      getAssetExceptions(a)
+        .filter(e => e.type !== 'needs_story')
+        .filter(e => e.severity === 'blocking').length === 0,
   ).length
 
   function commitRename() {
