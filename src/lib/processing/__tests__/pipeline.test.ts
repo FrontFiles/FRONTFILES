@@ -102,13 +102,28 @@ describe('processDerivative', () => {
     expect(result.profileVersion).toBe(1)
   })
 
-  it('fails watermarked_preview without draft allowance when profiles are draft', async () => {
+  it('stays pending (not failed) when watermark profile is unapproved — PR 4 policy fix', async () => {
+    // Per PR-4-PLAN.md §5: missing or unapproved profile is a policy
+    // gate, not an error. The row is reset to 'pending' so future
+    // approval re-enables on the next worker tick. The result still
+    // returns success: false (no derivative produced), but the error
+    // message is prefixed with 'stay_pending:' so callers can
+    // distinguish from real failures.
     const job = createJob(1) // watermarked_preview
 
     const result = await processDerivative(job, storage, mediaRows, false)
 
     expect(result.success).toBe(false)
+    expect(result.error).toContain('stay_pending')
     expect(result.error).toContain('not approved')
+
+    // Verify the row goes back to 'pending' (NOT 'failed') — this is
+    // the load-bearing behavior change. Real worker re-tries on the
+    // next tick once a profile is approved; reaper isn't needed here
+    // because the row is already pending, not stuck-processing.
+    const calls = (mediaRows.updateMediaRow as ReturnType<typeof vi.fn>).mock.calls
+    expect(calls[0][2].status).toBe('processing')
+    expect(calls[1][2].status).toBe('pending')
   })
 
   it('marks status as processing then ready on success', async () => {

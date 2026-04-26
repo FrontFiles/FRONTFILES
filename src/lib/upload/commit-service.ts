@@ -28,6 +28,7 @@ import sharp from 'sharp'
 import type { StorageAdapter } from '@/lib/storage'
 
 import { enqueueDerivativeRows } from '@/lib/processing/enqueue'
+import { dispatchAssetForProcessing } from '@/lib/processing/dispatcher'
 
 import {
   validateUploadBytes,
@@ -269,6 +270,23 @@ export async function commitUpload(
         }),
       )
     }
+    // PR 4 — fire-and-forget dispatch. The dispatcher resolves the
+    // asset's intrusion_level + creator name + format internally and
+    // processes the derivative pending rows asynchronously. Errors
+    // are logged but do NOT roll back the commit (the asset row is
+    // canonical; the reaper + next worker tick recover from any
+    // dispatch-time crash). Per PR-4-PLAN.md §4 dispatch hook.
+    dispatchAssetForProcessing(assetId, deps.adapter).catch(err => {
+      // eslint-disable-next-line no-console
+      console.error(
+        'commit.dispatch: dispatch_fired_failed',
+        JSON.stringify({
+          code: 'dispatch_fired_failed',
+          asset_id: assetId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      )
+    })
     return { ok: true, outcome: 'created', assetId }
   }
 
