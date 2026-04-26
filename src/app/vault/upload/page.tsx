@@ -1,33 +1,52 @@
 /**
- * Frontfiles Upload V3 — Page Surface (C2.1)
+ * Frontfiles Upload V3 — Page Surface (C2.1; dev-only fixture loader added in C2.2)
  *
  * Spec: UX-SPEC-V3.md §2 + C2.1-DIRECTIVE §3.2.
  *
- * Server component shell. Generates batch id server-side and hands it to
- * the client shell. The client shell computes V3 initial state via
- * useReducer's initializer — keeps non-serializable fields (e.g.
- * V2Asset.file: File | null) out of the server→client boundary.
+ * Server component shell. Generates batch id server-side and hands it
+ * to the client shell. Wraps in CreatorGate (preserves auth-gating).
  *
- * Wraps in CreatorGate (preserves auth-gating from the previous
- * UploadShellV2 production routing).
+ * DEV-ONLY FIXTURE LOADER (C2.2 follow-up):
+ *   In development, accepts `?scenario=<scenarioId>` query param to
+ *   hydrate a known mock scenario (e.g. archive_150_mixed). Validates
+ *   against SCENARIO_IDS; invalid IDs silently fall through to empty
+ *   batch. Production builds ignore the param entirely.
  *
- * No new feature flag at this surface — upload is on the standard
- * production path. PR 5 introduces the real `FFF_REAL_UPLOAD` cutover
- * gating for the network calls, not the page surface.
+ * Why this is dev-only: the production upload flow always starts from
+ * an empty batch (real assets come from drag-drop). The fixture loader
+ * exists for C2.2-C2.5 visual verification — see all 4 density modes,
+ * accordion behavior, filter bar, bulk ops bar in action.
  */
 
 import { CreatorGate } from '@/components/platform/CreatorGate'
 import UploadShell from './_components/UploadShell'
+import { SCENARIO_IDS, type ScenarioId } from '@/lib/upload/v2-scenario-registry'
 
 export const dynamic = 'force-dynamic'
 
-export default function UploadPage() {
-  // C2.1: empty batch with a fresh id. PR 5 wires real batch loading.
+type SearchParams = Promise<{ scenario?: string | string[] }>
+
+export default async function UploadPage({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) {
+  const params = await searchParams
   const batchId = `batch_${Date.now().toString(36)}`
+
+  // Dev-only scenario param. Production ignores it.
+  let devScenarioId: ScenarioId | null = null
+  if (process.env.NODE_ENV === 'development') {
+    const raw = typeof params.scenario === 'string' ? params.scenario : null
+    if (raw && (SCENARIO_IDS as readonly string[]).includes(raw)) {
+      devScenarioId = raw as ScenarioId
+    }
+  }
+
   return (
     <CreatorGate tool="Upload">
       <div className="flex-1 bg-white flex flex-col">
-        <UploadShell batchId={batchId} />
+        <UploadShell batchId={batchId} devScenarioId={devScenarioId} />
       </div>
     </CreatorGate>
   )

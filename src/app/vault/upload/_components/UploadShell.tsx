@@ -1,19 +1,19 @@
 /**
- * Frontfiles Upload V3 — Top-level Shell (updated by C2.2)
+ * Frontfiles Upload V3 — Top-level Shell (C2.1 base; C2.2 added live AssetList
+ * + dev-only fixture loader)
  *
  * Spec: UX-SPEC-V3.md §2 (single screen, three regions).
  *
  * C2.1 mounted the V3 reducer with placeholder regions.
- * C2.2 replaces the asset-list placeholder with the real <AssetList />
- * (which itself routes between density-mode variants and mounts
- * BulkOpsBar / FilterBar / AIProposalBanner conditionally).
+ * C2.2 replaced the asset-list placeholder with the real <AssetList />
+ * AND added a dev-only fixture loader (passes scenario fixture data
+ * through the V2 hydration path then bridges to V3).
  *
- * Other 4 region placeholders (drop zone, session defaults, side panel,
- * commit bar) remain placeholders pending C2.3–C2.5.
- *
- * SSR-safe boundary preserved: takes batchId (a primitive string) from
- * the server page handler; computes V3State client-side via useReducer's
- * initializer.
+ * SSR-safe boundary preserved: takes batchId (a primitive string) +
+ * devScenarioId (a primitive string or null) from the server page handler.
+ * V3State is computed client-side via useReducer's initializer, so
+ * non-serializable fields (V2Asset.file: File | null) never cross the
+ * server→client boundary.
  *
  * Mobile-aware design discipline (per IP-3 nuance): regions use min-w-0
  * on flex children, no fixed pixel widths, no hover-only interactions.
@@ -24,15 +24,22 @@
 import { useReducer } from 'react'
 import { v3Reducer, v3InitialState } from '@/lib/upload/v3-state'
 import { densityForCount } from '@/lib/upload/v3-types'
+import { hydrateV3FromV2State } from '@/lib/upload/v3-hydration'
+import { hydrateFromScenario } from '@/lib/upload/v2-hydration'
+import { SCENARIOS } from '@/lib/upload/v2-mock-scenarios'
+import type { ScenarioId } from '@/lib/upload/v2-scenario-registry'
+import type { V3State } from '@/lib/upload/v3-types'
 import { UploadContextProvider } from './UploadContext'
 import AssetList from './AssetList'
 
 interface Props {
   batchId: string
+  /** Dev-only scenario fixture id; null in production or when no ?scenario= param. */
+  devScenarioId: ScenarioId | null
 }
 
-export default function UploadShell({ batchId }: Props) {
-  const [state, dispatch] = useReducer(v3Reducer, batchId, v3InitialState)
+export default function UploadShell({ batchId, devScenarioId }: Props) {
+  const [state, dispatch] = useReducer(v3Reducer, { batchId, devScenarioId }, computeInitialState)
   const density = densityForCount(state.assetOrder.length)
 
   return (
@@ -43,6 +50,11 @@ export default function UploadShell({ batchId }: Props) {
           <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
             Drop zone — placeholder for C2.2 (currently {density} mode,{' '}
             {state.assetOrder.length} files)
+            {devScenarioId && (
+              <span className="ml-3 text-blue-600">
+                · dev fixture loaded: {devScenarioId}
+              </span>
+            )}
           </div>
         </div>
 
@@ -81,4 +93,28 @@ export default function UploadShell({ batchId }: Props) {
       </div>
     </UploadContextProvider>
   )
+}
+
+/**
+ * useReducer initializer. Computed client-side (no SSR serialization
+ * concerns). If devScenarioId is set, hydrate from the fixture via the
+ * V2 hydration path and bridge to V3. Otherwise return an empty batch.
+ */
+function computeInitialState({
+  batchId,
+  devScenarioId,
+}: {
+  batchId: string
+  devScenarioId: ScenarioId | null
+}): V3State {
+  if (devScenarioId) {
+    const scenario = SCENARIOS[devScenarioId]
+    if (scenario) {
+      // Hydrate at 'review-ready' target — all analysis complete, no
+      // story group assignments yet (analysis proposes; creator assigns).
+      const v2State = hydrateFromScenario(scenario, 'review-ready')
+      return hydrateV3FromV2State(v2State)
+    }
+  }
+  return v3InitialState(batchId)
 }
