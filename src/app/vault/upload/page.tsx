@@ -24,7 +24,10 @@ import { SCENARIO_IDS, type ScenarioId } from '@/lib/upload/v2-scenario-registry
 
 export const dynamic = 'force-dynamic'
 
-type SearchParams = Promise<{ scenario?: string | string[] }>
+type SearchParams = Promise<{
+  scenario?: string | string[]
+  simulateFailure?: string | string[]
+}>
 
 export default async function UploadPage({
   searchParams,
@@ -43,10 +46,26 @@ export default async function UploadPage({
     }
   }
 
+  // Dev-only commit-failure injection per C2.4 IPIV-5. Honored only when
+  // NODE_ENV === 'development' AND the param parses to a positive integer.
+  // Used for visual QA of CommitErrorPanel without a real network failure.
+  let devSimulateFailure: number | null = null
+  if (process.env.NODE_ENV === 'development') {
+    const raw = typeof params.simulateFailure === 'string' ? params.simulateFailure : null
+    if (raw) {
+      const n = parseInt(raw, 10)
+      if (Number.isFinite(n) && n > 0) devSimulateFailure = n
+    }
+  }
+
   return (
     <CreatorGate tool="Upload">
       <div className="flex-1 bg-white flex flex-col">
-        <UploadShell batchId={batchId} devScenarioId={devScenarioId} />
+        <UploadShell
+          batchId={batchId}
+          devScenarioId={devScenarioId}
+          devSimulateFailure={devSimulateFailure}
+        />
       </div>
     </CreatorGate>
   )

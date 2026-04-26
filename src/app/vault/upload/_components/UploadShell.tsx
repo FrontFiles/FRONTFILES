@@ -32,16 +32,31 @@ import type { V3State } from '@/lib/upload/v3-types'
 import { UploadContextProvider } from './UploadContext'
 import AssetList from './AssetList'
 import SideDetailPanel from './SideDetailPanel'
+import CommitBar from './CommitBar'
+import CommitSuccessPanel from './CommitSuccessPanel'
 
 interface Props {
   batchId: string
   /** Dev-only scenario fixture id; null in production or when no ?scenario= param. */
   devScenarioId: ScenarioId | null
+  /** Dev-only commit-failure injection (per C2.4 IPIV-5). null in production. */
+  devSimulateFailure: number | null
 }
 
-export default function UploadShell({ batchId, devScenarioId }: Props) {
+export default function UploadShell({ batchId, devScenarioId, devSimulateFailure }: Props) {
   const [state, dispatch] = useReducer(v3Reducer, { batchId, devScenarioId }, computeInitialState)
   const density = densityForCount(state.assetOrder.length)
+
+  // Per C2.4 L6 + IPIV-2: success phase replaces the entire screen body.
+  // Drop zone, session defaults, asset list, side panel, commit bar all
+  // hide. CommitSuccessPanel takes over.
+  if (state.commit.phase === 'success') {
+    return (
+      <UploadContextProvider state={state} dispatch={dispatch}>
+        <CommitSuccessPanel />
+      </UploadContextProvider>
+    )
+  }
 
   return (
     <UploadContextProvider state={state} dispatch={dispatch}>
@@ -88,15 +103,17 @@ export default function UploadShell({ batchId, devScenarioId }: Props) {
           <SideDetailPanel />
         </div>
 
-        {/* Region 3 (bottom, sticky) — commit bar */}
-        <div
-          data-region="commit-bar"
-          className="border-t border-black px-6 py-3 sticky bottom-0 bg-white min-w-0"
-        >
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Commit bar — placeholder for C2.4 (phase: {state.commit.phase}, batch: {batchId})
-          </div>
-        </div>
+        {/* Region 3 (bottom, sticky) — commit bar (LIVE per C2.4).
+         *
+         * Per UX-SPEC-V3 §11 + C2-PLAN §9: CommitBar orchestrates four
+         * visible phases (idle / summary / committing / partial-failure).
+         * The fifth phase ('success') is handled by the top-level branch
+         * above (renders CommitSuccessPanel as full screen body per L6).
+         *
+         * useCommitSimulation hook (mounted inside CommitBar) drives the
+         * fake committing → success/partial-failure transition. Real
+         * network is PR 5. */}
+        <CommitBar simulateFailure={devSimulateFailure} />
       </div>
     </UploadContextProvider>
   )

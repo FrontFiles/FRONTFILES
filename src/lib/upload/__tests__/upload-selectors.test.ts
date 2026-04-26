@@ -12,7 +12,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   getFilteredSortedSearchedAssets,
+  getCommitBarSummaryText,
   type FilterableView,
+  type PublishReadinessResult,
 } from '../upload-selectors'
 import type { V2Asset } from '../v2-types'
 
@@ -189,5 +191,90 @@ describe('getFilteredSortedSearchedAssets', () => {
     const view = buildView(assets, { filter: { ...buildView(assets).filter, format: 'video' } })
     const result = getFilteredSortedSearchedAssets(view)
     expect(result.map(a => a.id)).toEqual(['v1'])
+  })
+})
+
+// ── C2.4 — getCommitBarSummaryText ───────────────────────────────────
+//
+// Per UX-SPEC-V3 §10.2 mapping table. Five cases, one per row of the
+// table. The selector takes a PublishReadinessResult; we construct one
+// inline (pure function — no need to walk assets to test the mapping).
+//
+// Precedence order (highest first):
+//   1. blockedCount === 0          → ''
+//   2. >50% of included blocked    → 'Most assets need attention'
+//   3. single blocker type         → '{N} {needs|need} {label}'
+//   4. multiple blocker types      → '{blockedCount} issues to resolve'
+
+function buildReadiness(overrides: Partial<PublishReadinessResult>): PublishReadinessResult {
+  return {
+    ready: true,
+    blockerSummary: [],
+    readyCount: 0,
+    blockedCount: 0,
+    advisoryCount: 0,
+    excludedCount: 0,
+    blockerCounts: {},
+    includedCount: 0,
+    ...overrides,
+  }
+}
+
+describe('getCommitBarSummaryText', () => {
+  it('returns empty string when blockedCount is zero (all ready)', () => {
+    const r = buildReadiness({ readyCount: 5, blockedCount: 0, includedCount: 5 })
+    expect(getCommitBarSummaryText(r)).toBe('')
+  })
+
+  it('returns singular "needs" for one asset blocked by one type', () => {
+    const r = buildReadiness({
+      readyCount: 4,
+      blockedCount: 1,
+      includedCount: 5,
+      blockerCounts: { needs_price: 1 },
+    })
+    expect(getCommitBarSummaryText(r)).toBe('1 needs price set')
+  })
+
+  it('returns plural "need" for multiple assets blocked by one type', () => {
+    const r = buildReadiness({
+      readyCount: 7,
+      blockedCount: 3,
+      includedCount: 10,
+      blockerCounts: { needs_price: 3 },
+    })
+    expect(getCommitBarSummaryText(r)).toBe('3 need price set')
+  })
+
+  it('returns "{N} issues to resolve" for multiple blocker types', () => {
+    const r = buildReadiness({
+      readyCount: 5,
+      blockedCount: 5,
+      includedCount: 10,
+      blockerCounts: { needs_price: 2, needs_privacy: 3 },
+    })
+    expect(getCommitBarSummaryText(r)).toBe('5 issues to resolve')
+  })
+
+  it('returns "Most assets need attention" when >50% of included are blocked', () => {
+    const r = buildReadiness({
+      readyCount: 4,
+      blockedCount: 6, // 60% of 10
+      includedCount: 10,
+      blockerCounts: { needs_price: 4, needs_privacy: 2 },
+    })
+    expect(getCommitBarSummaryText(r)).toBe('Most assets need attention')
+  })
+
+  it('critical override takes precedence over single-type pattern', () => {
+    // 9 of 10 blocked by ONE type — would otherwise return "9 need price set",
+    // but >50% kicks in first.
+    const r = buildReadiness({
+      readyCount: 1,
+      blockedCount: 9,
+      includedCount: 10,
+      blockerCounts: { needs_price: 9 },
+    })
+    expect(getCommitBarSummaryText(r)).toBe('Most assets need attention')
   })
 })

@@ -33,11 +33,18 @@ interface Props {
 }
 
 export default function AssetRow({ asset }: Props) {
-  const { dispatch } = useUploadContext()
+  const { state, dispatch } = useUploadContext()
 
   function update<K extends keyof AssetEditableFields>(field: K, value: AssetEditableFields[K]) {
     dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field, value })
   }
+
+  // Per C2.4 IPIV-10: render-side read of state.commit.failed for the
+  // transient "Commit failed" chip. No new exception type added.
+  const commitFailure =
+    state.commit.phase === 'partial-failure'
+      ? state.commit.failed.find(f => f.assetId === asset.id) ?? null
+      : null
 
   function acceptCaption() {
     if (!asset.proposal?.description) return
@@ -69,10 +76,20 @@ export default function AssetRow({ asset }: Props) {
 
       {/* Body */}
       <div className="flex-1 min-w-0">
-        {/* Filename + exclude */}
+        {/* Filename + exclude + (optional) commit-failed chip */}
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate">
-            {asset.filename}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate">
+              {asset.filename}
+            </div>
+            {commitFailure && (
+              <span
+                className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 bg-red-600 text-white flex-shrink-0"
+                title={commitFailure.error}
+              >
+                Commit failed
+              </span>
+            )}
           </div>
           <button
             type="button"

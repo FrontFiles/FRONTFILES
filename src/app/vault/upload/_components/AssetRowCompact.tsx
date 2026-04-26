@@ -33,6 +33,14 @@ export default function AssetRowCompact({ asset }: Props) {
   const isReady = !asset.excluded && blocking.length === 0
   const hasCaptionGhost = !asset.editable.description && !!asset.proposal?.description
 
+  // Per C2.4 IPIV-10: render a red "Commit failed" chip when this asset
+  // is in state.commit.failed AND the commit phase is partial-failure.
+  // No new exception type — render-side read of the transient commit slice.
+  const commitFailure =
+    state.commit.phase === 'partial-failure'
+      ? state.commit.failed.find(f => f.assetId === asset.id) ?? null
+      : null
+
   return (
     <div
       className={`flex items-stretch border border-black bg-white min-w-0 ${asset.excluded ? 'opacity-40' : ''} ${isSelected ? 'border-l-[4px] border-l-blue-600' : ''}`}
@@ -88,12 +96,13 @@ export default function AssetRowCompact({ asset }: Props) {
 
         {/* Status chips */}
         <div className="flex gap-1 flex-shrink-0">
-          {isReady && <Chip label="Ready" tone="ready" />}
-          {blocking.slice(0, 3).map((e, i) => (
+          {commitFailure && <Chip label="Commit failed" tone="failed" title={commitFailure.error} />}
+          {!commitFailure && isReady && <Chip label="Ready" tone="ready" />}
+          {!commitFailure && blocking.slice(0, 3).map((e, i) => (
             <Chip key={i} label={chipLabelFor(e)} tone="blocking" />
           ))}
-          {blocking.length > 3 && <Chip label={`+${blocking.length - 3}`} tone="blocking" />}
-          {blocking.length === 0 && advisory.slice(0, 2).map((e, i) => (
+          {!commitFailure && blocking.length > 3 && <Chip label={`+${blocking.length - 3}`} tone="blocking" />}
+          {!commitFailure && blocking.length === 0 && advisory.slice(0, 2).map((e, i) => (
             <Chip key={i} label={chipLabelFor(e)} tone="advisory" />
           ))}
         </div>
@@ -127,15 +136,28 @@ function chipLabelFor(e: V2Exception): string {
   }
 }
 
-function Chip({ label, tone }: { label: string; tone: 'ready' | 'blocking' | 'advisory' }) {
+function Chip({
+  label,
+  tone,
+  title,
+}: {
+  label: string
+  tone: 'ready' | 'blocking' | 'advisory' | 'failed'
+  title?: string
+}) {
   const cls =
     tone === 'ready'
       ? 'bg-green-200 text-green-900'
       : tone === 'blocking'
         ? 'bg-yellow-300 text-black'
-        : 'bg-slate-200 text-slate-700'
+        : tone === 'failed'
+          ? 'bg-red-600 text-white'
+          : 'bg-slate-200 text-slate-700'
   return (
-    <span className={`text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 ${cls}`}>
+    <span
+      className={`text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 ${cls}`}
+      title={title}
+    >
       {label}
     </span>
   )

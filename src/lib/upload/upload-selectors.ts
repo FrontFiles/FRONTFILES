@@ -28,6 +28,7 @@ import type {
   StoryGroupKind,
   CommitOutcome,
   AssetFormat,
+  ExceptionType,
 } from './v2-types'
 import { TRANSACTABLE_STATES } from './types'
 import { isListablePrivacy } from '@/lib/asset/visibility'
@@ -161,6 +162,15 @@ export interface PublishReadinessResult {
   blockedCount: number
   advisoryCount: number
   excludedCount: number
+  /**
+   * Per-blocker-type counts (e.g. `{ needs_price: 3, needs_privacy: 2 }`).
+   * Used by getCommitBarSummaryText (per UX-SPEC-V3 §10.2) to distinguish
+   * one-type / multiple-types / critical (>50%) cases. Added at C2.4 —
+   * backwards-compatible (existing consumers ignore the new field).
+   */
+  blockerCounts: Partial<Record<ExceptionType, number>>
+  /** readyCount + blockedCount. Excludes excluded assets. Added at C2.4. */
+  includedCount: number
 }
 
 export function getPublishReadiness(view: AssetsView): PublishReadinessResult {
@@ -201,7 +211,117 @@ export function getPublishReadiness(view: AssetsView): PublishReadinessResult {
     blockedCount,
     advisoryCount,
     excludedCount,
+    blockerCounts: blockerCounts as Partial<Record<ExceptionType, number>>,
+    includedCount: included.length,
   }
+}
+
+/**
+ * V3 publish readiness — per UX-BRIEF v3 §4.5 + C2-PLAN §3.2 parity exception.
+ *
+ * Story groups are opt-in in V3, so `needs_story` is dropped from the
+ * blocking math here. The chip render layer (Phase 7e) already filters
+ * needs_story at the consumer; this selector finishes the alignment for
+ * commit-bar CTA math + plain-language summary.
+ *
+ * Implementation: walks getIncludedAssets, filters needs_story out of
+ * exceptions before the blocking check. Mirrors getPublishReadiness
+ * otherwise.
+ *
+ * V2 path keeps the unmodified getPublishReadiness above (parity contract).
+ */
+export function getV3PublishReadiness(view: AssetsView): PublishReadinessResult {
+  const included = getIncludedAssets(view)
+  let readyCount = 0
+  let blockedCount = 0
+  const blockerCounts: Record<string, number> = {}
+
+  for (const asset of included) {
+    const exceptions = getAssetExceptions(asset).filter(e => e.type !== 'needs_story')
+    const blocking = exceptions.filter(e => e.severity === 'blocking')
+    if (blocking.length > 0) {
+      blockedCount++
+      for (const b of blocking) {
+        blockerCounts[b.type] = (blockerCounts[b.type] || 0) + 1
+      }
+    } else {
+      readyCount++
+    }
+  }
+
+  const advisoryCount = getAdvisoryExceptions(view).length
+  const excludedCount = getAssets(view).filter(a => a.excluded).length
+
+  const blockerSummary: string[] = []
+  if (blockerCounts['needs_privacy']) blockerSummary.push(`${blockerCounts['needs_privacy']} asset${blockerCounts['needs_privacy'] > 1 ? 's' : ''} need privacy setting`)
+  if (blockerCounts['needs_price']) blockerSummary.push(`${blockerCounts['needs_price']} asset${blockerCounts['needs_price'] > 1 ? 's' : ''} need pricing`)
+  if (blockerCounts['needs_licences']) blockerSummary.push(`${blockerCounts['needs_licences']} asset${blockerCounts['needs_licences'] > 1 ? 's' : ''} need licence selection`)
+  if (blockerCounts['manifest_invalid']) blockerSummary.push(`${blockerCounts['manifest_invalid']} asset${blockerCounts['manifest_invalid'] > 1 ? 's have' : ' has'} invalid declaration`)
+  if (blockerCounts['unresolved_conflict']) blockerSummary.push(`${blockerCounts['unresolved_conflict']} asset${blockerCounts['unresolved_conflict'] > 1 ? 's have' : ' has'} unresolved metadata conflicts`)
+
+  return {
+    ready: readyCount > 0,
+    blockerSummary,
+    readyCount,
+    blockedCount,
+    advisoryCount,
+    excludedCount,
+    blockerCounts: blockerCounts as Partial<Record<ExceptionType, number>>,
+    includedCount: included.length,
+  }
+}
+
+/**
+ * Commit-bar plain-language summary text per UX-SPEC-V3 §10.2.
+ *
+ * Mapping (in order of precedence):
+ *   blockedCount === 0                  → ''                              (no text — just CTA)
+ *   blockedCount > 50% of included      → 'Most assets need attention'    (critical override)
+ *   single blocker type, count = 1      → '1 needs <label>'
+ *   single blocker type, count > 1      → 'N need <label>'
+ *   multiple blocker types              → '{blockedCount} issues to resolve'
+ *
+ * Note: blockedCount counts unique blocked ASSETS. Multiple blockers on
+ * one asset still count as 1 blocked asset. Sum of blockerCounts values
+ * may exceed blockedCount when assets have multiple blockers each — use
+ * blockedCount in the multiple-types case to match §10.2's "5 issues to
+ * resolve" wording where "issues" = blocked-asset count.
+ */
+export function getCommitBarSummaryText(readiness: PublishReadinessResult): string {
+  const { blockedCount, includedCount, blockerCounts } = readiness
+
+  if (blockedCount === 0) return ''
+
+  // Critical: >50% of included assets are blocked
+  if (includedCount > 0 && blockedCount / includedCount > 0.5) {
+    return 'Most assets need attention'
+  }
+
+  const types = Object.keys(blockerCounts) as ExceptionType[]
+  if (types.length === 1) {
+    const type = types[0]
+    const count = blockerCounts[type] ?? 0
+    const label = COMMIT_BAR_BLOCKER_LABEL[type] ?? type
+    const verb = count === 1 ? 'needs' : 'need'
+    return `${count} ${verb} ${label}`
+  }
+
+  // Multiple types
+  return `${blockedCount} issues to resolve`
+}
+
+/**
+ * User-facing labels for blocker types in the commit-bar one-type
+ * summary text. Verb conjugation ('needs' vs 'need') is applied by
+ * getCommitBarSummaryText. Per spec §10.2 example: "1 needs price set" /
+ * "3 need price set".
+ */
+const COMMIT_BAR_BLOCKER_LABEL: Partial<Record<ExceptionType, string>> = {
+  needs_price: 'price set',
+  needs_privacy: 'privacy set',
+  needs_licences: 'licences set',
+  manifest_invalid: 'a valid declaration',
+  unresolved_conflict: 'metadata conflict resolved',
 }
 
 // ── Story Coverage Summary ──
