@@ -41,6 +41,7 @@ import type { V3State } from '@/lib/upload/v3-types'
 import { UploadContextProvider } from '../_components/UploadContext'
 import EmptyState from './EmptyState'
 import CenterPane from './CenterPane'
+import RightRailInspector from './RightRailInspector'
 
 interface Props {
   batchId: string
@@ -129,25 +130,26 @@ export default function UploadShellV4({
             )}
           </div>
 
-          {/* Right rail — placeholder for D2.4. Per UX-SPEC-V4 §5.1 + IPV4-1:
+          {/* Right rail — LIVE per D2.4 (RightRailInspector inside).
            *
-           * Mounts only when selectedAssetIds.length === 1. Multi-select
-           * (length > 1) → contextual action bar appears (D2.5) instead.
-           * Empty (length === 0) → no rail.
+           * Mount conditions per L1 + IPD4-12:
+           *   - selectedAssetIds.length === 1 (single-asset focus mode)
+           *   - commit.phase ∈ {idle, summary} (rail suppressed during
+           *     committing / success / partial-failure — editing during
+           *     commit is meaningless)
+           *
+           * Multi-select (length > 1) → contextual action bar (D2.5).
+           * No selection → no rail.
            */}
-          {state.ui.selectedAssetIds.length === 1 && (
-            <div
-              data-region="right-rail"
-              className="w-[400px] flex-shrink-0 border-l border-black bg-white p-4"
-            >
-              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                Right rail — placeholder for D2.4
+          {state.ui.selectedAssetIds.length === 1 &&
+            (state.commit.phase === 'idle' || state.commit.phase === 'summary') && (
+              <div
+                data-region="right-rail"
+                className="w-[400px] flex-shrink-0 border-l border-black bg-white"
+              >
+                <RightRailInspector />
               </div>
-              <div className="text-[10px] uppercase tracking-widest text-slate-400 mt-2">
-                asset: {state.ui.selectedAssetIds[0]}
-              </div>
-            </div>
-          )}
+            )}
         </div>
 
         {/* Commit bar slot — placeholder for the D-phase that re-mounts CommitBar.
