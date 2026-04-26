@@ -110,9 +110,17 @@ function computeInitialState({
   if (devScenarioId) {
     const scenario = SCENARIOS[devScenarioId]
     if (scenario) {
-      // Hydrate at 'review-ready' target — all analysis complete, no
-      // story group assignments yet (analysis proposes; creator assigns).
-      const v2State = hydrateFromScenario(scenario, 'review-ready')
+      // Hydrate at 'review-assigned' target — analysis complete AND
+      // assets pre-assigned to their proposed story groups (skips the
+      // creator Accept-All flow).
+      //
+      // Trade-off: less faithful to the actual creator flow (in real
+      // life, the user sees AI cluster proposal banners and explicitly
+      // accepts). The dev loader uses 'review-assigned' so cluster
+      // accordions populate and the full Archive density mode UX is
+      // visually inspectable. Production code never takes this path
+      // (gated by devScenarioId being null in non-dev builds).
+      const v2State = hydrateFromScenario(scenario, 'review-assigned')
       return hydrateV3FromV2State(v2State)
     }
   }
