@@ -29,6 +29,7 @@ import { isRealUploadEnabled } from '@/lib/flags'
 import { getStorageAdapter } from '@/lib/storage'
 
 import { commitUpload } from '@/lib/upload/commit-service'
+import { findBatchForUpload } from '@/lib/upload/batch-store'
 
 // UUID v4 loose match — 36 chars, 8-4-4-4-12 with hex groups.
 // We allow any version digit because the contract is "UUID" not
@@ -63,6 +64,42 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       { code: 'bad_token', detail: 'X-Upload-Token must be a UUID' },
       { status: 400 },
+    )
+  }
+
+  // 3.5 Batch header parse + validate (PR 1.3).
+  //     Required header. UUID-shaped. Batch must exist, belong to
+  //     this creator, and be in 'open' state. Failures map to
+  //     400 / 404 / 403 / 409 / 500 distinct from the existing
+  //     PR 2 failure codes. See PR-1.3-PLAN.md §4.3.
+  const batchId = req.headers.get('x-batch-id') ?? ''
+  if (!batchId || batchId.length > TOKEN_MAX_LEN || !UUID_RE.test(batchId)) {
+    return NextResponse.json(
+      { code: 'batch_id_required', detail: 'X-Batch-Id must be a UUID' },
+      { status: 400 },
+    )
+  }
+  const batchLookup = await findBatchForUpload(batchId, creatorId)
+  if (batchLookup.kind === 'not_found') {
+    return NextResponse.json({ code: 'batch_not_found' }, { status: 404 })
+  }
+  if (batchLookup.kind === 'forbidden') {
+    return NextResponse.json({ code: 'forbidden' }, { status: 403 })
+  }
+  if (batchLookup.kind === 'invalid_state') {
+    return NextResponse.json(
+      {
+        code: 'invalid_batch_state',
+        current_state: batchLookup.currentState,
+        detail: `batch is in '${batchLookup.currentState}' state, expected 'open'`,
+      },
+      { status: 409 },
+    )
+  }
+  if (batchLookup.kind === 'other') {
+    return NextResponse.json(
+      { code: 'persistence_failed', detail: batchLookup.error },
+      { status: 500 },
     )
   }
 
@@ -101,6 +138,54 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // 4.5 PR 1.3 — parse the 5 new optional fields. All NULL-tolerant
+  //     in PR 1.3 per the plan §10 IP-1; tightened to required after
+  //     Phase E AI suggestion pipeline ships. JSON fields are
+  //     parsed (and validated as JSON); enum + UUID fields are
+  //     passed through to the DB which enforces shape via the enum
+  //     type, FK constraint, and the duplicate_consistency CHECK.
+  let proposalSnapshot: unknown = null
+  let extractedMetadata: unknown = null
+  let metadataSource: unknown = null
+  for (const [field, target] of [
+    ['proposal_snapshot', 'proposalSnapshot'],
+    ['extracted_metadata', 'extractedMetadata'],
+    ['metadata_source', 'metadataSource'],
+  ] as const) {
+    const raw = form.get(field)
+    if (typeof raw !== 'string' || raw.length === 0) continue
+    try {
+      const parsed = JSON.parse(raw)
+      if (target === 'proposalSnapshot') proposalSnapshot = parsed
+      else if (target === 'extractedMetadata') extractedMetadata = parsed
+      else metadataSource = parsed
+    } catch (err) {
+      return NextResponse.json(
+        {
+          code: 'bad_request',
+          detail: `${field} is not valid JSON: ${toErrorMessage(err)}`,
+        },
+        { status: 400 },
+      )
+    }
+  }
+  const duplicateStatusRaw = form.get('duplicate_status')
+  const duplicateStatus =
+    typeof duplicateStatusRaw === 'string' && duplicateStatusRaw.length > 0
+      ? (duplicateStatusRaw as 'none' | 'likely_duplicate' | 'confirmed_duplicate')
+      : null
+  const duplicateOfIdRaw = form.get('duplicate_of_id')
+  let duplicateOfId: string | null = null
+  if (typeof duplicateOfIdRaw === 'string' && duplicateOfIdRaw.length > 0) {
+    if (!UUID_RE.test(duplicateOfIdRaw)) {
+      return NextResponse.json(
+        { code: 'bad_request', detail: 'duplicate_of_id must be a UUID' },
+        { status: 400 },
+      )
+    }
+    duplicateOfId = duplicateOfIdRaw
+  }
+
   const filename =
     file instanceof File && typeof file.name === 'string'
       ? file.name
@@ -111,7 +196,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   //    service via validateUploadBytes.
   const bytes = Buffer.from(await file.arrayBuffer())
 
-  // 6. Commit.
+  // 6. Commit. PR 1.3 threads batchId + 5 new fields through to
+  //    the 21-arg upload_commit RPC. NULL-tolerant per IP-1.
   const adapter = getStorageAdapter()
   const result = await commitUpload(
     {
@@ -121,6 +207,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       claimedMime: file.type || 'application/octet-stream',
       bytes,
       metadata,
+      batchId,
+      proposalSnapshot,
+      extractedMetadata,
+      metadataSource,
+      duplicateStatus,
+      duplicateOfId,
     },
     { adapter },
   )

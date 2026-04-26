@@ -47,6 +47,36 @@ export interface CommitUploadRequest {
   bytes: Buffer
   /** Arbitrary client metadata — checksummed, not persisted verbatim. */
   metadata: unknown
+  // ── PR 1.3 — batch-aware commit ──
+  /**
+   * FK to upload_batches(id). Required after PR 1.3.
+   * The route validates it exists, belongs to the creator, and
+   * is in 'open' state before constructing this request.
+   */
+  batchId: string
+  /**
+   * jsonb mirror of v2-types.ts AssetProposal (snake_case).
+   * NULL-tolerant in PR 1.3; tightened to required after Phase E
+   * AI suggestion pipeline ships.
+   */
+  proposalSnapshot?: unknown | null
+  /**
+   * jsonb mirror of v2-types.ts ExtractedMetadata (snake_case, flat).
+   * NULL-tolerant in PR 1.3; tightened to required after Phase E.
+   */
+  extractedMetadata?: unknown | null
+  /**
+   * jsonb partial map { <editable_field_snake_case>: <MetadataSource> }.
+   * NULL-tolerant in PR 1.3.
+   */
+  metadataSource?: unknown | null
+  /** Duplicate detection state. NULL = not analysed. */
+  duplicateStatus?: 'none' | 'likely_duplicate' | 'confirmed_duplicate' | null
+  /**
+   * FK to vault_assets(id). Required by DB CHECK when
+   * duplicateStatus = 'confirmed_duplicate'; NULL otherwise.
+   */
+  duplicateOfId?: string | null
 }
 
 export type CommitUploadResult = CommitUploadOk | CommitUploadFailure
@@ -188,8 +218,10 @@ export async function commitUpload(
     }
   }
 
-  // 6. Atomic two-row insert via upload_commit RPC (or the
-  //    in-memory mock store in non-Supabase environments).
+  // 6. Atomic two-row insert via 21-arg upload_commit RPC (or
+  //    the in-memory mock store in non-Supabase environments).
+  //    PR 1.3 added the 6 new fields below; the 15 PR 2 fields
+  //    are unchanged. Idempotency contract preserved exactly.
   const input: InsertDraftAndOriginalInput = {
     assetId,
     creatorId: req.creatorId,
@@ -206,6 +238,13 @@ export async function commitUpload(
     width,
     height,
     originalSha256,
+    // PR 1.3 batch-aware fields — coalesce optional inputs to null
+    batchId: req.batchId,
+    proposalSnapshot: req.proposalSnapshot ?? null,
+    extractedMetadata: req.extractedMetadata ?? null,
+    metadataSource: req.metadataSource ?? null,
+    duplicateStatus: req.duplicateStatus ?? null,
+    duplicateOfId: req.duplicateOfId ?? null,
   }
 
   const outcome = await insertDraftAndOriginal(input)

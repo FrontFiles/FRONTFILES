@@ -5,6 +5,7 @@ import * as path from 'node:path'
 
 import { POST } from '../route'
 import { __testing as storeTesting } from '@/lib/upload/upload-store'
+import { __testing as batchTesting, type BatchRow } from '@/lib/upload/batch-store'
 import { scopeEnvVars } from '@/lib/test/env-scope'
 
 // Force mock mode: unset the 3 Supabase env vars so Pattern-a's
@@ -59,8 +60,31 @@ function buildForm(bytes: Buffer, filename: string, mime: string, metadata: unkn
 
 let tmpRoot: string
 
+// PR 1.3 — default batch fixture. Tests that exercise the route
+// past the batch-validation block must seed this (or a custom
+// alternative) before invoking POST. ID is a fixed UUID so tests
+// can pass it as the X-Batch-Id header without per-test wiring.
+const DEFAULT_BATCH_ID = '99999999-1111-4222-8333-444444444444'
+
+function seedDefaultBatch(creatorId = 'creator-1'): BatchRow {
+  const now = new Date().toISOString()
+  const batch: BatchRow = {
+    id: DEFAULT_BATCH_ID,
+    creatorId,
+    state: 'open',
+    newsroomMode: false,
+    createdAt: now,
+    updatedAt: now,
+    committedAt: null,
+    cancelledAt: null,
+  }
+  batchTesting.seed(batch)
+  return batch
+}
+
 beforeEach(async () => {
   storeTesting.reset()
+  batchTesting.reset()
   tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ff-route-'))
 })
 
@@ -137,6 +161,7 @@ describe('POST /api/upload — happy path (fs adapter, mock store)', () => {
     await withEnv(
       { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
       async () => {
+        seedDefaultBatch()
         // sharp would fail to decode the 9-byte header, so this
         // test is expected to 415 on decode. The purpose here is
         // to verify the route plumbing — validation + adapter +
@@ -148,6 +173,7 @@ describe('POST /api/upload — happy path (fs adapter, mock store)', () => {
           headers: {
             'x-creator-id': 'creator-1',
             'x-upload-token': '11111111-2222-4333-8444-555555555555',
+            'x-batch-id': DEFAULT_BATCH_ID,
           },
           body: form,
         })
@@ -171,11 +197,13 @@ describe('POST /api/upload — payload rejections', () => {
     await withEnv(
       { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
       async () => {
+        seedDefaultBatch()
         const form = buildForm(JPEG, 'IMG.png', 'image/png', {})
         const req = makeRequest({
           headers: {
             'x-creator-id': 'creator-1',
             'x-upload-token': '22222222-3333-4444-8555-666666666666',
+            'x-batch-id': DEFAULT_BATCH_ID,
           },
           body: form,
         })
@@ -192,11 +220,13 @@ describe('POST /api/upload — payload rejections', () => {
     await withEnv(
       { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
       async () => {
+        seedDefaultBatch()
         const form = buildForm(JPEG, 'IMG.gif', 'image/gif', {})
         const req = makeRequest({
           headers: {
             'x-creator-id': 'creator-1',
             'x-upload-token': '33333333-4444-4555-8666-777777777777',
+            'x-batch-id': DEFAULT_BATCH_ID,
           },
           body: form,
         })
@@ -204,6 +234,198 @@ describe('POST /api/upload — payload rejections', () => {
         expect(res.status).toBe(415)
         const body = await res.json()
         expect(body.validation_code).toBe('mime_not_allowed')
+      },
+    )
+  })
+})
+
+// ════════════════════════════════════════════════════════════════
+// PR 1.3 — X-Batch-Id contract tests
+// ════════════════════════════════════════════════════════════════
+
+describe('POST /api/upload — X-Batch-Id required (PR 1.3)', () => {
+  it('returns 400 batch_id_required when X-Batch-Id is missing', async () => {
+    await withEnv(
+      { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
+      async () => {
+        const req = makeRequest({
+          headers: {
+            'x-creator-id': 'creator-1',
+            'x-upload-token': '11111111-2222-4333-8444-555555555555',
+          },
+        })
+        const res = await POST(req as unknown as Parameters<typeof POST>[0])
+        expect(res.status).toBe(400)
+        const body = await res.json()
+        expect(body.code).toBe('batch_id_required')
+      },
+    )
+  })
+
+  it('returns 400 batch_id_required when X-Batch-Id is malformed', async () => {
+    await withEnv(
+      { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
+      async () => {
+        const req = makeRequest({
+          headers: {
+            'x-creator-id': 'creator-1',
+            'x-upload-token': '11111111-2222-4333-8444-555555555555',
+            'x-batch-id': 'not-a-uuid',
+          },
+        })
+        const res = await POST(req as unknown as Parameters<typeof POST>[0])
+        expect(res.status).toBe(400)
+        const body = await res.json()
+        expect(body.code).toBe('batch_id_required')
+      },
+    )
+  })
+
+  it('returns 404 batch_not_found when X-Batch-Id references a nonexistent batch', async () => {
+    await withEnv(
+      { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
+      async () => {
+        // No batch seeded — lookup misses.
+        const req = makeRequest({
+          headers: {
+            'x-creator-id': 'creator-1',
+            'x-upload-token': '11111111-2222-4333-8444-555555555555',
+            'x-batch-id': '88888888-1111-4222-8333-555555555555',
+          },
+        })
+        const res = await POST(req as unknown as Parameters<typeof POST>[0])
+        expect(res.status).toBe(404)
+        const body = await res.json()
+        expect(body.code).toBe('batch_not_found')
+      },
+    )
+  })
+
+  it('returns 403 forbidden when batch belongs to a different creator', async () => {
+    await withEnv(
+      { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
+      async () => {
+        seedDefaultBatch('creator-OTHER')
+        const req = makeRequest({
+          headers: {
+            'x-creator-id': 'creator-1',
+            'x-upload-token': '11111111-2222-4333-8444-555555555555',
+            'x-batch-id': DEFAULT_BATCH_ID,
+          },
+        })
+        const res = await POST(req as unknown as Parameters<typeof POST>[0])
+        expect(res.status).toBe(403)
+        const body = await res.json()
+        expect(body.code).toBe('forbidden')
+      },
+    )
+  })
+
+  it('returns 409 invalid_batch_state when batch is committed', async () => {
+    await withEnv(
+      { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
+      async () => {
+        const now = new Date().toISOString()
+        batchTesting.seed({
+          id: DEFAULT_BATCH_ID,
+          creatorId: 'creator-1',
+          state: 'committed',
+          newsroomMode: false,
+          createdAt: now,
+          updatedAt: now,
+          committedAt: now,
+          cancelledAt: null,
+        })
+        const req = makeRequest({
+          headers: {
+            'x-creator-id': 'creator-1',
+            'x-upload-token': '11111111-2222-4333-8444-555555555555',
+            'x-batch-id': DEFAULT_BATCH_ID,
+          },
+        })
+        const res = await POST(req as unknown as Parameters<typeof POST>[0])
+        expect(res.status).toBe(409)
+        const body = await res.json()
+        expect(body.code).toBe('invalid_batch_state')
+        expect(body.current_state).toBe('committed')
+      },
+    )
+  })
+
+  it('returns 409 invalid_batch_state when batch is cancelled', async () => {
+    await withEnv(
+      { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
+      async () => {
+        const now = new Date().toISOString()
+        batchTesting.seed({
+          id: DEFAULT_BATCH_ID,
+          creatorId: 'creator-1',
+          state: 'cancelled',
+          newsroomMode: false,
+          createdAt: now,
+          updatedAt: now,
+          committedAt: null,
+          cancelledAt: now,
+        })
+        const req = makeRequest({
+          headers: {
+            'x-creator-id': 'creator-1',
+            'x-upload-token': '11111111-2222-4333-8444-555555555555',
+            'x-batch-id': DEFAULT_BATCH_ID,
+          },
+        })
+        const res = await POST(req as unknown as Parameters<typeof POST>[0])
+        expect(res.status).toBe(409)
+        const body = await res.json()
+        expect(body.code).toBe('invalid_batch_state')
+        expect(body.current_state).toBe('cancelled')
+      },
+    )
+  })
+
+  it('rejects malformed duplicate_of_id at the route boundary', async () => {
+    await withEnv(
+      { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
+      async () => {
+        seedDefaultBatch()
+        const form = buildForm(JPEG, 'IMG.jpeg', 'image/jpeg', {})
+        form.append('duplicate_of_id', 'not-a-uuid')
+        const req = makeRequest({
+          headers: {
+            'x-creator-id': 'creator-1',
+            'x-upload-token': '44444444-5555-4666-8777-888888888888',
+            'x-batch-id': DEFAULT_BATCH_ID,
+          },
+          body: form,
+        })
+        const res = await POST(req as unknown as Parameters<typeof POST>[0])
+        expect(res.status).toBe(400)
+        const body = await res.json()
+        expect(body.code).toBe('bad_request')
+      },
+    )
+  })
+
+  it('rejects malformed proposal_snapshot JSON', async () => {
+    await withEnv(
+      { FFF_REAL_UPLOAD: 'true', FFF_STORAGE_FS_ROOT: tmpRoot },
+      async () => {
+        seedDefaultBatch()
+        const form = buildForm(JPEG, 'IMG.jpeg', 'image/jpeg', {})
+        form.append('proposal_snapshot', '{invalid json')
+        const req = makeRequest({
+          headers: {
+            'x-creator-id': 'creator-1',
+            'x-upload-token': '55555555-6666-4777-8888-999999999999',
+            'x-batch-id': DEFAULT_BATCH_ID,
+          },
+          body: form,
+        })
+        const res = await POST(req as unknown as Parameters<typeof POST>[0])
+        expect(res.status).toBe(400)
+        const body = await res.json()
+        expect(body.code).toBe('bad_request')
+        expect(body.detail).toContain('proposal_snapshot')
       },
     )
   })

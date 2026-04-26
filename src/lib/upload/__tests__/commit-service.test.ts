@@ -87,6 +87,10 @@ function baseRequest(overrides: Partial<CommitUploadRequest> = {}): CommitUpload
     claimedMime: 'image/jpeg',
     bytes: JPEG,
     metadata: { caption: 'hello', tags: ['a', 'b'] },
+    // PR 1.3 — batch-aware commit. All optional fields default to
+    // null at the input layer; the commit-service coalesces them
+    // explicitly when constructing InsertDraftAndOriginalInput.
+    batchId: 'batch-test-1',
     ...overrides,
   }
 }
@@ -143,6 +147,7 @@ describe('commitUpload — idempotency replay', () => {
       originalSizeBytes: req.bytes.length,
       metadataChecksum: metaChecksum,
       originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
     })
 
     const result = await commitUpload(req, deps(adapter))
@@ -166,6 +171,7 @@ describe('commitUpload — idempotency replay', () => {
       originalSizeBytes: req.bytes.length,
       metadataChecksum: metaChecksum,
       originalSha256: 'different-sha-value',
+      batchId: req.batchId,
     })
 
     const result = await commitUpload(req, deps(adapter))
@@ -187,6 +193,7 @@ describe('commitUpload — idempotency replay', () => {
       originalSizeBytes: req.bytes.length + 1,
       metadataChecksum: metaChecksum,
       originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
     })
 
     const result = await commitUpload(req, deps(adapter))
@@ -206,6 +213,7 @@ describe('commitUpload — idempotency replay', () => {
       originalSizeBytes: req.bytes.length,
       metadataChecksum: 'completely-different-checksum',
       originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
     })
 
     const result = await commitUpload(req, deps(adapter))
@@ -281,6 +289,7 @@ describe('commitUpload — token race (unique violation)', () => {
       originalSizeBytes: req.bytes.length,
       metadataChecksum: sha256Hex(Buffer.from(canonicalJSONStringify(req.metadata), 'utf8')),
       originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
     }
   }
 
