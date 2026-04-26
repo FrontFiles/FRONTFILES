@@ -1,4 +1,13 @@
 /**
+ * DORMANT — replaced by D2 (ContactSheetCard in app/vault/upload/_components_v4/).
+ * Scheduled for deletion at the explicit D2.8 cutover PR.
+ * DO NOT extend.
+ *
+ * Compact mode dies at D2.1 — replaced by the contact-sheet zoom slider.
+ * As of D2.1 this file is no longer on any production path.
+ */
+
+/**
  * Frontfiles Upload V3 — Compact-mode asset row (C2.2 §3.4)
  *
  * Spec: UX-SPEC-V3.md §4.1.

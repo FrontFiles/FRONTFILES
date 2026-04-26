@@ -1,4 +1,15 @@
 /**
+ * DORMANT — replaced by D2 (RightRailInspector in app/vault/upload/_components_v4/).
+ * Scheduled for deletion at the explicit D2.8 cutover PR.
+ * DO NOT extend.
+ *
+ * Push-from-right panel dies at D2.1 — inspector becomes a persistent right
+ * rail per UX-SPEC-V4 §5. Most of the field-editor + AI proposal detail body
+ * content adapts forward into RightRailInspector at D2.4. As of D2.1 this
+ * file is no longer on any production path.
+ */
+
+/**
  * Frontfiles Upload V3 — Side Detail Panel (C2.3 §1.1)
  *
  * Spec: UX-SPEC-V3.md §7 (canonical), C2-PLAN.md §8 (scope), C2.3-DIRECTIVE.md

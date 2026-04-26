@@ -60,6 +60,10 @@ function defaultUIState(): V3UIState {
     sortDirection: 'asc',
     sessionDefaultsBarCollapsed: false,
     priceBasisOpenAssetId: null,
+    // ── D2.1 additions (per UX-SPEC-V4 §15.2) ────────────────────
+    contactSheetZoom: 3, // default middle step (per spec §3.5)
+    leftRailCollapsed: false,
+    compareAssetIds: [],
   }
 }
 
@@ -884,6 +888,86 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
 
     case 'RESET_FLOW':
       return v3InitialState(state.batch.id)
+
+    // ── D2.1 additions (per UX-SPEC-V4 + D2.1-DIRECTIVE §4.2) ──
+
+    case 'SET_STORY_COVER': {
+      const group = state.storyGroupsById[action.storyGroupId]
+      if (!group) {
+        throw new Error(
+          `set_story_cover_invalid_group: storyGroupId="${action.storyGroupId}" not in storyGroupsById`,
+        )
+      }
+      if (action.assetId !== null && !state.assetsById[action.assetId]) {
+        throw new Error(
+          `set_story_cover_invalid_asset: assetId="${action.assetId}" not in assetsById`,
+        )
+      }
+      return {
+        ...state,
+        storyGroupsById: {
+          ...state.storyGroupsById,
+          [action.storyGroupId]: { ...group, coverAssetId: action.assetId },
+        },
+      }
+    }
+
+    case 'REORDER_ASSETS_IN_STORY': {
+      const group = state.storyGroupsById[action.storyGroupId]
+      if (!group) {
+        throw new Error(
+          `reorder_assets_invalid_group: storyGroupId="${action.storyGroupId}" not in storyGroupsById`,
+        )
+      }
+      // Set-equality check: new sequence must contain exactly the same ids
+      // currently in the story (membership unchanged; only order differs).
+      const current = new Set(group.sequence ?? group.proposedAssetIds)
+      const next = new Set(action.sequence)
+      if (current.size !== next.size || [...current].some(id => !next.has(id))) {
+        throw new Error(
+          `reorder_assets_set_mismatch: new sequence membership differs from current. ` +
+            `REORDER_ASSETS_IN_STORY changes order, not membership. Use MOVE_ASSET_TO_CLUSTER ` +
+            `or MOVE_ASSET_TO_UNGROUPED to change membership.`,
+        )
+      }
+      return {
+        ...state,
+        storyGroupsById: {
+          ...state.storyGroupsById,
+          [action.storyGroupId]: { ...group, sequence: [...action.sequence] },
+        },
+      }
+    }
+
+    case 'SET_CONTACT_SHEET_ZOOM': {
+      if (action.zoom < 1 || action.zoom > 5 || !Number.isInteger(action.zoom)) {
+        throw new Error(
+          `set_contact_sheet_zoom_invalid: zoom must be an integer 1-5, got ${action.zoom}`,
+        )
+      }
+      return { ...state, ui: { ...state.ui, contactSheetZoom: action.zoom } }
+    }
+
+    case 'TOGGLE_LEFT_RAIL_COLLAPSED':
+      return { ...state, ui: { ...state.ui, leftRailCollapsed: !state.ui.leftRailCollapsed } }
+
+    case 'ENTER_COMPARE_MODE': {
+      // Per IPD1-4 default (a) + IPV4-3 default (a): strict 2-only.
+      if (action.assetIds.length !== 2) {
+        throw new Error(
+          `compare_invalid_count: ENTER_COMPARE_MODE requires exactly 2 assetIds (per IPV4-3 = a strict 2-only), got ${action.assetIds.length}`,
+        )
+      }
+      for (const id of action.assetIds) {
+        if (!state.assetsById[id]) {
+          throw new Error(`compare_invalid_asset: assetId="${id}" not in assetsById`)
+        }
+      }
+      return { ...state, ui: { ...state.ui, compareAssetIds: [...action.assetIds] } }
+    }
+
+    case 'EXIT_COMPARE_MODE':
+      return { ...state, ui: { ...state.ui, compareAssetIds: [] } }
 
     // ── Exhaustive check ────────────────────────────────────────
     default: {

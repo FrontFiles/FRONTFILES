@@ -1,4 +1,13 @@
 /**
+ * DORMANT — replaced by D2 (ContactSheetCard in app/vault/upload/_components_v4/).
+ * Scheduled for deletion at the explicit D2.8 cutover PR.
+ * DO NOT extend.
+ *
+ * Linear mode dies at D2.1 — replaced by the contact-sheet zoom slider per
+ * UX-SPEC-V4 §3.5. As of D2.1 this file is no longer on any production path.
+ */
+
+/**
  * Frontfiles Upload V3 — Linear-mode asset row (C2.2 §3.3, extended in C2.5)
  *
  * Spec: UX-SPEC-V3.md §3.1 (row anatomy) + §3.2 (AI proposal visual)

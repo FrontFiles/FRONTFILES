@@ -1,4 +1,14 @@
 /**
+ * DORMANT — replaced by D2 (ContextualActionBar in app/vault/upload/_components_v4/).
+ * Scheduled for deletion at the explicit D2.8 cutover PR.
+ * DO NOT extend.
+ *
+ * Persistent BulkOpsBar dies at D2.1 — bulk is contextual on multi-select per
+ * UX-SPEC-V4 §9 (never a permanent toolbar). As of D2.1 this file is no
+ * longer on any production path.
+ */
+
+/**
  * Frontfiles Upload V3 — Bulk Operations Bar (C2.2 §3.6)
  *
  * Spec: UX-SPEC-V3.md §4.2.

@@ -13,10 +13,12 @@ import { describe, it, expect } from 'vitest'
 import {
   getFilteredSortedSearchedAssets,
   getCommitBarSummaryText,
+  getLayoutState,
+  getStoryCover,
   type FilterableView,
   type PublishReadinessResult,
 } from '../upload-selectors'
-import type { V2Asset } from '../v2-types'
+import type { V2Asset, V2StoryGroup } from '../v2-types'
 
 function makeAsset(overrides: Partial<V2Asset> & { id: string; filename: string }): V2Asset {
   return {
@@ -276,5 +278,91 @@ describe('getCommitBarSummaryText', () => {
       blockerCounts: { needs_price: 9 },
     })
     expect(getCommitBarSummaryText(r)).toBe('Most assets need attention')
+  })
+})
+
+// ── D2.1 — getLayoutState ────────────────────────────────────────
+//
+// Per UX-SPEC-V4 §2 + IPD1-5 default = (a) string union return.
+// Three states: 'empty' / 'workspace' / 'comparing'.
+
+describe('getLayoutState', () => {
+  it('returns "empty" when assetOrder.length === 0', () => {
+    const view = { assetsById: {}, assetOrder: [] }
+    expect(getLayoutState(view)).toBe('empty')
+  })
+
+  it('returns "workspace" when assetOrder has assets and not comparing', () => {
+    const a = makeAsset({ id: 'a', filename: 'a.jpg' })
+    const view = { assetsById: { a }, assetOrder: ['a'] }
+    expect(getLayoutState(view)).toBe('workspace')
+  })
+
+  it('returns "comparing" when compareAssetIds.length === 2', () => {
+    const a = makeAsset({ id: 'a', filename: 'a.jpg' })
+    const b = makeAsset({ id: 'b', filename: 'b.jpg' })
+    const view = {
+      assetsById: { a, b },
+      assetOrder: ['a', 'b'],
+      compareAssetIds: ['a', 'b'],
+    }
+    expect(getLayoutState(view)).toBe('comparing')
+  })
+
+  it('returns "workspace" (not "comparing") when compareAssetIds is length 1', () => {
+    const a = makeAsset({ id: 'a', filename: 'a.jpg' })
+    const view = {
+      assetsById: { a },
+      assetOrder: ['a'],
+      compareAssetIds: ['a'],
+    }
+    expect(getLayoutState(view)).toBe('workspace')
+  })
+})
+
+// ── D2.1 — getStoryCover ─────────────────────────────────────────
+
+describe('getStoryCover', () => {
+  function makeStory(overrides: Partial<V2StoryGroup> = {}): V2StoryGroup {
+    return {
+      id: 'g1',
+      name: 'Test',
+      kind: 'creator',
+      proposedAssetIds: ['a', 'b'],
+      existingStoryId: null,
+      existingStoryTitle: null,
+      existingStoryAssetCount: null,
+      rationale: '',
+      confidence: 0,
+      createdAt: '2026-01-01T00:00:00Z',
+      coverAssetId: null,
+      sequence: ['a', 'b'],
+      ...overrides,
+    }
+  }
+
+  it('returns the explicit coverAssetId asset when set and present', () => {
+    const a = makeAsset({ id: 'a', filename: 'a.jpg' })
+    const b = makeAsset({ id: 'b', filename: 'b.jpg' })
+    const group = makeStory({ coverAssetId: 'b' })
+    expect(getStoryCover(group, { a, b })?.id).toBe('b')
+  })
+
+  it('falls back to first in sequence when coverAssetId is null', () => {
+    const a = makeAsset({ id: 'a', filename: 'a.jpg' })
+    const b = makeAsset({ id: 'b', filename: 'b.jpg' })
+    const group = makeStory({ coverAssetId: null, sequence: ['a', 'b'] })
+    expect(getStoryCover(group, { a, b })?.id).toBe('a')
+  })
+
+  it('falls back when explicit cover asset has left the story (silent per IPV4-2)', () => {
+    const a = makeAsset({ id: 'a', filename: 'a.jpg' })
+    const group = makeStory({ coverAssetId: 'gone', sequence: ['a'] })
+    expect(getStoryCover(group, { a })?.id).toBe('a')
+  })
+
+  it('returns null when story has no resolvable assets', () => {
+    const group = makeStory({ coverAssetId: null, sequence: [], proposedAssetIds: [] })
+    expect(getStoryCover(group, {})).toBeNull()
   })
 })

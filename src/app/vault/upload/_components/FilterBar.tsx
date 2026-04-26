@@ -1,4 +1,13 @@
 /**
+ * DORMANT — replaced by D2 (ContactSheetFilterChips at top of CenterPane).
+ * Scheduled for deletion at the explicit D2.8 cutover PR.
+ * DO NOT extend.
+ *
+ * As of D2.1 this file is no longer on any production path. Filter chips
+ * fold into the center pane top per UX-SPEC-V4 §3.2.
+ */
+
+/**
  * Frontfiles Upload V3 — Filter Bar (C2.2 §3.7)
  *
  * Spec: UX-SPEC-V3.md §5.1.

@@ -1,4 +1,15 @@
 /**
+ * DORMANT — replaced by D2 (new shell at app/vault/upload/_components_v4/UploadShellV4.tsx).
+ * Scheduled for deletion at the explicit D2.8 cutover PR.
+ * DO NOT extend.
+ *
+ * As of D2.1 this file is no longer imported by any production code path
+ * (page.tsx routes to UploadShellV4). Tests still reference these components
+ * and remain green. If a regression in D2 forces rollback, page.tsx flips
+ * back to importing UploadShell here.
+ */
+
+/**
  * Frontfiles Upload V3 — Top-level Shell (C2.1 base; C2.2 added live AssetList
  * + dev-only fixture loader)
  *

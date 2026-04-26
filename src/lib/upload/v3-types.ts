@@ -95,13 +95,20 @@ export interface V3UIState {
   bulkOpsBarOpen: boolean
   /** Archive mode accordion state. */
   expandedClusterIds: string[]
-  /** Archive mode override per UX-SPEC-V3 §6.3. */
+  /** Archive mode override per UX-SPEC-V3 §6.3. DEPRECATED at D2.1; removed at D2.8 cutover. */
   flatListOverride: boolean
   filter: V2Filter
   searchQuery: string
   sortField: 'filename' | 'format' | 'story' | 'privacy' | 'price' | 'status' | 'declaration' | 'issues' | 'title' | 'size' | 'captureDate' | 'confidence' | 'location'
   sortDirection: 'asc' | 'desc'
   sessionDefaultsBarCollapsed: boolean
+  // ── D2.1 additions (per UX-SPEC-V4 §15.2) ──────────────────────
+  /** Contact-sheet card-size step (5 discrete values). Replaces density auto-detection. */
+  contactSheetZoom: 1 | 2 | 3 | 4 | 5
+  /** Left rail collapsed-to-icon-strip state. Persists per session. */
+  leftRailCollapsed: boolean
+  /** Compare mode asset ids. Length-2 enters Comparing layout state per IPV4-3. */
+  compareAssetIds: string[]
   /** "Why this price?" expand state. Single asset at a time. */
   priceBasisOpenAssetId: string | null
 }
@@ -296,3 +303,18 @@ export type V3Action =
 
   // ── Reset (per spec §11.3 "Upload more") ──
   | { type: 'RESET_FLOW' }
+
+  // ── D2.1 additions (per UX-SPEC-V4 §15.4) ──────────────────────
+  // Story cover + sequencing (per spec §7)
+  | { type: 'SET_STORY_COVER'; storyGroupId: string; assetId: string | null }
+  | { type: 'REORDER_ASSETS_IN_STORY'; storyGroupId: string; sequence: string[] }
+
+  // Contact sheet zoom (per spec §3.5)
+  | { type: 'SET_CONTACT_SHEET_ZOOM'; zoom: 1 | 2 | 3 | 4 | 5 }
+
+  // Left rail collapse (per spec §2.1)
+  | { type: 'TOGGLE_LEFT_RAIL_COLLAPSED' }
+
+  // Compare mode (per spec §10)
+  | { type: 'ENTER_COMPARE_MODE'; assetIds: string[] }
+  | { type: 'EXIT_COMPARE_MODE' }

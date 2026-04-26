@@ -656,6 +656,205 @@ describe('RESOLVE_DUPLICATE', () => {
   })
 })
 
+// ── D2.1 — Story cover + sequence + zoom + left rail + compare ───
+//
+// Per UX-SPEC-V4 §15.4 + D2.1-DIRECTIVE §4. Six new actions; happy-path
+// + invariant throws per IPD1-7 default = (a).
+
+describe('D2.1: SET_STORY_COVER', () => {
+  function withGroupAndAssets() {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ['a', 'b'].map(id => ({
+        id,
+        filename: `${id}.jpg`,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'My story' })
+    return s
+  }
+
+  it('writes coverAssetId on the named story', () => {
+    let s = withGroupAndAssets()
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: 'a' })
+    expect(s.storyGroupsById[groupId].coverAssetId).toBe('a')
+  })
+
+  it('clears cover when assetId is null', () => {
+    let s = withGroupAndAssets()
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: 'a' })
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: null })
+    expect(s.storyGroupsById[groupId].coverAssetId).toBeNull()
+  })
+
+  it('THROWS set_story_cover_invalid_group on unknown storyGroupId', () => {
+    const s = withGroupAndAssets()
+    expect(() =>
+      v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: 'ghost', assetId: 'a' }),
+    ).toThrowError(/set_story_cover_invalid_group/)
+  })
+
+  it('THROWS set_story_cover_invalid_asset on unknown assetId', () => {
+    const s = withGroupAndAssets()
+    const groupId = s.storyGroupOrder[0]
+    expect(() =>
+      v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: 'ghost' }),
+    ).toThrowError(/set_story_cover_invalid_asset/)
+  })
+})
+
+describe('D2.1: REORDER_ASSETS_IN_STORY', () => {
+  function withGroupContaining(ids: string[]) {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ids.map(id => ({
+        id,
+        filename: `${id}.jpg`,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'My story' })
+    const groupId = s.storyGroupOrder[0]
+    for (const id of ids) {
+      s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: id, clusterId: groupId })
+    }
+    // Seed the sequence so REORDER_ASSETS_IN_STORY has membership to compare.
+    const group = s.storyGroupsById[groupId]
+    s = {
+      ...s,
+      storyGroupsById: {
+        ...s.storyGroupsById,
+        [groupId]: { ...group, sequence: [...ids] },
+      },
+    }
+    return { state: s, groupId }
+  }
+
+  it('replaces sequence with new order', () => {
+    const { state, groupId } = withGroupContaining(['a', 'b', 'c'])
+    const s = v3Reducer(state, {
+      type: 'REORDER_ASSETS_IN_STORY',
+      storyGroupId: groupId,
+      sequence: ['c', 'a', 'b'],
+    })
+    expect(s.storyGroupsById[groupId].sequence).toEqual(['c', 'a', 'b'])
+  })
+
+  it('THROWS reorder_assets_invalid_group on unknown storyGroupId', () => {
+    const { state } = withGroupContaining(['a', 'b'])
+    expect(() =>
+      v3Reducer(state, {
+        type: 'REORDER_ASSETS_IN_STORY',
+        storyGroupId: 'ghost',
+        sequence: ['a', 'b'],
+      }),
+    ).toThrowError(/reorder_assets_invalid_group/)
+  })
+
+  it('THROWS reorder_assets_set_mismatch when membership differs', () => {
+    const { state, groupId } = withGroupContaining(['a', 'b', 'c'])
+    expect(() =>
+      v3Reducer(state, {
+        type: 'REORDER_ASSETS_IN_STORY',
+        storyGroupId: groupId,
+        sequence: ['a', 'b'], // missing 'c'
+      }),
+    ).toThrowError(/reorder_assets_set_mismatch/)
+  })
+})
+
+describe('D2.1: SET_CONTACT_SHEET_ZOOM', () => {
+  it('writes zoom 1-5', () => {
+    let s = freshState()
+    s = v3Reducer(s, { type: 'SET_CONTACT_SHEET_ZOOM', zoom: 5 })
+    expect(s.ui.contactSheetZoom).toBe(5)
+    s = v3Reducer(s, { type: 'SET_CONTACT_SHEET_ZOOM', zoom: 1 })
+    expect(s.ui.contactSheetZoom).toBe(1)
+  })
+
+  it('THROWS set_contact_sheet_zoom_invalid on out-of-range', () => {
+    const s = freshState()
+    expect(() =>
+      v3Reducer(s, { type: 'SET_CONTACT_SHEET_ZOOM', zoom: 0 as never }),
+    ).toThrowError(/set_contact_sheet_zoom_invalid/)
+    expect(() =>
+      v3Reducer(s, { type: 'SET_CONTACT_SHEET_ZOOM', zoom: 6 as never }),
+    ).toThrowError(/set_contact_sheet_zoom_invalid/)
+  })
+})
+
+describe('D2.1: TOGGLE_LEFT_RAIL_COLLAPSED', () => {
+  it('flips the collapsed state', () => {
+    let s = freshState()
+    expect(s.ui.leftRailCollapsed).toBe(false)
+    s = v3Reducer(s, { type: 'TOGGLE_LEFT_RAIL_COLLAPSED' })
+    expect(s.ui.leftRailCollapsed).toBe(true)
+    s = v3Reducer(s, { type: 'TOGGLE_LEFT_RAIL_COLLAPSED' })
+    expect(s.ui.leftRailCollapsed).toBe(false)
+  })
+})
+
+describe('D2.1: ENTER_COMPARE_MODE / EXIT_COMPARE_MODE', () => {
+  function withTwoAssets() {
+    return v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ['a', 'b'].map(id => ({
+        id,
+        filename: `${id}.jpg`,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+  }
+
+  it('writes compareAssetIds for length-2', () => {
+    const s = v3Reducer(withTwoAssets(), {
+      type: 'ENTER_COMPARE_MODE',
+      assetIds: ['a', 'b'],
+    })
+    expect(s.ui.compareAssetIds).toEqual(['a', 'b'])
+  })
+
+  it('THROWS compare_invalid_count when length !== 2 (per IPV4-3 = a strict 2-only)', () => {
+    const s = withTwoAssets()
+    expect(() => v3Reducer(s, { type: 'ENTER_COMPARE_MODE', assetIds: ['a'] })).toThrowError(
+      /compare_invalid_count/,
+    )
+    expect(() =>
+      v3Reducer(s, { type: 'ENTER_COMPARE_MODE', assetIds: ['a', 'b', 'c' as never] }),
+    ).toThrowError(/compare_invalid_count/)
+  })
+
+  it('THROWS compare_invalid_asset on unknown id', () => {
+    const s = withTwoAssets()
+    expect(() =>
+      v3Reducer(s, { type: 'ENTER_COMPARE_MODE', assetIds: ['a', 'ghost'] }),
+    ).toThrowError(/compare_invalid_asset/)
+  })
+
+  it('EXIT_COMPARE_MODE clears compareAssetIds', () => {
+    let s = v3Reducer(withTwoAssets(), {
+      type: 'ENTER_COMPARE_MODE',
+      assetIds: ['a', 'b'],
+    })
+    s = v3Reducer(s, { type: 'EXIT_COMPARE_MODE' })
+    expect(s.ui.compareAssetIds).toEqual([])
+  })
+
+  it('EXIT_COMPARE_MODE is idempotent (no throw on already-empty)', () => {
+    const s = freshState()
+    expect(() => v3Reducer(s, { type: 'EXIT_COMPARE_MODE' })).not.toThrow()
+  })
+})
+
 // ── Commit flow state machine ────────────────────────────────────
 
 describe('commit flow state machine', () => {

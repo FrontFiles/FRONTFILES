@@ -1,4 +1,15 @@
 /**
+ * DORMANT — replaced by D2 (LeftRailStoryHeader + sortable contact sheet).
+ * Scheduled for deletion at the explicit D2.8 cutover PR.
+ * DO NOT extend.
+ *
+ * Archive accordion shape dies at D2.1 — stories now live in the left rail
+ * (UX-SPEC-V4 §4); their assets render in the center contact sheet when the
+ * story bucket is selected. As of D2.1 this file is no longer on any
+ * production path.
+ */
+
+/**
  * Frontfiles Upload V3 — Archive-mode Story group accordion (C2.2 §3.5)
  *
  * Spec: UX-SPEC-V3.md §6.1.

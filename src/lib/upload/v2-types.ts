@@ -214,6 +214,16 @@ export interface V2StoryGroup {
   rationale: string
   confidence: number         // 0-1
   createdAt: string
+  // ── D2.1 additions (per UX-SPEC-V4 §15.3 / D-PLAN §3.2 spec exception) ──
+  //
+  // These two fields are optional on V2StoryGroup so existing v2-*
+  // construction sites compile unchanged. v3-hydration.ts ALWAYS sets
+  // them when bridging to V3State, so V3 consumers see them as populated.
+  // (V3 components may treat them as required via narrowed type if needed.)
+  /** Explicit cover asset; null = no explicit, render falls back to first in sequence. */
+  coverAssetId?: string | null
+  /** Ordered asset ids = canonical reading order. Defaults to [...proposedAssetIds] at hydration. */
+  sequence?: string[]
 }
 
 // ── Exception Types ──

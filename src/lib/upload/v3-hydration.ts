@@ -21,8 +21,75 @@ import { v3InitialState } from './v3-state'
 // V2State is imported only by hydrateV3FromV2State (parity bridge).
 // This is the single intentional cross-version coupling and is bounded
 // to the hydration path.
-import type { V2State } from './v2-types'
+import type { V2State, V2Asset, V2StoryGroup } from './v2-types'
 import { densityForCount } from './v3-types'
+
+/**
+ * D2.1 — AI auto-accept threshold (per UX-SPEC-V4 §11.1 + IPV4-5 + IPD1-2).
+ *
+ * At hydration time, for each asset whose proposal carries confidence ≥ this
+ * threshold, the proposal's caption + tags + geography are auto-accepted into
+ * editable fields. Per IPD1-3: NEVER price (spec §9.2 ban carries from bulk-
+ * accept), NEVER title (creators author titles personally).
+ *
+ * The constant lives here (not env-var-configurable) per IPD1-2 = (a). When
+ * the AI pipeline lands at E2 and produces real confidence values, this
+ * threshold may need calibration; until then, fixtures define their own
+ * confidence values.
+ */
+export const AI_AUTO_ACCEPT_THRESHOLD = 0.85
+
+/**
+ * D2.1 — Auto-accept sweep applied after the V2→V3 hydration bridge.
+ *
+ * Mutates a copy of assetsById; returns the modified map. Pure: returns
+ * a NEW object; does not mutate inputs.
+ */
+function applyAIAutoAcceptSweep(
+  assetsById: Record<string, V2Asset>,
+): Record<string, V2Asset> {
+  const out: Record<string, V2Asset> = {}
+  for (const [id, asset] of Object.entries(assetsById)) {
+    if (!asset.proposal || asset.proposal.confidence < AI_AUTO_ACCEPT_THRESHOLD) {
+      out[id] = asset
+      continue
+    }
+    // Per IPD1-3 = (a): caption (description) + tags + geography only.
+    // NEVER price (spec §9.2 + L5). NEVER title.
+    const editable = { ...asset.editable }
+    if (!editable.description && asset.proposal.description) {
+      editable.description = asset.proposal.description
+    }
+    if (editable.tags.length === 0 && asset.proposal.tags?.length) {
+      editable.tags = [...asset.proposal.tags]
+    }
+    if (editable.geography.length === 0 && asset.proposal.geography?.length) {
+      editable.geography = [...asset.proposal.geography]
+    }
+    out[id] = { ...asset, editable }
+  }
+  return out
+}
+
+/**
+ * D2.1 — Cover + sequence defaults applied to each story at hydration.
+ *
+ * Cover defaults to null (render falls back to first in sequence via
+ * getStoryCover selector). Sequence defaults to a copy of proposedAssetIds.
+ */
+function applyStoryDefaults(
+  storyGroupsById: Record<string, V2StoryGroup>,
+): Record<string, V2StoryGroup> {
+  const out: Record<string, V2StoryGroup> = {}
+  for (const [id, g] of Object.entries(storyGroupsById)) {
+    out[id] = {
+      ...g,
+      coverAssetId: g.coverAssetId ?? null,
+      sequence: g.sequence ?? [...g.proposedAssetIds],
+    }
+  }
+  return out
+}
 
 export function hydrateV3FromBatchId(batchId: string): V3State {
   return v3InitialState(batchId)
@@ -56,6 +123,11 @@ export function hydrateV3FromV2State(v2State: V2State): V3State {
   const expandedClusterIds =
     v2State.storyGroupOrder.length > 0 ? [v2State.storyGroupOrder[0]] : []
 
+  // D2.1: AI auto-accept sweep + story cover/sequence defaults.
+  // Both are pure transforms producing new objects (no input mutation).
+  const assetsById = applyAIAutoAcceptSweep(v2State.assetsById)
+  const storyGroupsById = applyStoryDefaults(v2State.storyGroupsById)
+
   return {
     ...base,
     batch: {
@@ -63,9 +135,9 @@ export function hydrateV3FromV2State(v2State: V2State): V3State {
       createdAt: v2State.batch.createdAt,
       committedAt: v2State.batch.committedAt,
     },
-    assetsById: v2State.assetsById,
+    assetsById,
     assetOrder: v2State.assetOrder,
-    storyGroupsById: v2State.storyGroupsById,
+    storyGroupsById,
     storyGroupOrder: v2State.storyGroupOrder,
     defaults: v2State.defaults,
     ui: {

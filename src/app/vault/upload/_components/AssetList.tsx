@@ -1,4 +1,13 @@
 /**
+ * DORMANT — replaced by D2 (ContactSheet in app/vault/upload/_components_v4/).
+ * Scheduled for deletion at the explicit D2.8 cutover PR.
+ * DO NOT extend.
+ *
+ * Density auto-detection dies at D2.1 — center pane is now zoom-slider-driven
+ * per UX-SPEC-V4 §3.5. As of D2.1 this file is no longer on any production path.
+ */
+
+/**
  * Frontfiles Upload V3 — Asset List density router (C2.2 §3.2)
  *
  * Spec: UX-SPEC-V3.md §3–§6.
