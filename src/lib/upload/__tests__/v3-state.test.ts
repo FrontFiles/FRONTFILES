@@ -935,6 +935,24 @@ describe('filter / sort / search actions', () => {
     expect(s.ui.filter.preset).toBe('blocking')
   })
 
+  // D2.2 IPD2-14: SET_FILTER_PRESET also clears storyGroupId.
+  // Intent: clicking a category chip means "filter by category, not by
+  // story". User re-applies story filter by clicking a story header in
+  // the left rail (which dispatches SET_FILTER { storyGroupId }).
+  it('SET_FILTER_PRESET clears storyGroupId (D2.2 IPD2-14)', () => {
+    let s = freshState()
+    // Seed: pretend user previously selected a story bucket.
+    s = {
+      ...s,
+      ui: { ...s.ui, filter: { ...s.ui.filter, storyGroupId: 'g-prev' } },
+    }
+    expect(s.ui.filter.storyGroupId).toBe('g-prev')
+
+    s = v3Reducer(s, { type: 'SET_FILTER_PRESET', preset: 'all' })
+    expect(s.ui.filter.preset).toBe('all')
+    expect(s.ui.filter.storyGroupId).toBeNull()
+  })
+
   it('SET_SORT writes field+direction', () => {
     const s = v3Reducer(freshState(), { type: 'SET_SORT', field: 'price', direction: 'desc' })
     expect(s.ui.sortField).toBe('price')

@@ -1,8 +1,8 @@
 /**
- * Frontfiles Upload V4 — Contact Sheet Card (D2.3 §1.1)
+ * Frontfiles Upload V4 — Contact Sheet Card (D2.3 §1.1, D2.2 drag-source augmented)
  *
  * Spec: UX-SPEC-V4 §3.3 (anatomy) + §3.4 (click model) + §11.3 (AI furniture
- * lives ONLY in the inspector — NOT here).
+ * lives ONLY in the inspector — NOT here) + §8 (DnD interaction model).
  *
  * Single asset card. Preview-first. Renders ONLY:
  *   - Thumbnail (object-cover, square)
@@ -14,13 +14,22 @@
  * NO ✓ accept icons. NO ↻ regenerate. NO Why? link. NO price text. NO chips
  * array. The contact sheet is a visual workspace, not an admin table.
  *
- * DnD source wiring is DEFERRED to D2.2 (per IPD3-1 default = a). Click-only
- * for now. Drag handle + DragOverlay land when D2.2 ships left-rail receivers.
+ * D2.2: drag-source props accepted from a parent wrapper (DraggableCellRenderer
+ * or SortableCellRenderer in ContactSheet.tsx). The card itself stays
+ * presentational — drag-hook calls live in the parent wrappers because
+ * useDraggable vs useSortable can't be conditional inside one component.
  */
 
 'use client'
 
-import { useEffect, useMemo, type MouseEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  type CSSProperties,
+  type HTMLAttributes,
+  type MouseEvent,
+  type Ref,
+} from 'react'
 import { useUploadContext } from '../_components/UploadContext'
 import { getAssetExceptions } from '@/lib/upload/upload-selectors'
 import type { V2Asset } from '@/lib/upload/v3-types'
@@ -30,9 +39,29 @@ interface Props {
   cardSize: number
   /** Click handler from ContactSheet — handles single/Cmd/Shift modifier logic. */
   onClick: (assetId: string, event: MouseEvent) => void
+  // ── D2.2 drag-source props (passed from parent wrapper) ──
+  /** Ref from useDraggable / useSortable (setNodeRef). */
+  dragRef?: Ref<HTMLDivElement>
+  /** Listeners from useDraggable / useSortable. Spread onto the card root. */
+  dragListeners?: HTMLAttributes<HTMLDivElement>
+  /** Attributes (a11y) from useDraggable / useSortable. */
+  dragAttributes?: HTMLAttributes<HTMLDivElement>
+  /** Sortable transform style (only present when inside a SortableContext). */
+  dragStyle?: CSSProperties
+  /** True while this card is being dragged. */
+  isDragging?: boolean
 }
 
-export default function ContactSheetCard({ asset, cardSize, onClick }: Props) {
+export default function ContactSheetCard({
+  asset,
+  cardSize,
+  onClick,
+  dragRef,
+  dragListeners,
+  dragAttributes,
+  dragStyle,
+  isDragging = false,
+}: Props) {
   const { state } = useUploadContext()
   const isSelected = state.ui.selectedAssetIds.includes(asset.id)
   const story = asset.storyGroupId ? state.storyGroupsById[asset.storyGroupId] : null
@@ -65,16 +94,19 @@ export default function ContactSheetCard({ asset, cardSize, onClick }: Props) {
 
   return (
     <div
+      ref={dragRef}
       onClick={e => onClick(asset.id, e)}
       onDoubleClick={e => onClick(asset.id, e)}
-      style={{ width: cardSize, height: cardHeight }}
+      style={{ width: cardSize, height: cardHeight, ...dragStyle }}
       className={`relative bg-slate-100 cursor-pointer group overflow-hidden ${
         isSelected ? 'border-2 border-blue-600' : 'border border-black'
-      } ${asset.excluded ? 'opacity-50' : ''}`}
+      } ${asset.excluded ? 'opacity-50' : ''} ${isDragging ? 'opacity-40' : ''}`}
       data-asset-id={asset.id}
       role="button"
       tabIndex={0}
       aria-pressed={isSelected}
+      {...dragListeners}
+      {...dragAttributes}
     >
       {/* Thumbnail or placeholder */}
       {url ? (

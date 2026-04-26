@@ -761,9 +761,17 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
       }
 
     case 'SET_FILTER_PRESET':
+      // Per D2.2 IPD2-14 = (a): switching the preset chip also clears
+      // the storyGroupId filter. Intent: clicking a category filter
+      // means "I want to filter by category, not by story". The user
+      // re-applies storyGroupId by clicking a story header in the
+      // left rail (which dispatches SET_FILTER { storyGroupId }).
       return {
         ...state,
-        ui: { ...state.ui, filter: { ...state.ui.filter, preset: action.preset } },
+        ui: {
+          ...state.ui,
+          filter: { ...state.ui.filter, preset: action.preset, storyGroupId: null },
+        },
       }
 
     case 'SET_SORT':

@@ -28,20 +28,29 @@
 
 'use client'
 
-import { useReducer } from 'react'
+import { useCallback, useReducer } from 'react'
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import { v3Reducer, v3InitialState } from '@/lib/upload/v3-state'
 import { getLayoutState } from '@/lib/upload/upload-selectors'
 import { hydrateV3FromV2State } from '@/lib/upload/v3-hydration'
 import { hydrateFromScenario } from '@/lib/upload/v2-hydration'
 import { SCENARIOS } from '@/lib/upload/v2-mock-scenarios'
 import type { ScenarioId } from '@/lib/upload/v2-scenario-registry'
-import type { V3State } from '@/lib/upload/v3-types'
+import type { V3Action, V3State } from '@/lib/upload/v3-types'
 // UploadContext lives in C2's _components/ directory and is reused here.
 // (Per D2.1 §8 it is NOT dormant-flagged — it's a spine carryover.)
 import { UploadContextProvider } from '../_components/UploadContext'
 import EmptyState from './EmptyState'
 import CenterPane from './CenterPane'
 import RightRailInspector from './RightRailInspector'
+import LeftRail from './LeftRail'
 
 interface Props {
   batchId: string
@@ -67,6 +76,119 @@ export default function UploadShellV4({
     compareAssetIds: state.ui.compareAssetIds,
   })
 
+  // ── D2.2 DnD plumbing ─────────────────────────────────────────
+  //
+  // Single PointerSensor with a small activation distance so that clicks
+  // (no movement) still register as clicks; only mouse-down + drag past
+  // the threshold initiates a drag. Prevents accidental drags on click.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  /**
+   * Drag-end router. Inspects active.id (the dragged asset) and over.id
+   * (the drop target) and dispatches the right action(s).
+   *
+   * Multi-select: if the dragged asset is in selectedAssetIds AND there's
+   * more than one selected, the action applies to all selected (per
+   * IPD2-6 + L11). Otherwise applies to the single dragged asset.
+   *
+   * Cross-context drops route by over.id pattern:
+   *   'unassigned'              → MOVE_ASSET_TO_UNGROUPED
+   *   'story-{id}-body'         → MOVE_ASSET_TO_CLUSTER
+   *   'story-{id}-cover'        → MOVE_ASSET_TO_CLUSTER + SET_STORY_COVER
+   *                               (cover is single — only the dragged asset
+   *                                gets set as cover, even in multi-select)
+   *
+   * Sortable peer drops (over.id is another asset id in the same SortableContext):
+   *   reorder via arrayMove + dispatch REORDER_ASSETS_IN_STORY (only when
+   *   filter.storyGroupId is set; otherwise ignored).
+   */
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over) return
+
+      const activeId = String(active.id)
+      const overId = String(over.id)
+
+      // Multi-select expansion: if the dragged asset is in selection and
+      // selection has >1 assets, apply to all selected. Per IPD2-6 + L11.
+      const inSelection = state.ui.selectedAssetIds.includes(activeId)
+      const targetAssetIds =
+        inSelection && state.ui.selectedAssetIds.length > 1
+          ? state.ui.selectedAssetIds
+          : [activeId]
+
+      // Cross-context: Unassigned bucket
+      if (overId === 'unassigned') {
+        for (const id of targetAssetIds) {
+          dispatch({ type: 'MOVE_ASSET_TO_UNGROUPED', assetId: id } as V3Action)
+        }
+        return
+      }
+
+      // Cross-context: story header body
+      const bodyMatch = overId.match(/^story-(.+)-body$/)
+      if (bodyMatch) {
+        const storyGroupId = bodyMatch[1]
+        for (const id of targetAssetIds) {
+          dispatch({
+            type: 'MOVE_ASSET_TO_CLUSTER',
+            assetId: id,
+            clusterId: storyGroupId,
+          } as V3Action)
+        }
+        return
+      }
+
+      // Cross-context: story header cover area (move + set cover)
+      const coverMatch = overId.match(/^story-(.+)-cover$/)
+      if (coverMatch) {
+        const storyGroupId = coverMatch[1]
+        for (const id of targetAssetIds) {
+          dispatch({
+            type: 'MOVE_ASSET_TO_CLUSTER',
+            assetId: id,
+            clusterId: storyGroupId,
+          } as V3Action)
+        }
+        // Cover is single — only the dragged asset becomes cover.
+        dispatch({
+          type: 'SET_STORY_COVER',
+          storyGroupId,
+          assetId: activeId,
+        } as V3Action)
+        return
+      }
+
+      // Sortable peer (within-story reorder). over.id is another asset id;
+      // the active item's index moves to the over item's index. Only when
+      // filter.storyGroupId is set (otherwise sortable mode isn't active).
+      const groupId = state.ui.filter.storyGroupId
+      if (groupId && state.assetsById[overId] && activeId !== overId) {
+        const story = state.storyGroupsById[groupId]
+        if (!story) return
+        const sequence = story.sequence ?? story.proposedAssetIds
+        const fromIdx = sequence.indexOf(activeId)
+        const toIdx = sequence.indexOf(overId)
+        if (fromIdx === -1 || toIdx === -1) return
+        const next = arrayMove(sequence, fromIdx, toIdx)
+        dispatch({
+          type: 'REORDER_ASSETS_IN_STORY',
+          storyGroupId: groupId,
+          sequence: next,
+        } as V3Action)
+        return
+      }
+    },
+    [
+      state.ui.selectedAssetIds,
+      state.ui.filter.storyGroupId,
+      state.storyGroupsById,
+      state.assetsById,
+      dispatch,
+    ],
+  )
+
   // Empty layout state: EmptyState fills the screen. Three-pane shell + commit
   // bar slot are not mounted — there's nothing yet to populate them.
   if (layout === 'empty') {
@@ -80,36 +202,26 @@ export default function UploadShellV4({
   // Workspace and Comparing both render the three-pane shell. Per spec §2:
   // Comparing is a center-pane variant (CompareView replaces the contact sheet),
   // not a structural layout change. D2.6 wires the actual swap.
+  //
+  // D2.2: the entire shell is wrapped in DndContext so cards in the center
+  // can be dragged onto receivers in the left rail. handleDragEnd routes
+  // by over.id pattern (see definition above).
   return (
     <UploadContextProvider state={state} dispatch={dispatch}>
-      <div className="flex flex-col min-h-screen min-w-0">
-        <div className="flex flex-row flex-1 min-w-0 min-h-0">
-          {/* Left rail — placeholder for D2.2.
-           *
-           * Per UX-SPEC-V4 §2.0.1 (corrected): mounts as soon as
-           * assetOrder.length > 0 (NOT gated on storyGroupOrder.length).
-           * Collapsed via state.ui.leftRailCollapsed (D2.2 wires the toggle).
-           */}
-          {!state.ui.leftRailCollapsed && (
-            <div
-              data-region="left-rail"
-              className="w-[240px] flex-shrink-0 border-r border-black bg-white p-4"
-            >
-              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                Left rail — placeholder for D2.2
-              </div>
-              <div className="text-[10px] uppercase tracking-widest text-slate-400 mt-2">
-                Stories: {state.storyGroupOrder.length}
-              </div>
-              <div className="text-[10px] uppercase tracking-widest text-slate-400">
-                Unassigned: {
-                  state.assetOrder.filter(
-                    id => state.assetsById[id] && !state.assetsById[id].excluded && state.assetsById[id].storyGroupId === null,
-                  ).length
-                }
-              </div>
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="flex flex-col min-h-screen min-w-0">
+          <div className="flex flex-row flex-1 min-w-0 min-h-0">
+            {/* Left rail — LIVE per D2.2.
+             *
+             * Per UX-SPEC-V4 §2.0.1 (corrected): mounts as soon as
+             * assetOrder.length > 0 (NOT gated on storyGroupOrder.length).
+             * The rail itself handles the leftRailCollapsed state internally
+             * (via LeftRailHeader's toggle button) — it always renders, just
+             * at a different width.
+             */}
+            <div data-region="left-rail" className="border-r border-black flex-shrink-0">
+              <LeftRail />
             </div>
-          )}
 
           {/* Center pane — LIVE per D2.3 (CenterPane orchestrator inside).
            *
@@ -173,7 +285,8 @@ export default function UploadShellV4({
             {devSeedBanners && <span>seedBanners=true</span>}
           </div>
         </div>
-      </div>
+        </div>
+      </DndContext>
     </UploadContextProvider>
   )
 }
