@@ -141,6 +141,20 @@ const envSchema = z.object({
     .describe(
       'Bearer secret on the /api/cron/newsroom-scan endpoint. Required in production.',
     ),
+  // NR-D9c: cron secret for the publish-pipeline worker (embargo
+  // lifts + subscriber notification fanout). Same shape as
+  // SCANNER_CRON_SECRET. v1.1 backlog: consolidate both newsroom
+  // cron secrets into a single NEWSROOM_CRON_SECRET.
+  NEWSROOM_PUBLISH_CRON_SECRET: z
+    .string()
+    .min(32, {
+      message:
+        'NEWSROOM_PUBLISH_CRON_SECRET must be 32+ chars. Generate with `openssl rand -base64 48` (NR-D5b-i precedent).',
+    })
+    .optional()
+    .describe(
+      'Bearer secret on the /api/cron/newsroom-publish-pipeline endpoint. Required in production.',
+    ),
 
   // ─── Optional: Stripe (wired in Phase 5) ──────────────────────
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -231,6 +245,7 @@ const rawEnv = {
   SCANNER_GCV_API_KEY: process.env.SCANNER_GCV_API_KEY,
   SCANNER_STUB_DELAY_MS: process.env.SCANNER_STUB_DELAY_MS,
   SCANNER_CRON_SECRET: process.env.SCANNER_CRON_SECRET,
+  NEWSROOM_PUBLISH_CRON_SECRET: process.env.NEWSROOM_PUBLISH_CRON_SECRET,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   STRIPE_CONNECT_CLIENT_ID: process.env.STRIPE_CONNECT_CLIENT_ID,

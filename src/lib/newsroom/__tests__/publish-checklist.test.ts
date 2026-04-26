@@ -45,6 +45,7 @@ function makePack(overrides: Partial<NewsroomPackRow> = {}): NewsroomPackRow {
     status: 'draft' as NewsroomPackStatus,
     visibility: 'private',
     published_at: null,
+    notification_sent_at: null,
     archived_at: null,
     takedown_at: null,
     takedown_reason: null,
