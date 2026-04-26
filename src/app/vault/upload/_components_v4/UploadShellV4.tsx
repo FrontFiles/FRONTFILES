@@ -40,6 +40,7 @@ import type { V3State } from '@/lib/upload/v3-types'
 // (Per D2.1 §8 it is NOT dormant-flagged — it's a spine carryover.)
 import { UploadContextProvider } from '../_components/UploadContext'
 import EmptyState from './EmptyState'
+import CenterPane from './CenterPane'
 
 interface Props {
   batchId: string
@@ -109,24 +110,23 @@ export default function UploadShellV4({
             </div>
           )}
 
-          {/* Center pane — placeholder for D2.3 (Workspace) / D2.6 (Comparing).
+          {/* Center pane — LIVE per D2.3 (CenterPane orchestrator inside).
            *
-           * D2.3 fills with ContactSheet + filter chips + zoom slider.
-           * D2.6 fills the Comparing variant with side-by-side CompareView.
-           */}
-          <div
-            data-region="center-pane"
-            className="flex-1 overflow-auto min-w-0 bg-white p-4"
-          >
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Center pane — placeholder for D2.3 (layout: {layout}, zoom: {state.ui.contactSheetZoom})
-            </div>
-            <div className="text-[10px] uppercase tracking-widest text-slate-400 mt-2">
-              {state.assetOrder.length} assets · {state.storyGroupOrder.length} stories
-              {devScenarioId && (
-                <span className="ml-3 text-blue-600">· dev fixture: {devScenarioId}</span>
-              )}
-            </div>
+           * Hosts AIProposalBanner + ContactSheetFilterChips + ContactSheet
+           * (Workspace) or CompareViewPlaceholder (Comparing — D2.6 fills).
+           * Bottom row: ZoomSlider (left) + CountFooter (right).
+           *
+           * The data-region attr stays as 'center-pane' for visual smoke
+           * locator continuity. The dev-fixture banner moves into a small
+           * hint inside CenterPane is not needed — the count footer carries
+           * the contextual info now. */}
+          <div data-region="center-pane" className="flex-1 min-w-0 min-h-0 flex flex-col">
+            <CenterPane />
+            {devScenarioId && (
+              <div className="border-t border-slate-200 px-4 py-1 text-[10px] uppercase tracking-widest text-blue-600">
+                dev fixture: {devScenarioId}
+              </div>
+            )}
           </div>
 
           {/* Right rail — placeholder for D2.4. Per UX-SPEC-V4 §5.1 + IPV4-1:
