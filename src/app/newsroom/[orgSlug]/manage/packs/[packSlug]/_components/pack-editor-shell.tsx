@@ -1,39 +1,63 @@
 /**
- * Frontfiles — Pack editor shell (NR-D6b, F3)
+ * Frontfiles — Pack editor shell (NR-D6b, F3 → NR-D9b, F1)
  *
  * Server component. Composes the top bar (breadcrumb + status
- * badge + initial save indicator + disabled Publish CTA) and
- * the tab nav (Details active; Assets + Embargo disabled
- * placeholders), then renders the active-tab content as
- * `children`.
+ * badge + initial save indicator + Publish CTA) and the tab nav
+ * (Details + Assets + Embargo), then renders the active-tab
+ * content as `children`.
  *
- * Save indicator is intentionally a static slot here. F4 (the
- * `'use client'` Details form) manages its own dynamic indicator
- * inline next to its submit button — passing reactive state
- * through a server boundary into a client child via prop would
- * either require server actions (locked NO per audit (h)) or a
- * router-refresh dance after every keystroke. Two indicators
- * (one initial, one live) is the v1 compromise; can unify in a
- * v1.1 polish pass.
+ * NR-D9b conversion: this shell is now `async`. When `pack !==
+ * null`, it fetches the publish-precondition substrate (warranty,
+ * signing-key state, asset/scan/alt-text aggregates, embargo +
+ * recipient count) and derives the 7-row checklist via
+ * `derivePublishChecklist`. The Publish CTA is replaced by the
+ * `<PublishActions>` client wrapper, and a `<PrePublishChecklist>`
+ * sidebar is mounted next to the active-tab content. When
+ * `pack === null` (create-mode), the sidebar is skipped and the
+ * Publish CTA stays disabled with the legacy NR-D6b tooltip.
  *
- * Disabled-tab semantics (audit (i)): Assets + Embargo render as
- * `<span>` (not `<button>` or `<Link>`) with tooltips so admins
- * understand the state is intentional rather than broken.
+ * Caller compatibility: the 5-prop signature
+ * (`{orgSlug, orgName, pack, saveState, children}`) is preserved.
+ * The 4 caller pages (`new/`, `[packSlug]/`, `embargo/`,
+ * `assets/`) are unchanged — the shell now does its own fetching.
  *
- * Disabled Publish CTA (audit (j)): the button is rendered but
- * disabled with a tooltip pointing to NR-D9. Matches the disabled-
- * CTA semantics on the dashboard's "New pack" button (NR-D6a F3).
+ * Save indicator is intentionally a static slot here. F4 of NR-D6b
+ * (the `'use client'` Details form) manages its own dynamic
+ * indicator inline next to its submit button.
+ *
+ * Disabled-tab semantics (NR-D6b audit (i)): Assets + Embargo
+ * render as `<span>` (not `<button>` or `<Link>`) with tooltips
+ * when `pack === null`.
  *
  * Spec cross-references:
  *   - PRD.md §5.1 P6 (top-bar layout — verbatim authority)
- *   - directives/NR-D6b-pack-creation-details-tab.md §F3
+ *   - PRD.md §5.1 P10 (sidebar + CTA states — verbatim authority)
+ *   - directives/NR-D9b-publish-flow.md §F1
+ *   - src/lib/newsroom/publish-checklist.ts — derivation
+ *   - src/lib/newsroom/canonical-url.ts — `packCanonicalUrl`
  */
 
 import Link from 'next/link'
 
-import type { NewsroomPackRow } from '@/lib/db/schema'
+import { getSupabaseClient } from '@/lib/db/client'
+import type {
+  NewsroomAssetRow,
+  NewsroomAssetScanResultRow,
+  NewsroomEmbargoRow,
+  NewsroomPackRow,
+  NewsroomRightsWarrantyRow,
+} from '@/lib/db/schema'
+import { packCanonicalUrl } from '@/lib/newsroom/canonical-url'
+import {
+  derivePublishChecklist,
+  type ChecklistResult,
+} from '@/lib/newsroom/publish-checklist'
 
-const PUBLISH_CTA_TOOLTIP = 'Publishing ships in NR-D9. Save draft for now.'
+import { PrePublishChecklist } from './pre-publish-checklist'
+import { PublishActions } from './publish-actions'
+
+const PUBLISH_CTA_TOOLTIP_CREATE =
+  'Save the pack first to enable publishing.'
 
 const SAVE_STATE_LABEL: Record<
   'idle' | 'saving' | 'saved',
@@ -44,7 +68,146 @@ const SAVE_STATE_LABEL: Record<
   saved: 'Saved',
 }
 
-export function PackEditorShell({
+interface ShellPublishState {
+  warranty: NewsroomRightsWarrantyRow | null
+  embargo: NewsroomEmbargoRow | null
+  recipientCount: number
+  checklist: ChecklistResult
+  canonicalUrl: string
+}
+
+/**
+ * Fetches the publish-precondition substrate and derives the
+ * checklist. Only invoked when `pack !== null` — create-mode skips
+ * this entirely.
+ */
+async function loadPublishState(
+  orgSlug: string,
+  pack: NewsroomPackRow,
+): Promise<ShellPublishState> {
+  const supabase = getSupabaseClient()
+
+  // Parallel fetches: warranty, signing key, assets, embargo.
+  // Scan results, alt-text aggregate, and recipient count are
+  // sequential (depend on the assets / embargo lookup).
+  const [warrantyRes, signingKeyRes, assetsRes, embargoRes] =
+    await Promise.all([
+      pack.rights_warranty_id !== null
+        ? supabase
+            .from('newsroom_rights_warranties')
+            .select('*')
+            .eq('id', pack.rights_warranty_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase
+        .from('newsroom_signing_keys')
+        .select('kid', { count: 'exact', head: true })
+        .eq('status', 'active'),
+      supabase
+        .from('newsroom_assets')
+        .select('*')
+        .eq('pack_id', pack.id),
+      pack.embargo_id !== null
+        ? supabase
+            .from('newsroom_embargoes')
+            .select('*')
+            .eq('id', pack.embargo_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ])
+
+  const warranty =
+    (warrantyRes.data as NewsroomRightsWarrantyRow | null) ?? null
+
+  // signingKeyRes.count is non-null when query succeeds. Treat
+  // any falsy as no key (defensive — surface as missing).
+  const hasActiveSigningKey =
+    typeof signingKeyRes.count === 'number' && signingKeyRes.count > 0
+
+  const assets = (assetsRes.data ?? []) as NewsroomAssetRow[]
+  const assetCount = assets.length
+
+  // Alt-text deficit: count image-kind assets without alt_text.
+  const imagesMissingAltCount = assets.filter(
+    (a) =>
+      a.kind === 'image' &&
+      (a.alt_text === null || a.alt_text.trim().length === 0),
+  ).length
+
+  // Scan results: fetch by asset_id IN (...); compute count by
+  // result. Orphan rows (asset without scan_result) handled by the
+  // derivation (treated as 'scanning').
+  const scanCounts = { pending: 0, clean: 0, flagged: 0, error: 0 }
+  if (assetCount > 0) {
+    const assetIds = assets.map((a) => a.id)
+    const { data: scanRows } = await supabase
+      .from('newsroom_asset_scan_results')
+      .select('result')
+      .in('asset_id', assetIds)
+    for (const r of (scanRows ?? []) as Pick<
+      NewsroomAssetScanResultRow,
+      'result'
+    >[]) {
+      switch (r.result) {
+        case 'pending':
+          scanCounts.pending += 1
+          break
+        case 'clean':
+          scanCounts.clean += 1
+          break
+        case 'flagged':
+          scanCounts.flagged += 1
+          break
+        case 'error':
+          scanCounts.error += 1
+          break
+      }
+    }
+  }
+
+  const embargo =
+    (embargoRes.data as NewsroomEmbargoRow | null) ?? null
+
+  let recipientCount = 0
+  if (embargo !== null) {
+    const { count } = await supabase
+      .from('newsroom_embargo_recipients')
+      .select('id', { count: 'exact', head: true })
+      .eq('embargo_id', embargo.id)
+      .is('revoked_at', null)
+    recipientCount = typeof count === 'number' ? count : 0
+  }
+
+  const checklist = derivePublishChecklist({
+    pack,
+    warranty,
+    embargo:
+      embargo !== null
+        ? {
+            id: embargo.id,
+            lift_at: embargo.lift_at,
+            policy_text: embargo.policy_text,
+            recipientCount,
+          }
+        : null,
+    assetCount,
+    imagesMissingAltCount,
+    scanCounts,
+    hasActiveSigningKey,
+  })
+
+  const canonicalUrl = packCanonicalUrl(orgSlug, pack.slug)
+
+  return {
+    warranty,
+    embargo,
+    recipientCount,
+    checklist,
+    canonicalUrl,
+  }
+}
+
+export async function PackEditorShell({
   orgSlug,
   orgName,
   pack,
@@ -62,6 +225,10 @@ export function PackEditorShell({
     ? `/${orgSlug}/manage/packs/${pack.slug}`
     : `/${orgSlug}/manage/packs/new`
 
+  // Only fetch publish state for an existing pack.
+  const publishState =
+    pack !== null ? await loadPublishState(orgSlug, pack) : null
+
   return (
     <main>
       {/* ── Top bar ── */}
@@ -75,37 +242,56 @@ export function PackEditorShell({
         </nav>
 
         <div>
-          {/* Status badge — always "Draft" in NR-D6b's editable surface
-              (F2 status-guard rejects non-draft packs upstream). */}
-          <span aria-label="Status: Draft">Draft</span>
+          {/* Status badge — pack.status when present, "Draft" in
+              create mode (the new/page.tsx flow only renders the
+              shell with pack=null on first composition). */}
+          <span aria-label={`Status: ${pack?.status ?? 'draft'}`}>
+            {(pack?.status ?? 'draft').replace(/^./, (c) => c.toUpperCase())}
+          </span>
 
-          {/* Initial save indicator (server-rendered). F4 has its own
-              live indicator next to the submit button. */}
+          {/* Initial save indicator (server-rendered). F4 of NR-D6b
+              has its own live indicator next to the submit button. */}
           <span aria-live="polite">{SAVE_STATE_LABEL[saveState]}</span>
 
-          {/* Disabled Publish CTA — NR-D9 turns this on. */}
-          <button type="button" disabled title={PUBLISH_CTA_TOOLTIP}>
-            Publish
-          </button>
+          {/* Publish CTA. Create mode: disabled with legacy tooltip.
+              Edit mode: <PublishActions> client wrapper drives the
+              modal flow. */}
+          {pack !== null && publishState !== null ? (
+            <PublishActions
+              orgSlug={orgSlug}
+              packSlug={pack.slug}
+              packId={pack.id}
+              packTitle={pack.title}
+              packLicenceClass={pack.licence_class}
+              packCreditLine={pack.credit_line}
+              packPublishAt={pack.publish_at}
+              warrantyConfirmed={publishState.warranty !== null}
+              embargo={
+                publishState.embargo !== null
+                  ? {
+                      lift_at: publishState.embargo.lift_at,
+                      recipientCount: publishState.recipientCount,
+                    }
+                  : null
+              }
+              ctaLabel={publishState.checklist.ctaLabel}
+              ctaDisabled={publishState.checklist.ctaDisabled}
+              missing={publishState.checklist.missing}
+              canonicalUrl={publishState.canonicalUrl}
+            />
+          ) : (
+            <button
+              type="button"
+              disabled
+              title={PUBLISH_CTA_TOOLTIP_CREATE}
+            >
+              Publish
+            </button>
+          )}
         </div>
       </header>
 
-      {/* ── Tab nav ──
-       *  NR-D7a activated the Assets tab; NR-D8 activates Embargo.
-       *  Both follow the same shape: rendered as <Link> when a
-       *  saved pack exists (path takes pack.slug), or as a
-       *  disabled <span> in create mode (no slug yet — admin
-       *  saves the draft first via the Details tab, then the
-       *  other tabs become reachable).
-       *
-       *  Active-state styling for "currently on Details vs Assets
-       *  vs Embargo" is intentionally not encoded here — Next 16
-       *  doesn't expose the current pathname to server components
-       *  without an extra wrapper, and the visual-polish pass owns
-       *  selected-tab indicators. All three tabs render
-       *  aria-current="page" so the editor surface itself is
-       *  signalled; routing differentiates the actual content.
-       */}
+      {/* ── Tab nav ── (unchanged from NR-D6b) */}
       <nav aria-label="Pack editor tabs">
         <Link href={detailsHref} aria-current="page">
           Details
@@ -142,8 +328,13 @@ export function PackEditorShell({
         )}
       </nav>
 
-      {/* ── Active tab content (DetailsForm) ── */}
-      <section>{children}</section>
+      {/* ── Active tab content (children) + checklist sidebar ── */}
+      <div>
+        <section>{children}</section>
+        {publishState !== null ? (
+          <PrePublishChecklist items={publishState.checklist.items} />
+        ) : null}
+      </div>
     </main>
   )
 }
