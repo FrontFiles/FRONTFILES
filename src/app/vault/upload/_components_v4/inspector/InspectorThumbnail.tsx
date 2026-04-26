@@ -17,7 +17,7 @@
 
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { V2Asset } from '@/lib/upload/v3-types'
 
 interface Props {
@@ -25,6 +25,13 @@ interface Props {
 }
 
 export default function InspectorThumbnail({ asset }: Props) {
+  // Per IPD3-9 + the D2.7 blob-URL revocation fix: prefer thumbnailRef;
+  // fall back to URL.createObjectURL(asset.file) only when no thumbnailRef
+  // exists. We do NOT revoke on unmount — the blob URL is shared across
+  // surfaces (this inspector + the contact-sheet card both read
+  // asset.thumbnailRef from state). Revoking on individual unmount kills
+  // a URL the other surface is still using. Leak in dev; URLs free on
+  // page refresh. Production paths use real backend URLs.
   const url = useMemo<string | null>(() => {
     if (asset.thumbnailRef) return asset.thumbnailRef
     if (asset.file) {
@@ -36,12 +43,6 @@ export default function InspectorThumbnail({ asset }: Props) {
     }
     return null
   }, [asset.thumbnailRef, asset.file])
-
-  useEffect(() => {
-    return () => {
-      if (url && url.startsWith('blob:')) URL.revokeObjectURL(url)
-    }
-  }, [url])
 
   return (
     <div className="flex-shrink-0">

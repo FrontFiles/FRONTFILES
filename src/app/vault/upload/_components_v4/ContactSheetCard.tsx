@@ -23,7 +23,6 @@
 'use client'
 
 import {
-  useEffect,
   useMemo,
   type CSSProperties,
   type HTMLAttributes,
@@ -67,7 +66,14 @@ export default function ContactSheetCard({
   const story = asset.storyGroupId ? state.storyGroupsById[asset.storyGroupId] : null
   const dot = useMemo(() => resolveStatusDot(asset), [asset])
 
-  // Object-URL hygiene per IPD3-9 (same pattern as C2 SideDetailPanel thumbnail).
+  // Per IPD3-9: prefer thumbnailRef; fall back to a NEW object-URL of
+  // asset.file when no thumbnailRef exists. We do NOT revoke on unmount —
+  // the blob URL is shared across surfaces (this card AND the right-rail
+  // inspector both read asset.thumbnailRef from state). Revoking on
+  // individual component unmount kills the URL while the asset is still
+  // in state. Leak in dev is acceptable; URLs free on page refresh.
+  // Production paths use real backend URLs (not blob:) and don't hit the
+  // createObjectURL fallback at all.
   const url = useMemo<string | null>(() => {
     if (asset.thumbnailRef) return asset.thumbnailRef
     if (asset.file) {
@@ -79,12 +85,6 @@ export default function ContactSheetCard({
     }
     return null
   }, [asset.thumbnailRef, asset.file])
-
-  useEffect(() => {
-    return () => {
-      if (url && url.startsWith('blob:')) URL.revokeObjectURL(url)
-    }
-  }, [url])
 
   // 16:9 landscape per founder lock (D2.3 visual feedback). Width is
   // zoom-driven; height = width × 9/16. Object-cover crops the thumbnail
