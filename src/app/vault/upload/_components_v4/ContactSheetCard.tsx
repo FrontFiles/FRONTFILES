@@ -57,11 +57,17 @@ export default function ContactSheetCard({ asset, cardSize, onClick }: Props) {
     }
   }, [url])
 
+  // 16:9 landscape per founder lock (D2.3 visual feedback). Width is
+  // zoom-driven; height = width × 9/16. Object-cover crops the thumbnail
+  // to fill (no letterboxing). Editorial standard for mixed-media contact
+  // sheets — matches video content natively, crops photo content cleanly.
+  const cardHeight = Math.round((cardSize * 9) / 16)
+
   return (
     <div
       onClick={e => onClick(asset.id, e)}
       onDoubleClick={e => onClick(asset.id, e)}
-      style={{ width: cardSize, height: cardSize }}
+      style={{ width: cardSize, height: cardHeight }}
       className={`relative bg-slate-100 cursor-pointer group overflow-hidden ${
         isSelected ? 'border-2 border-blue-600' : 'border border-black'
       } ${asset.excluded ? 'opacity-50' : ''}`}

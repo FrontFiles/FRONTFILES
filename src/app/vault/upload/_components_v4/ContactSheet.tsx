@@ -83,7 +83,12 @@ export default function ContactSheet() {
   const visible = useMemo(() => getFilteredSortedSearchedAssets(filterView), [filterView])
 
   const cardWidth = ZOOM_TO_CARD_WIDTH[state.ui.contactSheetZoom]
+  // 16:9 landscape per founder lock — height = width × 9/16. Card visual
+  // dimensions live in ContactSheetCard; rowHeight here mirrors the math
+  // so the virtualized grid lays out correctly without overlap or gap.
+  const cardHeight = Math.round((cardWidth * 9) / 16)
   const cardWithGap = cardWidth + CARD_GAP
+  const rowWithGap = cardHeight + CARD_GAP
   const columns = Math.max(1, Math.floor((size.width + CARD_GAP) / cardWithGap))
   const rows = Math.ceil(visible.length / columns)
 
@@ -149,7 +154,7 @@ export default function ContactSheet() {
           columnCount={columns}
           rowCount={rows}
           columnWidth={cardWithGap}
-          rowHeight={cardWithGap}
+          rowHeight={rowWithGap}
           width={size.width}
           height={size.height}
           itemData={{ visible, columns, cardSize: cardWidth, onClick: handleCardClick }}
