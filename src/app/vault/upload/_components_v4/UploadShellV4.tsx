@@ -28,7 +28,7 @@
 
 'use client'
 
-import { useCallback, useReducer } from 'react'
+import { useCallback, useReducer, useRef, useState, type DragEvent } from 'react'
 import {
   DndContext,
   PointerSensor,
@@ -51,6 +51,8 @@ import EmptyState from './EmptyState'
 import CenterPane from './CenterPane'
 import RightRailInspector from './RightRailInspector'
 import LeftRail from './LeftRail'
+import { FileIngestProvider } from './lib/FileIngestContext'
+import { filesToAssetDescriptors } from './lib/filesToAssetDescriptors'
 
 interface Props {
   batchId: string
@@ -82,6 +84,71 @@ export default function UploadShellV4({
   // (no movement) still register as clicks; only mouse-down + drag past
   // the threshold initiates a drag. Prevents accidental drags on click.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  // ── D2.7 file ingest plumbing ────────────────────────────────
+  //
+  // Single hidden <input type="file" multiple> ref-controlled; both the
+  // EmptyState "click to browse" affordance and the LeftRailHeader
+  // "+ Add files" button trigger it via FileIngestContext.
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  function handleFiles(files: FileList | File[] | null) {
+    if (!files) return
+    const descriptors = filesToAssetDescriptors(files)
+    if (descriptors.length === 0) return
+    dispatch({ type: 'ADD_FILES', files: descriptors } as V3Action)
+  }
+
+  function handleFilePickerChange(event: React.ChangeEvent<HTMLInputElement>) {
+    handleFiles(event.target.files)
+    // Reset the input value so picking the same file twice still fires onChange.
+    event.target.value = ''
+  }
+
+  // ── D2.7 whole-window file-drop listener ─────────────────────
+  //
+  // Per L1: drop listener attaches to a root div inside UploadShellV4.
+  // Per L6: gate by dataTransfer.types.includes('Files') so internal
+  // @dnd-kit drags don't trigger this. Per IPD7-7 = (b): use a counter
+  // to track dragenter/dragleave reliably across child element transitions.
+  const [isFileDragging, setIsFileDragging] = useState(false)
+  const dragCounterRef = useRef(0)
+
+  function isFileDragEvent(e: DragEvent): boolean {
+    return Array.from(e.dataTransfer?.types ?? []).includes('Files')
+  }
+
+  function handleDragEnter(e: DragEvent<HTMLDivElement>) {
+    if (!isFileDragEvent(e)) return
+    e.preventDefault()
+    dragCounterRef.current += 1
+    setIsFileDragging(true)
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    if (!isFileDragEvent(e)) return
+    e.preventDefault() // required to allow drop
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    if (!isFileDragEvent(e)) return
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1)
+    if (dragCounterRef.current === 0) {
+      setIsFileDragging(false)
+    }
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    if (!isFileDragEvent(e)) return
+    e.preventDefault()
+    dragCounterRef.current = 0
+    setIsFileDragging(false)
+    handleFiles(e.dataTransfer.files)
+  }
 
   /**
    * Drag-end router. Inspects active.id (the dragged asset) and over.id
@@ -189,12 +256,53 @@ export default function UploadShellV4({
     ],
   )
 
+  // D2.7: hidden file input + drop overlay are sibling DOM nodes that wrap
+  // every layout state. Extract a reusable shell wrapper so both Empty
+  // and Workspace branches get the file ingest plumbing for free.
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      multiple
+      accept="image/*,video/*,audio/*,.txt,.svg,.ai,.eps"
+      onChange={handleFilePickerChange}
+      className="hidden"
+      aria-hidden
+      tabIndex={-1}
+    />
+  )
+
+  const dropOverlay = isFileDragging ? (
+    <div
+      className="fixed inset-4 z-50 border-4 border-dashed border-blue-600 bg-white/70 flex items-center justify-center pointer-events-none"
+      aria-hidden
+    >
+      <div className="text-3xl font-bold uppercase tracking-widest text-blue-600">
+        Drop to add files
+      </div>
+    </div>
+  ) : null
+
   // Empty layout state: EmptyState fills the screen. Three-pane shell + commit
-  // bar slot are not mounted — there's nothing yet to populate them.
+  // bar slot are not mounted — there's nothing yet to populate them. The
+  // file ingest provider + drop listener still wrap so empty-state can
+  // accept file drops + click-to-browse.
   if (layout === 'empty') {
     return (
       <UploadContextProvider state={state} dispatch={dispatch}>
-        <EmptyState />
+        <FileIngestProvider value={{ openFilePicker }}>
+          <div
+            className="flex-1 flex flex-col min-w-0"
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {fileInput}
+            {dropOverlay}
+            <EmptyState />
+          </div>
+        </FileIngestProvider>
       </UploadContextProvider>
     )
   }
@@ -206,22 +314,35 @@ export default function UploadShellV4({
   // D2.2: the entire shell is wrapped in DndContext so cards in the center
   // can be dragged onto receivers in the left rail. handleDragEnd routes
   // by over.id pattern (see definition above).
+  //
+  // D2.7: outer div hosts the file-drop listener (gated by dataTransfer
+  // 'Files' check so internal @dnd-kit drags don't trigger). Hidden file
+  // input + drop overlay are siblings of the shell content.
   return (
     <UploadContextProvider state={state} dispatch={dispatch}>
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="flex flex-col min-h-screen min-w-0">
-          <div className="flex flex-row flex-1 min-w-0 min-h-0">
-            {/* Left rail — LIVE per D2.2.
-             *
-             * Per UX-SPEC-V4 §2.0.1 (corrected): mounts as soon as
-             * assetOrder.length > 0 (NOT gated on storyGroupOrder.length).
-             * The rail itself handles the leftRailCollapsed state internally
-             * (via LeftRailHeader's toggle button) — it always renders, just
-             * at a different width.
-             */}
-            <div data-region="left-rail" className="border-r border-black flex-shrink-0">
-              <LeftRail />
-            </div>
+      <FileIngestProvider value={{ openFilePicker }}>
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <div
+            className="flex flex-col min-h-screen min-w-0"
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {fileInput}
+            {dropOverlay}
+            <div className="flex flex-row flex-1 min-w-0 min-h-0">
+              {/* Left rail — LIVE per D2.2.
+               *
+               * Per UX-SPEC-V4 §2.0.1 (corrected): mounts as soon as
+               * assetOrder.length > 0 (NOT gated on storyGroupOrder.length).
+               * The rail itself handles the leftRailCollapsed state internally
+               * (via LeftRailHeader's toggle button) — it always renders, just
+               * at a different width.
+               */}
+              <div data-region="left-rail" className="border-r border-black flex-shrink-0">
+                <LeftRail />
+              </div>
 
           {/* Center pane — LIVE per D2.3 (CenterPane orchestrator inside).
            *
@@ -285,8 +406,9 @@ export default function UploadShellV4({
             {devSeedBanners && <span>seedBanners=true</span>}
           </div>
         </div>
-        </div>
-      </DndContext>
+          </div>
+        </DndContext>
+      </FileIngestProvider>
     </UploadContextProvider>
   )
 }

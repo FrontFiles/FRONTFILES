@@ -14,14 +14,20 @@
 
 'use client'
 
+import { useState } from 'react'
 import { useUploadContext } from '../_components/UploadContext'
+import { useFileIngest } from './lib/FileIngestContext'
+import SessionDefaultsPopover from './SessionDefaultsPopover'
 
 export default function LeftRailHeader() {
   const { state, dispatch } = useUploadContext()
+  const { openFilePicker } = useFileIngest()
   const collapsed = state.ui.leftRailCollapsed
+  // D2.7 IPD7-13 = (a): popover open state lives here, close to its trigger.
+  const [defaultsOpen, setDefaultsOpen] = useState(false)
 
   return (
-    <div className="border-b border-black px-3 py-2 flex items-center gap-2 flex-shrink-0 min-w-0">
+    <div className="border-b border-black px-3 py-2 flex items-center gap-2 flex-shrink-0 min-w-0 relative">
       <button
         type="button"
         onClick={() => dispatch({ type: 'TOGGLE_LEFT_RAIL_COLLAPSED' })}
@@ -34,28 +40,35 @@ export default function LeftRailHeader() {
 
       {!collapsed && (
         <>
+          {/* D2.7: + Add files button now triggers the shared file picker
+              (UploadShellV4 owns the hidden <input> ref + handler). */}
           <button
             type="button"
-            onClick={() => {
-              // TODO(D2.7): wire to native file picker via UploadShellV4-level handler
-            }}
+            onClick={openFilePicker}
             className="flex-1 border border-black px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-black bg-white hover:bg-black hover:text-white transition-colors min-w-0 truncate"
-            title="Add files (wires at D2.7)"
+            title="Add files from your computer"
           >
             + Add files
           </button>
 
+          {/* D2.7: cog now toggles SessionDefaultsPopover (popover state
+              lives here per IPD7-13 = (a)). */}
           <button
             type="button"
-            onClick={() => {
-              // TODO(D2.7): open SessionDefaultsPopover
-            }}
-            className="border border-black w-7 h-7 flex items-center justify-center text-sm hover:bg-black hover:text-white transition-colors flex-shrink-0"
+            onClick={() => setDefaultsOpen(o => !o)}
+            className={`border border-black w-7 h-7 flex items-center justify-center text-sm transition-colors flex-shrink-0 ${
+              defaultsOpen
+                ? 'bg-black text-white'
+                : 'bg-white text-black hover:bg-black hover:text-white'
+            }`}
             aria-label="Session defaults"
-            title="Session defaults (wires at D2.7)"
+            aria-expanded={defaultsOpen}
+            title="Session defaults"
           >
             ⚙
           </button>
+
+          {defaultsOpen && <SessionDefaultsPopover onClose={() => setDefaultsOpen(false)} />}
         </>
       )}
     </div>
