@@ -156,6 +156,28 @@ const envSchema = z.object({
       'Bearer secret on the /api/cron/newsroom-publish-pipeline endpoint. Required in production.',
     ),
 
+  // NR-D10: Ed25519 signing-key material for the stub KMS adapter.
+  // Required in production; without these two vars set, the publish
+  // RPC's `no_active_signing_key` precondition cannot be satisfied
+  // and any publish attempt fails. Bootstrap procedure (one-time per
+  // dev environment) lives at:
+  //   docs/runbooks/newsroom-signing-key-bootstrap.md
+  // v1.1 / NR-G5: replaced by real KMS provisioning per NR-H1.
+  NEWSROOM_SIGNING_KEY_PRIVATE: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'Base64-encoded PEM (PKCS8) Ed25519 private key. Loaded by StubKmsAdapter. Required in production. See docs/runbooks/newsroom-signing-key-bootstrap.md.',
+    ),
+  NEWSROOM_SIGNING_KEY_ID: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'String identifier matching newsroom_signing_keys.kid. Populates DownloadReceipt.signing_key_kid. Required in production. See docs/runbooks/newsroom-signing-key-bootstrap.md.',
+    ),
+
   // ─── Optional: Stripe (wired in Phase 5) ──────────────────────
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -246,6 +268,8 @@ const rawEnv = {
   SCANNER_STUB_DELAY_MS: process.env.SCANNER_STUB_DELAY_MS,
   SCANNER_CRON_SECRET: process.env.SCANNER_CRON_SECRET,
   NEWSROOM_PUBLISH_CRON_SECRET: process.env.NEWSROOM_PUBLISH_CRON_SECRET,
+  NEWSROOM_SIGNING_KEY_PRIVATE: process.env.NEWSROOM_SIGNING_KEY_PRIVATE,
+  NEWSROOM_SIGNING_KEY_ID: process.env.NEWSROOM_SIGNING_KEY_ID,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   STRIPE_CONNECT_CLIENT_ID: process.env.STRIPE_CONNECT_CLIENT_ID,
