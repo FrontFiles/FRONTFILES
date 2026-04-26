@@ -72,3 +72,9 @@ SESSION_STATE_*.md
 
 # npm lockfile — project is bun-managed; package-lock.json is contamination
 package-lock.json
+
+# Cowork session local state — per-session lock files and local settings
+# never enter history. Tracked .claude/agents/*.md and launch.json
+# remain unaffected.
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
