@@ -23,8 +23,11 @@ import type {
   V2Defaults,
   V2Exception,
   V2CompletionSummary,
+  V2Filter,
+  V2FilterPreset,
   StoryGroupKind,
   CommitOutcome,
+  AssetFormat,
 } from './v2-types'
 import { TRANSACTABLE_STATES } from './types'
 import { isListablePrivacy } from '@/lib/asset/visibility'
@@ -318,6 +321,183 @@ export interface AnalysisProgressResult {
   failed: number
   inProgress: number
   percent: number
+}
+
+// ── Filtered / sorted / searched assets (NEW per C2.2-DIRECTIVE §3.9) ──
+//
+// Replaces the V2-coupled `getFilteredAssets` in v2-state.ts. Operates on a
+// narrow view that includes filter/search/sort state from V3UIState (or its
+// equivalent in V2). Both V2State and V3State satisfy this view via
+// structural typing.
+//
+// Behavior parity with the dormant v2-state.ts version is enforced
+// implicitly: the implementation mirrors the same filter presets, sort
+// logic, and search semantics. Existing v2-state tests + the C2.1 parity
+// test remain the regression net for the V2 path.
+
+export type FilterableSortField =
+  | 'filename'
+  | 'format'
+  | 'story'
+  | 'privacy'
+  | 'price'
+  | 'status'
+  | 'declaration'
+  | 'issues'
+  | 'title'
+  | 'size'
+  | 'captureDate'
+  | 'confidence'
+  | 'location'
+
+export interface FilterableView extends AssetsView {
+  filter: V2Filter
+  searchQuery: string
+  sortField: FilterableSortField
+  sortDirection: 'asc' | 'desc'
+}
+
+export function getFilteredSortedSearchedAssets(view: FilterableView): V2Asset[] {
+  let assets = getAssets(view)
+  const { filter, searchQuery, sortField, sortDirection } = view
+
+  // Search query filter (full-text on filename + title + tags + format)
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase().trim()
+    assets = assets.filter(
+      a =>
+        a.filename.toLowerCase().includes(q) ||
+        a.editable.title.toLowerCase().includes(q) ||
+        a.editable.tags.some(t => t.toLowerCase().includes(q)) ||
+        (a.format && a.format.toLowerCase().includes(q)),
+    )
+  }
+
+  // Filter preset (single value per V2Filter.preset; "exclusive" per IPII-2)
+  switch (filter.preset) {
+    case 'blocking':
+      assets = assets.filter(
+        a => !a.excluded && getAssetExceptions(a).some(e => e.severity === 'blocking'),
+      )
+      break
+    case 'advisory':
+      assets = assets.filter(
+        a => !a.excluded && getAssetExceptions(a).some(e => e.severity === 'advisory'),
+      )
+      break
+    case 'unassigned':
+      assets = assets.filter(a => !a.excluded && a.storyGroupId === null)
+      break
+    case 'assigned':
+      assets = assets.filter(a => !a.excluded && a.storyGroupId !== null)
+      break
+    case 'duplicates':
+      assets = assets.filter(a => a.duplicateStatus !== 'none')
+      break
+    case 'excluded':
+      assets = assets.filter(a => a.excluded)
+      break
+    case 'ready':
+      assets = assets.filter(
+        a =>
+          !a.excluded &&
+          a.analysisStatus === 'complete' &&
+          getAssetExceptions(a).filter(e => e.severity === 'blocking').length === 0,
+      )
+      break
+    case 'processing':
+      assets = assets.filter(
+        a =>
+          a.analysisStatus === 'uploading' ||
+          a.analysisStatus === 'analysing' ||
+          a.analysisStatus === 'pending',
+      )
+      break
+    case 'failed':
+      assets = assets.filter(a => a.analysisStatus === 'failed')
+      break
+    case 'conflicts':
+      assets = assets.filter(a => a.conflicts?.some(c => c.resolvedBy === null))
+      break
+    case 'missing-required':
+      assets = assets.filter(
+        a =>
+          !a.excluded &&
+          getAssetExceptions(a).some(
+            e =>
+              e.type === 'needs_story' ||
+              e.type === 'needs_privacy' ||
+              e.type === 'needs_price' ||
+              e.type === 'needs_licences',
+          ),
+      )
+      break
+    case 'private-ready':
+      assets = assets.filter(
+        a =>
+          !a.excluded &&
+          a.editable.privacy === 'PRIVATE' &&
+          getAssetExceptions(a).filter(e => e.severity === 'blocking').length === 0,
+      )
+      break
+    case 'all':
+    default:
+      break
+  }
+
+  // Secondary filters
+  if (filter.storyGroupId) {
+    assets = assets.filter(a => a.storyGroupId === filter.storyGroupId)
+  }
+  if (filter.format) {
+    assets = assets.filter(a => a.format === filter.format)
+  }
+  if (filter.privacy) {
+    assets = assets.filter(a => a.editable.privacy === filter.privacy)
+  }
+  if (filter.declaration) {
+    assets = assets.filter(a => a.declarationState === filter.declaration)
+  }
+  if (filter.hasConflicts === true) {
+    assets = assets.filter(a => a.conflicts?.some(c => c.resolvedBy === null))
+  }
+
+  // Sort
+  const dir = sortDirection === 'desc' ? -1 : 1
+  const sorted = [...assets].sort((a, b) => {
+    switch (sortField) {
+      case 'filename':
+        return dir * a.filename.localeCompare(b.filename)
+      case 'title':
+        return dir * a.editable.title.localeCompare(b.editable.title)
+      case 'size':
+        return dir * (a.fileSize - b.fileSize)
+      case 'format':
+        return dir * String(a.format ?? '').localeCompare(String(b.format ?? ''))
+      case 'price':
+        return dir * ((a.editable.price ?? 0) - (b.editable.price ?? 0))
+      case 'privacy':
+        return dir * String(a.editable.privacy ?? '').localeCompare(String(b.editable.privacy ?? ''))
+      case 'status':
+        return dir * a.analysisStatus.localeCompare(b.analysisStatus)
+      case 'declaration':
+        return dir * String(a.declarationState ?? '').localeCompare(String(b.declarationState ?? ''))
+      case 'story':
+        return dir * String(a.storyGroupId ?? '').localeCompare(String(b.storyGroupId ?? ''))
+      case 'issues':
+        return dir * (getAssetExceptions(a).length - getAssetExceptions(b).length)
+      case 'captureDate':
+        return dir * String(a.editable.captureDate ?? '').localeCompare(String(b.editable.captureDate ?? ''))
+      case 'confidence':
+        return dir * ((a.proposal?.confidence ?? 0) - (b.proposal?.confidence ?? 0))
+      case 'location':
+        return dir * (a.editable.geography[0] ?? '').localeCompare(b.editable.geography[0] ?? '')
+      default:
+        return 0
+    }
+  })
+
+  return sorted
 }
 
 export function getAnalysisProgress(view: AssetsView): AnalysisProgressResult {

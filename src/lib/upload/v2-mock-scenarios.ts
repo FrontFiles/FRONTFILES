@@ -936,12 +936,135 @@ export const SCALE_BATCH_50_PLUS: MockScenario = {
   analysisTemplates: buildScaleAnalysis(),
 }
 
+// ══════════════════════════════════════════════════
+// C2.2 §3.1 — Archive-scale fixtures (programmatically generated)
+// ══════════════════════════════════════════════════
+//
+// Three deterministic fixtures for the 4-mode density router. Built by
+// `buildArchiveScenario` — no Math.random; stable IDs from index.
+//
+//   archive_150_mixed         — 150 assets, 3 implied clusters
+//   archive_500_single_shoot  — 500 assets, 1 large cluster
+//   archive_1500_decade       — 1,500 assets, 12 clusters
+//
+// Per IPII-12: extends existing SCENARIO_REGISTRY (DevHarness compatibility).
+
+interface ArchiveScenarioSpec {
+  id: ScenarioId
+  label: string
+  count: number
+  clusters: Array<{ name: string; size: number; rationale: string }>
+}
+
+function buildArchiveScenario(spec: ArchiveScenarioSpec): MockScenario {
+  const assets: MockAsset[] = []
+  const storyGroupTemplates: MockStoryGroupTemplate[] = []
+  const analysisTemplates: MockAnalysisTemplate[] = []
+
+  let idx = 0
+  for (let c = 0; c < spec.clusters.length; c++) {
+    const cluster = spec.clusters[c]
+    const startIdx = idx
+    const clusterAssetIndices: number[] = []
+
+    for (let i = 0; i < cluster.size; i++) {
+      const assetIndex = idx
+      const filename = `${spec.id}_c${c}_${String(i).padStart(4, '0')}.jpg`
+      const fileSize = 1_500_000 + (i * 7919) % 3_000_000 // deterministic size variation
+      assets.push({
+        filename,
+        fileSize,
+        format: 'photo',
+      })
+      clusterAssetIndices.push(assetIndex)
+      analysisTemplates.push({
+        assetIndex,
+        declarationState: i % 17 === 0 ? 'provenance_pending' : 'provenance_intermediate',
+        confidence: 0.6 + (i % 4) * 0.1, // 0.6 / 0.7 / 0.8 / 0.9
+        title: `${cluster.name} — frame ${i + 1}`,
+        description: `Synthetic asset ${i + 1} in cluster "${cluster.name}".`,
+        tags: ['archive', cluster.name.toLowerCase().replace(/\s+/g, '-')],
+        geography: ['archive-test'],
+        priceSuggestionCents: 12000 + (i % 8) * 1500, // €120 to €225
+        privacySuggestion: 'PUBLIC',
+        licenceSuggestions: ['EDITORIAL'],
+      })
+      idx++
+    }
+
+    storyGroupTemplates.push({
+      name: cluster.name,
+      kind: 'proposed',
+      assetIndices: clusterAssetIndices,
+      confidence: 0.85,
+      rationale: cluster.rationale,
+    })
+  }
+
+  return {
+    id: spec.id,
+    label: spec.label,
+    description: `${spec.count} programmatically-generated assets across ${spec.clusters.length} cluster(s) for Archive-mode density testing.`,
+    fileCount: spec.count,
+    assets,
+    storyGroupTemplates,
+    analysisTemplates,
+  }
+}
+
+export const ARCHIVE_150_MIXED: MockScenario = buildArchiveScenario({
+  id: 'archive_150_mixed',
+  label: 'Archive — 150 files, 3 implied clusters',
+  count: 150,
+  clusters: [
+    { name: 'Lisbon Climate March 2026', size: 60, rationale: 'Visual + temporal proximity (single afternoon)' },
+    { name: 'Setúbal Coastal Erosion 2025', size: 50, rationale: 'Same coastline; multiple visits over a month' },
+    { name: 'Évora Wildfire Aftermath', size: 40, rationale: 'Single event; overlapping geo metadata' },
+  ],
+})
+
+export const ARCHIVE_500_SINGLE_SHOOT: MockScenario = buildArchiveScenario({
+  id: 'archive_500_single_shoot',
+  label: 'Archive — 500 files, 1 large cluster',
+  count: 500,
+  clusters: [
+    {
+      name: 'Carnaval do Porto 2026',
+      size: 500,
+      rationale: 'Single multi-day event; 500 frames captured continuously',
+    },
+  ],
+})
+
+export const ARCHIVE_1500_DECADE: MockScenario = buildArchiveScenario({
+  id: 'archive_1500_decade',
+  label: 'Archive — 1,500 files, 12 clusters',
+  count: 1500,
+  clusters: [
+    { name: '2016 Refugee Corridor', size: 100, rationale: 'Reportage series, March-May 2016' },
+    { name: '2017 Catalonia Referendum', size: 150, rationale: 'Multiple cities; same week' },
+    { name: '2018 Algarve Wildfires', size: 100, rationale: 'Summer 2018; geo-clustered' },
+    { name: '2019 Portuguese Election', size: 120, rationale: 'Campaign trail; multiple rallies' },
+    { name: '2020 Pandemic Lockdown', size: 200, rationale: 'Lisbon empty streets, March-May 2020' },
+    { name: '2021 Climate Summit Glasgow', size: 80, rationale: 'COP26 coverage' },
+    { name: '2022 Ukraine Border', size: 120, rationale: 'February-April 2022' },
+    { name: '2023 Lampedusa Crisis', size: 100, rationale: 'Migrant landing event' },
+    { name: '2024 European Elections', size: 150, rationale: 'Multi-country campaign coverage' },
+    { name: '2025 Lisbon Floods', size: 130, rationale: 'October 2025 flooding' },
+    { name: '2026 Carnaval Lisboa', size: 100, rationale: 'Spring 2026 carnival' },
+    { name: 'Misc / Unclustered', size: 150, rationale: 'Long-tail individual assignments' },
+  ],
+})
+
 // ── Scenario Registry ──
 
 export const SCENARIOS: Record<ScenarioId, MockScenario> = {
   clean_single_story: CLEAN_SINGLE_STORY,
   messy_multi_story: MESSY_MULTI_STORY,
   scale_batch_50_plus: SCALE_BATCH_50_PLUS,
+  archive_150_mixed: ARCHIVE_150_MIXED,
+  archive_500_single_shoot: ARCHIVE_500_SINGLE_SHOOT,
+  archive_1500_decade: ARCHIVE_1500_DECADE,
 }
 
 export const SCENARIO_LIST = Object.values(SCENARIOS)

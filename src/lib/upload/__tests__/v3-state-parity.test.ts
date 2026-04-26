@@ -29,7 +29,12 @@
 
 import { describe, it, expect } from 'vitest'
 import { hydrateFromScenario, type HydrationTarget } from '../v2-hydration'
-import { CLEAN_SINGLE_STORY, MESSY_MULTI_STORY, SCALE_BATCH_50_PLUS } from '../v2-mock-scenarios'
+import {
+  CLEAN_SINGLE_STORY,
+  MESSY_MULTI_STORY,
+  SCALE_BATCH_50_PLUS,
+  ARCHIVE_150_MIXED,
+} from '../v2-mock-scenarios'
 import { hydrateV3FromV2State } from '../v3-hydration'
 import {
   getAssets,
@@ -48,6 +53,10 @@ const FIXTURES = [
   { name: 'CLEAN_SINGLE_STORY', scenario: CLEAN_SINGLE_STORY },
   { name: 'MESSY_MULTI_STORY', scenario: MESSY_MULTI_STORY },
   { name: 'SCALE_BATCH_50_PLUS', scenario: SCALE_BATCH_50_PLUS },
+  // C2.2 §3.1 — extends parity coverage to Archive-scale fixtures.
+  // Only the 150-asset fixture is included here; 500 and 1500 are
+  // deferred to a perf-test follow-up to keep the parity suite fast.
+  { name: 'ARCHIVE_150_MIXED', scenario: ARCHIVE_150_MIXED },
 ] as const
 
 // All hydration targets except 'add-files' (no analysis yet — parity is
