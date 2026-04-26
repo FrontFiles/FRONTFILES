@@ -27,6 +27,8 @@ import sharp from 'sharp'
 
 import type { StorageAdapter } from '@/lib/storage'
 
+import { enqueueDerivativeRows } from '@/lib/processing/enqueue'
+
 import {
   validateUploadBytes,
   type ServerValidationErrorCode,
@@ -249,6 +251,24 @@ export async function commitUpload(
 
   const outcome = await insertDraftAndOriginal(input)
   if (outcome.kind === 'ok') {
+    // PR 3 — enqueue the three derivative pending rows for the
+    // worker. Failure does NOT roll back the commit per
+    // UPLOAD-PR3-AUDIT-2026-04-26.md IP-3 — the asset row is
+    // canonical; backfill (PR 6) sweeps any orphan that committed
+    // but failed to enqueue. Logged with structured detail for
+    // operator visibility.
+    const enqueueResult = await enqueueDerivativeRows(assetId)
+    if (enqueueResult.kind !== 'ok') {
+      // eslint-disable-next-line no-console
+      console.error(
+        'commit.enqueue: derivative_enqueue_failed',
+        JSON.stringify({
+          code: 'derivative_enqueue_failed',
+          asset_id: assetId,
+          result: enqueueResult,
+        }),
+      )
+    }
     return { ok: true, outcome: 'created', assetId }
   }
 
