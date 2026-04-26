@@ -58,6 +58,18 @@ export type TransitionToCommittedResult =
   | { kind: 'invalid_state'; currentState: BatchState }
   | { kind: 'other'; error: string }
 
+/**
+ * Result of `findBatchForUpload`. Same shape as the commit-time
+ * transition result so callers can use the same disambiguation
+ * pattern.
+ */
+export type FindBatchForUploadResult =
+  | { kind: 'ok'; batch: BatchRow }
+  | { kind: 'not_found' }
+  | { kind: 'forbidden' }
+  | { kind: 'invalid_state'; currentState: BatchState }
+  | { kind: 'other'; error: string }
+
 // ── In-memory store ────────────────────────────────────────
 
 const batchMock = new Map<string, BatchRow>()
@@ -175,6 +187,50 @@ export async function transitionToCommitted(
     kind: 'invalid_state',
     currentState: (lookup as { state: BatchState }).state,
   }
+}
+
+/**
+ * PR 1.3 — read-only batch lookup used by `/api/upload` to validate
+ * `X-Batch-Id` before any storage write. Verifies the batch exists,
+ * belongs to the requesting creator, and is still `'open'` (i.e.
+ * accepting new uploads). Returns a typed reason on each failure
+ * mode so the route can map to the appropriate HTTP status.
+ *
+ * Cost in real mode: one indexed SELECT against
+ * `upload_batches_creator_state_idx` (PR 1.1). ~1ms.
+ */
+export async function findBatchForUpload(
+  batchId: string,
+  creatorId: string,
+): Promise<FindBatchForUploadResult> {
+  if (!isSupabaseConfigured()) {
+    const batch = batchMock.get(batchId)
+    if (!batch) return { kind: 'not_found' }
+    if (batch.creatorId !== creatorId) return { kind: 'forbidden' }
+    if (batch.state !== 'open') {
+      return { kind: 'invalid_state', currentState: batch.state }
+    }
+    return { kind: 'ok', batch }
+  }
+
+  const client = getSupabaseClient()
+  const { data, error } = await client
+    .from('upload_batches')
+    .select(
+      'id, creator_id, state, newsroom_mode, created_at, updated_at, committed_at, cancelled_at',
+    )
+    .eq('id', batchId)
+    .maybeSingle()
+
+  if (error) return { kind: 'other', error: error.message }
+  if (!data) return { kind: 'not_found' }
+
+  const row = rowFromSupabase(data)
+  if (row.creatorId !== creatorId) return { kind: 'forbidden' }
+  if (row.state !== 'open') {
+    return { kind: 'invalid_state', currentState: row.state }
+  }
+  return { kind: 'ok', batch: row }
 }
 
 // ── Helpers ────────────────────────────────────────────────

@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// DORMANT — replaced by C2 (new shell at app/vault/upload/).
+// Scheduled for deletion at the explicit cutover PR (PR 5+).
+// DO NOT extend. DO NOT import from production code paths.
+// See docs/upload/C2-PLAN.md §3.3 for the coexistence rule.
+// ═══════════════════════════════════════════════════════════════
 /**
  * Frontfiles Bulk Upload v2 — Reducer Hydration Helpers
  *

@@ -47,6 +47,19 @@ export interface InsertDraftAndOriginalInput {
   width: number
   height: number
   originalSha256: string
+  // ── PR 1.3 — batch-aware commit (21-arg upload_commit) ──
+  /** FK to upload_batches(id). Required after PR 1.3. */
+  batchId: string
+  /** jsonb; system-generated AssetProposal at commit time. NULL until Phase E. */
+  proposalSnapshot: unknown | null
+  /** jsonb; raw EXIF/IPTC/XMP/C2PA extraction. NULL until Phase E. */
+  extractedMetadata: unknown | null
+  /** jsonb; per-field source tracking. NULL until Phase E. */
+  metadataSource: unknown | null
+  /** Duplicate detection state. NULL = not analysed. */
+  duplicateStatus: 'none' | 'likely_duplicate' | 'confirmed_duplicate' | null
+  /** FK to vault_assets(id) when duplicateStatus='confirmed_duplicate' (DB CHECK). */
+  duplicateOfId: string | null
 }
 
 export type InsertDraftAndOriginalResult =
@@ -67,6 +80,10 @@ interface StoredUpload {
   originalSizeBytes: number
   metadataChecksum: string
   originalSha256: string
+  // PR 1.3 — recorded for fidelity in tests; NOT used in idempotency
+  // lookup (lookup remains by (creator_id, client_upload_token) per
+  // the PR 2 contract). See PR-1.3-PLAN.md §4.4 IP-4.
+  batchId: string
 }
 
 const uploadMock = new Map<string, StoredUpload>()
@@ -157,11 +174,16 @@ export async function insertDraftAndOriginal(
       originalSizeBytes: input.originalSizeBytes,
       metadataChecksum: input.metadataChecksum,
       originalSha256: input.originalSha256,
+      batchId: input.batchId,
     })
     return { kind: 'ok' }
   }
 
   const client = getSupabaseClient()
+  // PR 1.3 — 21-arg upload_commit. The 15 PR 2 params come first
+  // (positions 1-15, unchanged), the 6 new PR 1.1/PR 1.3 params
+  // are appended (positions 16-21). The 15-arg overload is dropped
+  // by migration 20260427000001_drop_upload_commit_15arg.sql.
   const { error } = await client.rpc('upload_commit', {
     p_asset_id: input.assetId,
     p_creator_id: input.creatorId,
@@ -178,6 +200,12 @@ export async function insertDraftAndOriginal(
     p_width: input.width,
     p_height: input.height,
     p_original_sha256: input.originalSha256,
+    p_batch_id: input.batchId,
+    p_proposal_snapshot: input.proposalSnapshot,
+    p_extracted_metadata: input.extractedMetadata,
+    p_metadata_source: input.metadataSource,
+    p_duplicate_status: input.duplicateStatus,
+    p_duplicate_of_id: input.duplicateOfId,
   })
 
   if (!error) return { kind: 'ok' }

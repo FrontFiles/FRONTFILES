@@ -8,6 +8,7 @@ import {
   type CommitUploadRequest,
 } from '../commit-service'
 import { __testing as storeTesting } from '../upload-store'
+import { __testing as enqueueTesting } from '@/lib/processing/enqueue'
 import { sha256Hex } from './test-helpers'
 import { scopeEnvVars } from '@/lib/test/env-scope'
 
@@ -30,6 +31,10 @@ const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x01, 0x02, 0x03])
 
 beforeEach(() => {
   storeTesting.reset()
+  // PR 3 — reset the derivative-enqueue mock store so each test
+  // starts clean. The enqueue hook fires inside commit-service on
+  // the happy path; tests assert on the resulting state.
+  enqueueTesting.reset()
 })
 
 // ── Fake adapter for commit tests ────────────────────────
@@ -87,6 +92,10 @@ function baseRequest(overrides: Partial<CommitUploadRequest> = {}): CommitUpload
     claimedMime: 'image/jpeg',
     bytes: JPEG,
     metadata: { caption: 'hello', tags: ['a', 'b'] },
+    // PR 1.3 — batch-aware commit. All optional fields default to
+    // null at the input layer; the commit-service coalesces them
+    // explicitly when constructing InsertDraftAndOriginalInput.
+    batchId: 'batch-test-1',
     ...overrides,
   }
 }
@@ -143,6 +152,7 @@ describe('commitUpload — idempotency replay', () => {
       originalSizeBytes: req.bytes.length,
       metadataChecksum: metaChecksum,
       originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
     })
 
     const result = await commitUpload(req, deps(adapter))
@@ -166,6 +176,7 @@ describe('commitUpload — idempotency replay', () => {
       originalSizeBytes: req.bytes.length,
       metadataChecksum: metaChecksum,
       originalSha256: 'different-sha-value',
+      batchId: req.batchId,
     })
 
     const result = await commitUpload(req, deps(adapter))
@@ -187,6 +198,7 @@ describe('commitUpload — idempotency replay', () => {
       originalSizeBytes: req.bytes.length + 1,
       metadataChecksum: metaChecksum,
       originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
     })
 
     const result = await commitUpload(req, deps(adapter))
@@ -206,6 +218,7 @@ describe('commitUpload — idempotency replay', () => {
       originalSizeBytes: req.bytes.length,
       metadataChecksum: 'completely-different-checksum',
       originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
     })
 
     const result = await commitUpload(req, deps(adapter))
@@ -230,6 +243,62 @@ describe('commitUpload — storage write failure', () => {
     expect(storeTesting.size()).toBe(0)
     // No compensating delete needed — nothing was written.
     expect(adapter.calls.some(c => c.op === 'delete')).toBe(false)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// PR 3 — derivative pending-row enqueue hook
+// ═══════════════════════════════════════════════════════════════
+
+describe('commitUpload — derivative enqueue hook (PR 3)', () => {
+  it('happy commit enqueues 3 pending derivative rows for the new asset', async () => {
+    const adapter = makeAdapter()
+    const result = await commitUpload(baseRequest(), deps(adapter, 'asset-enq-1'))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.outcome).toBe('created')
+    expect(result.assetId).toBe('asset-enq-1')
+    // Three pending rows now exist in the enqueue mock store —
+    // one per role: thumbnail, watermarked_preview, og_image.
+    expect(enqueueTesting.size()).toBe(3)
+    expect(enqueueTesting.has('asset-enq-1', 'thumbnail')).toBe(true)
+    expect(enqueueTesting.has('asset-enq-1', 'watermarked_preview')).toBe(true)
+    expect(enqueueTesting.has('asset-enq-1', 'og_image')).toBe(true)
+  })
+
+  it('storage failure path does NOT enqueue derivative rows', async () => {
+    const adapter = makeAdapter()
+    adapter.nextPutShouldThrow = 'disk full'
+    const result = await commitUpload(baseRequest(), deps(adapter, 'asset-enq-2'))
+    expect(result.ok).toBe(false)
+    // Enqueue is gated on the happy path. Commit failed before
+    // the row insert; enqueue hook never fires.
+    expect(enqueueTesting.size()).toBe(0)
+  })
+
+  it('idempotency hit path does NOT re-enqueue (per audit IP-3)', async () => {
+    // Seed an existing matching row so the second commit returns
+    // 'hit' instead of 'created'. The enqueue hook fires only on
+    // the 'created' path — the original commit was responsible for
+    // enqueue (or backfill resolves any gap).
+    const adapter = makeAdapter()
+    const req = baseRequest()
+    const metaChecksum = sha256Hex(Buffer.from(canonicalJSONStringify(req.metadata), 'utf8'))
+    storeTesting.seedExisting({
+      assetId: 'pre-existing-asset',
+      creatorId: req.creatorId,
+      clientUploadToken: req.clientUploadToken,
+      originalSizeBytes: req.bytes.length,
+      metadataChecksum: metaChecksum,
+      originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
+    })
+    const result = await commitUpload(req, deps(adapter))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.outcome).toBe('hit')
+    // The 'hit' path bypasses enqueue — store stays empty.
+    expect(enqueueTesting.size()).toBe(0)
   })
 })
 
@@ -281,6 +350,7 @@ describe('commitUpload — token race (unique violation)', () => {
       originalSizeBytes: req.bytes.length,
       metadataChecksum: sha256Hex(Buffer.from(canonicalJSONStringify(req.metadata), 'utf8')),
       originalSha256: sha256Hex(req.bytes),
+      batchId: req.batchId,
     }
   }
 

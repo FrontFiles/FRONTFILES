@@ -17,6 +17,11 @@ import type { ProcessingJob, ProcessingResult, WatermarkIntrusionLevel } from '.
 import { IMAGE_DERIVATIVE_SPECS, shortAssetId } from './types'
 import { processDerivative } from './pipeline'
 import type { StorageAdapter, MediaRowAdapter } from './pipeline'
+// PR 4 — high-level dispatch entry uses these
+import type { StorageAdapter as LowLevelStorage } from '@/lib/storage'
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client'
+import { makeMediaRowAdapter } from './media-row-adapter'
+import { makePipelineStorageAdapter } from './storage-bridge'
 
 // ══════════════════════════════════════════════
 // TYPES
@@ -77,10 +82,11 @@ export async function dispatchDerivativeProcessing(
     attribution: request.creatorName,
   }))
 
-  // Create pending rows for all derivatives
-  for (const job of jobs) {
-    await mediaRows.updateMediaRow(job.assetId, job.spec.role, { status: 'pending' as const })
-  }
+  // PR 4 change: pending rows are created by PR 3's enqueueDerivativeRows
+  // (called from commit-service before this dispatcher fires). The
+  // dispatcher no longer creates them — that would conflict with the
+  // existing pending rows under the UNIQUE (asset_id, media_role) constraint.
+  // Per PR-4-PLAN.md §4.2 dispatcher modification.
 
   // Fire-and-forget: process all derivatives concurrently
   // Errors are caught per-job and recorded in asset_media.generation_status
@@ -97,6 +103,111 @@ export async function dispatchDerivativeProcessing(
   }).catch(err => {
     console.error(`[processing] Unexpected error dispatching derivatives for ${request.assetId}:`, err)
   })
+}
+
+// ══════════════════════════════════════════════
+// PR 4 — High-level entry point
+// ══════════════════════════════════════════════
+
+/**
+ * Higher-level dispatch entry — looks up the asset's format +
+ * intrusion_level + creator name, builds the pipeline-shape adapters
+ * via storage-bridge + media-row-adapter, then dispatches the
+ * existing fire-and-forget pipeline.
+ *
+ * This is the function commit-service.ts and scripts/process-derivatives.ts
+ * call. It centralises the lookup + adapter construction so callers
+ * don't have to duplicate it.
+ *
+ * In mock mode (no Supabase), returns sensible defaults for tests.
+ */
+export async function dispatchAssetForProcessing(
+  assetId: string,
+  storage: LowLevelStorage,
+): Promise<void> {
+  const lookup = await lookupAssetForDispatch(assetId)
+  if (!lookup) {
+    // eslint-disable-next-line no-console
+    console.error(
+      'dispatcher.lookup: asset_not_found',
+      JSON.stringify({ code: 'asset_not_found', asset_id: assetId }),
+    )
+    return
+  }
+
+  const mediaRows = makeMediaRowAdapter()
+  const pipelineStorage = makePipelineStorageAdapter(storage)
+
+  await dispatchDerivativeProcessing(
+    {
+      assetId,
+      format: lookup.format,
+      intrusionLevel: lookup.intrusionLevel,
+      creatorName: lookup.creatorName,
+    },
+    pipelineStorage,
+    mediaRows,
+    /* allowDraft */ false,
+  )
+}
+
+interface AssetDispatchLookup {
+  format: string
+  intrusionLevel: WatermarkIntrusionLevel
+  creatorName: string
+}
+
+async function lookupAssetForDispatch(
+  assetId: string,
+): Promise<AssetDispatchLookup | null> {
+  if (!isSupabaseConfigured()) {
+    // Mock mode: tests don't actually hit this path (they invoke
+    // dispatchDerivativeProcessing directly with their own values).
+    // Return sensible defaults so the wiring is testable end-to-end
+    // if someone does call dispatchAssetForProcessing in mock mode.
+    return {
+      format: 'photo',
+      intrusionLevel: 'standard',
+      creatorName: 'Test Creator',
+    }
+  }
+
+  const client = getSupabaseClient()
+  const { data, error } = await client
+    .from('vault_assets')
+    .select('format, intrusion_level, users!inner(display_name)')
+    .eq('id', assetId)
+    .maybeSingle()
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error(
+      'dispatcher.lookup: query_failed',
+      JSON.stringify({
+        code: 'lookup_query_failed',
+        asset_id: assetId,
+        error: error.message,
+      }),
+    )
+    return null
+  }
+  if (!data) return null
+
+  // Supabase joins return the joined row as an object (or array).
+  // Normalise both shapes.
+  const row = data as {
+    format: string
+    intrusion_level: WatermarkIntrusionLevel | null
+    users:
+      | { display_name: string | null }
+      | Array<{ display_name: string | null }>
+      | null
+  }
+  const usersRow = Array.isArray(row.users) ? row.users[0] : row.users
+  return {
+    format: row.format,
+    intrusionLevel: row.intrusion_level ?? 'standard',
+    creatorName: usersRow?.display_name ?? 'Unknown Creator',
+  }
 }
 
 /**
@@ -155,9 +266,10 @@ export async function dispatchBackfill(
       attribution: request.creatorName,
     }))
 
-    for (const job of jobs) {
-      await mediaRows.updateMediaRow(job.assetId, job.spec.role, { status: 'pending' as const })
-    }
+    // PR 4 change: pending rows are created by the backfill query
+    // (PR 6) before this function runs. Same rationale as
+    // dispatchDerivativeProcessing — UNIQUE constraint means we
+    // shouldn't try to insert again.
 
     const results = await Promise.all(
       jobs.map(job => processDerivative(job, storage, mediaRows, allowDraft)),

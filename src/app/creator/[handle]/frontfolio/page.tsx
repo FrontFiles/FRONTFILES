@@ -370,7 +370,7 @@ function CreatorDetailRail({ profile, connectionCount, isSelfView }: {
               <div className="w-4 h-4 bg-[#0000ff] flex items-center justify-center">
                 <svg viewBox="0 0 12 12" fill="none" className="w-2.5 h-2.5 text-white"><path d="M3 6l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </div>
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-black text-white text-[9px] font-bold uppercase tracking-wider whitespace-nowrap opacity-0 group-hover/verified:opacity-100 transition-opacity pointer-events-none z-10">Verified Creator</div>
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-black text-white text-[9px] font-bold uppercase tracking-wider whitespace-nowrap opacity-0 group-hover/verified:opacity-100 transition-opacity pointer-events-none z-10">Frontfiles Creator</div>
             </div>
             {profile.foundingMember && (
               <div className="relative group/fm shrink-0">

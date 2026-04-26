@@ -669,6 +669,13 @@ export interface NewsroomPackRow {
   status: NewsroomPackStatus
   visibility: NewsroomPackVisibility
   published_at: string | null
+  /**
+   * NR-D9c (migration 20260425000008): set by the lift-worker /
+   * notification-fanout cron once subscriber notifications have
+   * been dispatched for this pack's publish event. NULL = not yet
+   * sent. Race-safe via `WHERE notification_sent_at IS NULL`.
+   */
+  notification_sent_at: string | null
   archived_at: string | null
   takedown_at: string | null
   takedown_reason: string | null
@@ -1007,6 +1014,22 @@ export interface NewsroomBeatSubscriptionRow {
   recipient_id: string
   company_id: string
   notify_on: NewsroomBeatNotifyOn
+  created_at: string
+  updated_at: string
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NEWSROOM — Domain-email OTP storage (NR-D5b-ii)
+// ═══════════════════════════════════════════════════════════════
+
+export interface NewsroomEmailOtpRow {
+  id: string
+  company_id: string
+  email: string
+  code_hash: string
+  attempts: number
+  expires_at: string
+  consumed_at: string | null
   created_at: string
   updated_at: string
 }

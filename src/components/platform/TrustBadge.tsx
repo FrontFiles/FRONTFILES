@@ -8,14 +8,37 @@ interface TrustBadgeProps {
   className?: string
 }
 
+// LABEL POLICY (BP-D7-IMPL, 2026-04-26):
+// Labels deliberately omit "Verified" / "Trusted" prefixes.
+//
+// IMPORTANT — semantic compression vs data model:
+// The data layer STILL CARRIES both `verified` and `trusted` badge
+// states on CreatorProfileRow. This LabelMap intentionally renders
+// both states identically because no earning logic exists yet — every
+// creator defaults to `trust_badge: 'verified'` per identity/store.ts:546.
+// Showing "Verified" or "Trusted" without an earning gate behind them
+// would overclaim per CLAUDE.md item 9.
+//
+// This is a USER-FACING DEFENSIVE COMPRESSION, not a model change.
+// Future contributors: do NOT assume the verified/trusted distinction
+// has been removed from data. It hasn't. The compression lives ONLY
+// in this LabelMap and is reversed when BP-D5 ships proper earning
+// logic with a real default state (likely an `unverified` /
+// `pending_verification` state added to the enum, with the existing
+// `verified` and `trusted` becoming earned).
+//
+// See:
+//   docs/audits/BLUE-PROTOCOL-USER-FACING-COPY-AUDIT-2026-04-26.md §C-2
+//   docs/audits/BLUE-PROTOCOL-TRUST-BADGE-VERIFICATION-2026-04-26.md
+//   docs/audits/BLUE-PROTOCOL-WATERMARK-DIRECTIVES-2026-04-26.md (BP-D5)
 const BADGE_LABELS: Record<TrustTier, Record<TrustBadgeType, string>> = {
   standard: {
-    verified: 'Verified Creator',
-    trusted: 'Trusted Creator',
+    verified: 'Frontfiles Creator',
+    trusted: 'Frontfiles Creator',
   },
   protected_source: {
-    verified: 'Verified Protected Source',
-    trusted: 'Trusted Protected Source',
+    verified: 'Protected Source',
+    trusted: 'Protected Source',
   },
 }
 

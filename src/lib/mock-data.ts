@@ -1411,7 +1411,7 @@ export const mockCertificationEvents: CertificationEvent[] = [
   {
     id: 'evt-002',
     type: 'fcs_layer_complete',
-    description: 'FCS L1-L3 complete. Validation Declaration: Fully Validated. Hash: fcs-f3a6b9c2',
+    description: 'Provenance manifest verified. Validation Declaration: Fully Validated. Hash: fff-f3a6b9c2',
     timestamp: '2026-03-23T07:18:00Z',
     metadata: { declarationState: 'fully_validated', hash: 'fcs-f3a6b9c2' },
   },
@@ -1432,7 +1432,7 @@ export const mockCertificationEvents: CertificationEvent[] = [
   {
     id: 'evt-005',
     type: 'fcs_layer_complete',
-    description: 'FCS Layer 4 assembly certification. Article: fcs-art-a1b2c3',
+    description: 'Assembly verification recorded. Article reference: art-a1b2c3',
     timestamp: '2026-03-19T09:05:00Z',
     metadata: { layer: 4, articleId: 'article-001' },
   },

@@ -108,17 +108,41 @@ export async function processDerivative(
       const family: TemplateFamily = resolveTemplateFamily(resized.width, resized.height)
       const profile = await getApprovedProfile(intrusionLevel, family)
 
-      if (!profile) {
-        throw new Error(
-          `No watermark profile found for level=${intrusionLevel}, family=${family}`,
+      // PR 4 stay-pending policy: missing or unapproved profile is a
+      // policy gate, NOT an error. Reset the row to 'pending' so a
+      // future profile approval re-enables it on the next worker tick.
+      // The pipeline returns success: false with a stay_pending error
+      // string so dispatcher / log analyses can distinguish from real
+      // failures via the error prefix. Per PR-4-PLAN.md §5.
+      const profileUseable = profile && (profile.approvalStatus === 'approved' || allowDraft)
+      if (!profileUseable) {
+        const reason = profile
+          ? `profile is '${profile.approvalStatus}', not approved`
+          : `no profile exists for (level=${intrusionLevel}, family=${family})`
+        await mediaRows.updateMediaRow(assetId, spec.role, { status: 'pending' })
+        // eslint-disable-next-line no-console
+        console.warn(
+          'processing.stay_pending',
+          JSON.stringify({
+            code: 'no_approved_profile',
+            asset_id: assetId,
+            media_role: spec.role,
+            intrusion_level: intrusionLevel,
+            template_family: family,
+            reason,
+          }),
         )
-      }
-
-      if (profile.approvalStatus !== 'approved' && !allowDraft) {
-        throw new Error(
-          `Watermark profile ${profile.id} is '${profile.approvalStatus}', not approved. ` +
-          `Processing blocked until profile is approved by product owner.`,
-        )
+        return {
+          assetId,
+          role: spec.role,
+          success: false,
+          storageRef: null,
+          width: null,
+          height: null,
+          fileSizeBytes: null,
+          profileVersion: null,
+          error: `stay_pending: ${reason}`,
+        }
       }
 
       outputBuffer = await compositeWatermark(

@@ -1,8 +1,24 @@
-# Bulk Upload v2
+# Bulk Upload v2 — DORMANT (replaced by C2)
 
-## Where it lives
+> ⚠ **DORMANT — replaced by C2 (new shell at `src/app/vault/upload/`).**
+>
+> The components in this directory are no longer routed to. The
+> `/vault/upload` route now mounts the new V3 shell. These files
+> remain on disk as **temporary rollback scaffolding only**, scheduled
+> for deletion at the explicit cutover PR (PR 5+).
+>
+> **Do not extend these files. Do not import from production code paths.**
+> See `docs/upload/C2-PLAN.md` §3.3 for the coexistence rule.
+>
+> **Exception:** `DevHarness.tsx` is a dev-only tool and stays on the
+> v2 reducer (per IP-7). It is not dormant; it remains usable for
+> scenario verification during the C2.x stabilization window.
 
-- **Route:** `/vault/upload` (`src/app/vault/upload/page.tsx`)
+---
+
+## Where it lived (historical)
+
+- **Route:** `/vault/upload` (`src/app/vault/upload/page.tsx`) — now mounts the new V3 `UploadShell`
 - **Shell:** `src/components/upload-v2/UploadShellV2.tsx`
 - **State:** `src/lib/upload/v2-state.ts` (reducer + selectors)
 - **Types:** `src/lib/upload/v2-types.ts`

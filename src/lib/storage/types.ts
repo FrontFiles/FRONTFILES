@@ -66,6 +66,48 @@ export interface PutDerivativeInput {
   contentType: string
 }
 
+/**
+ * Input to `signedPutUrl`. Lets the caller specify an exact
+ * storage_ref (so newsroom callers can use their own path scheme,
+ * e.g. `newsroom/packs/{packId}/assets/{assetId}/original.{ext}`)
+ * rather than relying on `originalPath(assetId, filename)`.
+ */
+export interface SignedPutUrlInput {
+  storageRef: string
+  /**
+   * Caller's TTL hint in seconds. Adapters honour as best-effort —
+   * the underlying provider may enforce its own minimum/maximum.
+   * Supabase Storage's createSignedUploadUrl uses ~2 hours by
+   * default at the time of writing; this hint is informational.
+   * Defaults to 900 (15 minutes).
+   */
+  ttlSeconds?: number
+  /**
+   * Expected MIME type of the bytes the client will PUT. Some
+   * adapters pin the content-type at issuance so the upload can't
+   * be tricked into writing as a different MIME. Optional.
+   */
+  contentType?: string
+}
+
+export interface SignedPutUrlOutput {
+  /** URL the client PUTs file bytes to. */
+  url: string
+  /**
+   * Optional headers the client must set on the PUT request. The
+   * Supabase adapter sets none beyond what Supabase encodes into
+   * the URL itself; the field exists for adapters that need to
+   * surface a bearer token or signature header.
+   */
+  headers?: Record<string, string>
+  /**
+   * ISO-8601 timestamp the URL becomes invalid. The caller's
+   * `ttlSeconds` is a hint; this field is the adapter's claim
+   * about when the URL actually expires.
+   */
+  expiresAt: string
+}
+
 // ── Interface ──────────────────────────────────────────────
 
 export interface StorageAdapter {
@@ -102,6 +144,24 @@ export interface StorageAdapter {
    * responsible for logging it as a compensating-action failure.
    */
   delete(storageRef: string): Promise<void>
+
+  /**
+   * Issue a presigned URL the client can PUT bytes to directly.
+   *
+   * Use case: browser-side uploads of large files (NR-D7a's 500 MB
+   * cap) where server-mediated buffering is infeasible. The client
+   * receives the URL from a server-side route, then PUTs the file
+   * bytes from the browser without round-tripping the bytes
+   * through our compute layer.
+   *
+   * Idempotent: subsequent PUTs to the same `storageRef` overwrite
+   * (matches `putOriginal` semantics).
+   *
+   * Adapters that don't support presigned URLs may throw — callers
+   * should be prepared for `Error` and surface a "switch storage
+   * driver" message to the operator.
+   */
+  signedPutUrl(input: SignedPutUrlInput): Promise<SignedPutUrlOutput>
 }
 
 // ── Errors ─────────────────────────────────────────────────

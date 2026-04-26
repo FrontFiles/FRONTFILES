@@ -22,6 +22,8 @@ import { originalPath, derivativePath, validateStorageRef } from './paths'
 import type {
   PutOriginalInput,
   PutDerivativeInput,
+  SignedPutUrlInput,
+  SignedPutUrlOutput,
   StorageAdapter,
 } from './types'
 
@@ -73,6 +75,23 @@ export class FilesystemStorageAdapter implements StorageAdapter {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
       throw err
     }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async signedPutUrl(
+    _input: SignedPutUrlInput,
+  ): Promise<SignedPutUrlOutput> {
+    // Filesystem adapter has no concept of presigned URLs — there's
+    // no over-the-wire endpoint to delegate to a browser. Browser-
+    // side uploads (NR-D7a asset upload) need real signed URLs from
+    // a backing object store. Surface a clear message so the
+    // operator understands the cause is configuration, not code.
+    throw new Error(
+      'FilesystemStorageAdapter.signedPutUrl: not implemented. ' +
+        'Browser uploads require presigned URL support; set ' +
+        'FFF_STORAGE_DRIVER=supabase (with FFF_STORAGE_SUPABASE_BUCKET) ' +
+        'to use the Supabase adapter for asset uploads.',
+    )
   }
 
   private async writeBytes(

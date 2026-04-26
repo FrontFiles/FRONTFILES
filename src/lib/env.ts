@@ -96,6 +96,88 @@ const envSchema = z.object({
     .optional()
     .describe('Supabase Storage bucket name when FFF_STORAGE_DRIVER=supabase.'),
 
+  // ─── Required: Newsroom verification (NR-D5b-i) ───────────────
+  NEWSROOM_VERIFICATION_HMAC_SECRET: z.string().min(1, {
+    message:
+      'NEWSROOM_VERIFICATION_HMAC_SECRET is required (256+ bits; generate with `openssl rand -base64 48`). Server-only.',
+  }),
+
+  // ─── Optional: Scanner pipeline (NR-D7b) ──────────────────────
+  // Image moderation: GCV SafeSearch fires when both PROJECT_ID
+  // and API_KEY are set; otherwise the stub adapter runs.
+  SCANNER_GCV_PROJECT_ID: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'Google Cloud project ID for the GCV SafeSearch adapter. Pair with SCANNER_GCV_API_KEY.',
+    ),
+  SCANNER_GCV_API_KEY: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'GCV API key (vision.googleapis.com). Pair with SCANNER_GCV_PROJECT_ID.',
+    ),
+  SCANNER_STUB_DELAY_MS: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe(
+      'Synthetic latency in ms for the stub scanner. Default 5000 in factory.',
+    ),
+  // Cron secret: required in production. The schema declares it
+  // optional so dev environments without the secret don't fail
+  // env-load (the cron route returns 401 in that case). Production
+  // deploys MUST set this — manual gate at NR-G2 / launch hardening.
+  SCANNER_CRON_SECRET: z
+    .string()
+    .min(32, {
+      message:
+        'SCANNER_CRON_SECRET must be 32+ chars. Generate with `openssl rand -base64 48` (NR-D5b-i precedent).',
+    })
+    .optional()
+    .describe(
+      'Bearer secret on the /api/cron/newsroom-scan endpoint. Required in production.',
+    ),
+  // NR-D9c: cron secret for the publish-pipeline worker (embargo
+  // lifts + subscriber notification fanout). Same shape as
+  // SCANNER_CRON_SECRET. v1.1 backlog: consolidate both newsroom
+  // cron secrets into a single NEWSROOM_CRON_SECRET.
+  NEWSROOM_PUBLISH_CRON_SECRET: z
+    .string()
+    .min(32, {
+      message:
+        'NEWSROOM_PUBLISH_CRON_SECRET must be 32+ chars. Generate with `openssl rand -base64 48` (NR-D5b-i precedent).',
+    })
+    .optional()
+    .describe(
+      'Bearer secret on the /api/cron/newsroom-publish-pipeline endpoint. Required in production.',
+    ),
+
+  // NR-D10: Ed25519 signing-key material for the stub KMS adapter.
+  // Required in production; without these two vars set, the publish
+  // RPC's `no_active_signing_key` precondition cannot be satisfied
+  // and any publish attempt fails. Bootstrap procedure (one-time per
+  // dev environment) lives at:
+  //   docs/runbooks/newsroom-signing-key-bootstrap.md
+  // v1.1 / NR-G5: replaced by real KMS provisioning per NR-H1.
+  NEWSROOM_SIGNING_KEY_PRIVATE: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'Base64-encoded PEM (PKCS8) Ed25519 private key. Loaded by StubKmsAdapter. Required in production. See docs/runbooks/newsroom-signing-key-bootstrap.md.',
+    ),
+  NEWSROOM_SIGNING_KEY_ID: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'String identifier matching newsroom_signing_keys.kid. Populates DownloadReceipt.signing_key_kid. Required in production. See docs/runbooks/newsroom-signing-key-bootstrap.md.',
+    ),
+
   // ─── Optional: Stripe (wired in Phase 5) ──────────────────────
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -180,6 +262,14 @@ const rawEnv = {
   FFF_STORAGE_DRIVER: process.env.FFF_STORAGE_DRIVER,
   FFF_STORAGE_FS_ROOT: process.env.FFF_STORAGE_FS_ROOT,
   FFF_STORAGE_SUPABASE_BUCKET: process.env.FFF_STORAGE_SUPABASE_BUCKET,
+  NEWSROOM_VERIFICATION_HMAC_SECRET: process.env.NEWSROOM_VERIFICATION_HMAC_SECRET,
+  SCANNER_GCV_PROJECT_ID: process.env.SCANNER_GCV_PROJECT_ID,
+  SCANNER_GCV_API_KEY: process.env.SCANNER_GCV_API_KEY,
+  SCANNER_STUB_DELAY_MS: process.env.SCANNER_STUB_DELAY_MS,
+  SCANNER_CRON_SECRET: process.env.SCANNER_CRON_SECRET,
+  NEWSROOM_PUBLISH_CRON_SECRET: process.env.NEWSROOM_PUBLISH_CRON_SECRET,
+  NEWSROOM_SIGNING_KEY_PRIVATE: process.env.NEWSROOM_SIGNING_KEY_PRIVATE,
+  NEWSROOM_SIGNING_KEY_ID: process.env.NEWSROOM_SIGNING_KEY_ID,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   STRIPE_CONNECT_CLIENT_ID: process.env.STRIPE_CONNECT_CLIENT_ID,

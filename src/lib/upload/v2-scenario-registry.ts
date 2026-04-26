@@ -5,7 +5,14 @@
  * Importable by UI, tests, and verification helpers.
  */
 
-export type ScenarioId = 'clean_single_story' | 'messy_multi_story' | 'scale_batch_50_plus'
+export type ScenarioId =
+  | 'clean_single_story'
+  | 'messy_multi_story'
+  | 'scale_batch_50_plus'
+  // C2.2 §3.1 — Archive-scale fixtures for the 4-mode density router.
+  | 'archive_150_mixed'
+  | 'archive_500_single_shoot'
+  | 'archive_1500_decade'
 
 export interface ScenarioMeta {
   id: ScenarioId
@@ -57,9 +64,54 @@ export const SCENARIO_REGISTRY: Record<ScenarioId, ScenarioMeta> = {
     expectedInitialBlockerCountRange: [50, 60],
     expectedInitialAdvisoryCountRange: [8, 20],
   },
+
+  // ── C2.2 §3.1 — Archive-scale fixtures (programmatically generated) ──
+  archive_150_mixed: {
+    id: 'archive_150_mixed',
+    label: 'Archive — 150 files, 3 implied clusters',
+    description: '150 synthetic assets across 3 implied clusters (visual + temporal proximity). Tests Archive density mode + cluster accordion + per-cluster bulk actions.',
+    targetUseCase: 'Archive mode demo (Tier 1): smallest Archive scenario; verifies density transition at 100-asset threshold.',
+    expectedBehavior: 'Density auto-switches to Archive at threshold. 3 cluster accordions render. Filter chips + bulk ops bar visible. Per-cluster Accept/Edit/Set price buttons render.',
+    expectedExpressEligible: false,
+    expectedStoryProposalCount: 3,
+    expectedAssetCountRange: [150, 150],
+    expectedInitialBlockerCountRange: [120, 150],
+    expectedInitialAdvisoryCountRange: [10, 40],
+  },
+  archive_500_single_shoot: {
+    id: 'archive_500_single_shoot',
+    label: 'Archive — 500 files, 1 large cluster',
+    description: '500 synthetic assets from a single event (one shoot). Tests single-cluster accordion + large-cluster bulk actions + virtualization within cluster body.',
+    targetUseCase: 'Archive mode demo (Tier 2): single-cluster stress; verifies "Bulk-edit caption" template flow and "Set price" cluster action.',
+    expectedBehavior: 'One cluster accordion. Per-cluster bulk-edit caption applies template to all 500. Per-cluster set-price applies to all 500.',
+    expectedExpressEligible: false,
+    expectedStoryProposalCount: 1,
+    expectedAssetCountRange: [500, 500],
+    expectedInitialBlockerCountRange: [400, 500],
+    expectedInitialAdvisoryCountRange: [20, 80],
+  },
+  archive_1500_decade: {
+    id: 'archive_1500_decade',
+    label: 'Archive — 1,500 files, 12 clusters',
+    description: '1,500 synthetic assets across 12 implied clusters spanning a decade. Stress-test virtualization + accordion expand/collapse perf + filter responsiveness at scale.',
+    targetUseCase: 'Archive mode demo (Tier 3): perf stress test. Verifies the system handles 1,500 assets without UI freeze when expand/collapsing accordions or scrolling within clusters.',
+    expectedBehavior: 'Density Archive. 12 cluster accordions. Initial render only first cluster expanded (per IPII-3). Scrolling smooth via react-window or non-virtualized cluster body fallback.',
+    expectedExpressEligible: false,
+    expectedStoryProposalCount: 12,
+    expectedAssetCountRange: [1500, 1500],
+    expectedInitialBlockerCountRange: [1200, 1500],
+    expectedInitialAdvisoryCountRange: [50, 200],
+  },
 }
 
-export const SCENARIO_IDS: ScenarioId[] = ['clean_single_story', 'messy_multi_story', 'scale_batch_50_plus']
+export const SCENARIO_IDS: ScenarioId[] = [
+  'clean_single_story',
+  'messy_multi_story',
+  'scale_batch_50_plus',
+  'archive_150_mixed',
+  'archive_500_single_shoot',
+  'archive_1500_decade',
+]
 
 export function getScenarioMeta(id: ScenarioId): ScenarioMeta {
   return SCENARIO_REGISTRY[id]
