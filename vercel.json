@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/newsroom-scan",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/newsroom-publish-pipeline",
+      "schedule": "0 * * * *"
     }
   ]
 }

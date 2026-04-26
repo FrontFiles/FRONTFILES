@@ -669,6 +669,13 @@ export interface NewsroomPackRow {
   status: NewsroomPackStatus
   visibility: NewsroomPackVisibility
   published_at: string | null
+  /**
+   * NR-D9c (migration 20260425000008): set by the lift-worker /
+   * notification-fanout cron once subscriber notifications have
+   * been dispatched for this pack's publish event. NULL = not yet
+   * sent. Race-safe via `WHERE notification_sent_at IS NULL`.
+   */
+  notification_sent_at: string | null
   archived_at: string | null
   takedown_at: string | null
   takedown_reason: string | null
