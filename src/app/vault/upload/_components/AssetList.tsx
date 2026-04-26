@@ -202,17 +202,13 @@ function ArchiveAccordionList({
 }: {
   visible: { id: string; storyGroupId: string | null }[]
 }) {
-  const { state, dispatch } = useUploadContext()
+  const { state } = useUploadContext()
   const groups = getStoryGroups(state)
 
-  // Auto-expand first cluster on initial render if no clusters expanded
-  useEffect(() => {
-    if (state.ui.expandedClusterIds.length === 0 && groups.length > 0) {
-      dispatch({ type: 'TOGGLE_CLUSTER_EXPANDED', clusterId: groups[0].id })
-    }
-    // Run once on mount only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // First-cluster auto-expand is handled in hydrateV3FromV2State — see
+  // v3-hydration.ts. Render here is a pure read of state.ui.expandedClusterIds.
+  // (Earlier useEffect-based approach broke under React StrictMode dev
+  // double-fire of effects.)
 
   // Bucket visible assets by clusterId
   const buckets = useMemo(() => {

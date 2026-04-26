@@ -48,6 +48,14 @@ export function hydrateV3FromV2State(v2State: V2State): V3State {
   const storyGroupOverlayOn = density === 'batch' || density === 'archive'
 
   const base = v3InitialState(v2State.batch.id)
+  // Per IPII-3: first cluster auto-expanded on initial render, others
+  // collapsed. Initialize expandedClusterIds in hydration (NOT via
+  // useEffect — StrictMode runs effects twice and would toggle back to
+  // collapsed). Toggle semantics still work: user can click first cluster
+  // header to collapse it.
+  const expandedClusterIds =
+    v2State.storyGroupOrder.length > 0 ? [v2State.storyGroupOrder[0]] : []
+
   return {
     ...base,
     batch: {
@@ -64,6 +72,7 @@ export function hydrateV3FromV2State(v2State: V2State): V3State {
       ...base.ui,
       storyGroupOverlayOn,
       bulkOpsBarOpen: density === 'batch' || density === 'archive',
+      expandedClusterIds,
     },
   }
 }
