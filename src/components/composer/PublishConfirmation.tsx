@@ -49,7 +49,7 @@ export function PublishConfirmation() {
         {/* Source assets */}
         <div className="px-6 py-4 border-b border-slate-200">
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-2">
-            Source assets (FCS Layer 4 Assembly)
+            Source assets — assembly verified
           </span>
           <div className="flex flex-col gap-1.5">
             {sourceAssets.map(asset => (

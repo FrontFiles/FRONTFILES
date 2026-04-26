@@ -37,7 +37,7 @@ export function ProfileLeftRail({ profile, connectionState }: ProfileLeftRailPro
               </svg>
             </div>
             <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-black text-white text-[9px] font-bold uppercase tracking-wider whitespace-nowrap opacity-0 group-hover/verified:opacity-100 transition-opacity pointer-events-none">
-              Verified Creator
+              Frontfiles Creator
             </div>
           </div>
           {profile.foundingMember && (

@@ -274,7 +274,7 @@ function CheckoutPageContent({ params }: { params: Promise<{ assetId: string }> 
                   </div>
                 )}
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  This asset has been processed by the Frontfiles Certification System (FCS). The Validation Declaration above reflects the current provenance and integrity status. By proceeding, you acknowledge this declaration.
+                  This asset's Validation Declaration above reflects the provenance and integrity information currently documented for this work on Frontfiles. By proceeding, you acknowledge this declaration.
                 </p>
                 {asset.certificationHash && (
                   <div className="font-mono text-[10px] text-slate-400 break-all">

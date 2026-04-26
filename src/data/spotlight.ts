@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// FRONTFILES — FCS Spotlight Dataset
+// FRONTFILES — Editor's Pick Spotlight Dataset
 // Automated recommendation surface — no editorial judgement implied
 // Validation Declaration state has ZERO ranking weight
 // ═══════════════════════════════════════════════════════════════

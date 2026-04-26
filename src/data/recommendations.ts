@@ -292,7 +292,7 @@ export const recommendations: RecommendationGroup[] = [
     id: 'rec-020',
     sourceType: 'asset',
     sourceId: 'asset-001',
-    title: 'FCS Spotlight',
+    title: 'Editor\'s Pick',
     reasonLabel: 'Recently surfaced in Spotlight',
     targetAssetIds: ['asset-013', 'asset-020', 'asset-025', 'asset-029', 'asset-034'],
     targetStoryIds: [],
