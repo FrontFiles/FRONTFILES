@@ -27,6 +27,7 @@ export const dynamic = 'force-dynamic'
 type SearchParams = Promise<{
   scenario?: string | string[]
   simulateFailure?: string | string[]
+  seedBanners?: string | string[]
 }>
 
 export default async function UploadPage({
@@ -58,6 +59,15 @@ export default async function UploadPage({
     }
   }
 
+  // Dev-only AI cluster banner seeding per C2.5 IPV-5. Honored only when
+  // NODE_ENV === 'development' AND `?seedBanners=1` is present. Used for
+  // visual QA of AIProposalBanner without a real AI pipeline.
+  let devSeedBanners = false
+  if (process.env.NODE_ENV === 'development') {
+    const raw = typeof params.seedBanners === 'string' ? params.seedBanners : null
+    if (raw === '1' || raw === 'true') devSeedBanners = true
+  }
+
   return (
     <CreatorGate tool="Upload">
       <div className="flex-1 bg-white flex flex-col">
@@ -65,6 +75,7 @@ export default async function UploadPage({
           batchId={batchId}
           devScenarioId={devScenarioId}
           devSimulateFailure={devSimulateFailure}
+          devSeedBanners={devSeedBanners}
         />
       </div>
     </CreatorGate>

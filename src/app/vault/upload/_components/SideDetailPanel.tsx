@@ -43,6 +43,7 @@ import type { V2Asset, V3State, AssetEditableFields, MetadataConflict } from '@/
 import type { PrivacyState, LicenceType } from '@/lib/upload/types'
 import { LICENCE_TYPE_LABELS } from '@/lib/upload/types'
 import DuplicateResolver from './DuplicateResolver'
+import PriceBasisPanel from './PriceBasisPanel'
 
 const PRIVACY_OPTIONS: PrivacyState[] = ['PUBLIC', 'RESTRICTED', 'PRIVATE']
 const LICENCE_OPTIONS: LicenceType[] = [
@@ -126,7 +127,7 @@ export default function SideDetailPanel() {
       <Thumbnail asset={asset} />
       <FieldEditor asset={asset} />
       <ExceptionsSection asset={asset} state={state} />
-      <AIProposalDetailShell />
+      <AIProposalDetailSection asset={asset} />
     </aside>
   )
 }
@@ -193,8 +194,13 @@ function Thumbnail({ asset }: { asset: V2Asset }) {
 
 // ── Field editor ─────────────────────────────────────────────────────
 
+const REGEN_FEEDBACK_MS = 600
+
+type RegenField = 'title' | 'caption' | 'tags' | 'geography' | 'price'
+
 function FieldEditor({ asset }: { asset: V2Asset }) {
   const { dispatch } = useUploadContext()
+  const [regenerating, setRegenerating] = useState<RegenField | null>(null)
 
   function update<K extends keyof AssetEditableFields>(
     field: K,
@@ -203,86 +209,161 @@ function FieldEditor({ asset }: { asset: V2Asset }) {
     dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field, value })
   }
 
+  // Per C2.5 IPV-3 (UI stub) + spec §9.4: dispatch the no-op REGENERATE_PROPOSAL
+  // (telemetry hook) and show brief feedback. Real regen is E2.
+  function regenerate(field: RegenField) {
+    dispatch({
+      type: 'REGENERATE_PROPOSAL',
+      assetId: asset.id,
+      // Action shape supports caption/tags/keywords/price; map our 5-field UX.
+      field:
+        field === 'title' || field === 'geography' ? 'tags' : (field as 'caption' | 'tags' | 'price'),
+    })
+    setRegenerating(field)
+    setTimeout(() => setRegenerating(null), REGEN_FEEDBACK_MS)
+  }
+
+  // Per spec §9.1 + L2: ✓ accept icon appears only when the editable value
+  // is empty AND the proposal field has content.
+  const hasTitleGhost = !asset.editable.title && !!asset.proposal?.title
+  const hasCaptionGhost = !asset.editable.description && !!asset.proposal?.description
+  const hasTagsGhost = asset.editable.tags.length === 0 && (asset.proposal?.tags?.length ?? 0) > 0
+  const hasGeoGhost =
+    asset.editable.geography.length === 0 && (asset.proposal?.geography?.length ?? 0) > 0
+  const hasPriceGhost = asset.editable.price === null && !!asset.proposal?.priceSuggestion
+
   return (
     <div className="border-b border-black p-3 flex flex-col gap-2 min-w-0">
       <Field label="Title">
-        <input
-          type="text"
-          value={asset.editable.title}
-          onChange={e => update('title', e.target.value)}
-          className={FIELD_INPUT}
-          placeholder={asset.proposal?.title ?? ''}
-        />
+        <div className="flex items-start gap-1.5 min-w-0">
+          <input
+            type="text"
+            value={asset.editable.title}
+            onChange={e => update('title', e.target.value)}
+            className={`${FIELD_INPUT} flex-1 ${hasTitleGhost ? 'italic text-slate-500' : ''}`}
+            placeholder={asset.proposal?.title ?? ''}
+          />
+          {hasTitleGhost && (
+            <AcceptRow
+              onAccept={() => update('title', asset.proposal!.title)}
+              onRegen={() => regenerate('title')}
+              regenerating={regenerating === 'title'}
+              acceptTitle="Accept AI title"
+            />
+          )}
+        </div>
       </Field>
 
       <Field label="Caption">
-        <textarea
-          value={asset.editable.description}
-          onChange={e => update('description', e.target.value)}
-          rows={3}
-          className={`${FIELD_INPUT} resize-y`}
-          placeholder={asset.proposal?.description ?? ''}
-        />
+        <div className="flex items-start gap-1.5 min-w-0">
+          <textarea
+            value={asset.editable.description}
+            onChange={e => update('description', e.target.value)}
+            rows={3}
+            className={`${FIELD_INPUT} resize-y flex-1 ${hasCaptionGhost ? 'italic text-slate-500' : ''}`}
+            placeholder={asset.proposal?.description ?? ''}
+          />
+          {hasCaptionGhost && (
+            <AcceptRow
+              onAccept={() => update('description', asset.proposal!.description)}
+              onRegen={() => regenerate('caption')}
+              regenerating={regenerating === 'caption'}
+              acceptTitle="Accept AI caption"
+            />
+          )}
+        </div>
       </Field>
 
       <Field label="Tags">
-        <input
-          type="text"
-          value={asset.editable.tags.join(', ')}
-          onChange={e =>
-            update(
-              'tags',
-              e.target.value
-                .split(',')
-                .map(t => t.trim())
-                .filter(Boolean),
-            )
-          }
-          className={FIELD_INPUT}
-          placeholder="comma-separated"
-        />
+        <div className="flex items-start gap-1.5 min-w-0">
+          <input
+            type="text"
+            value={asset.editable.tags.join(', ')}
+            onChange={e =>
+              update(
+                'tags',
+                e.target.value
+                  .split(',')
+                  .map(t => t.trim())
+                  .filter(Boolean),
+              )
+            }
+            className={`${FIELD_INPUT} flex-1 ${hasTagsGhost ? 'italic text-slate-500' : ''}`}
+            placeholder={hasTagsGhost ? asset.proposal!.tags.join(', ') : 'comma-separated'}
+          />
+          {hasTagsGhost && (
+            <AcceptRow
+              onAccept={() => update('tags', asset.proposal!.tags)}
+              onRegen={() => regenerate('tags')}
+              regenerating={regenerating === 'tags'}
+              acceptTitle="Accept AI tags"
+            />
+          )}
+        </div>
       </Field>
 
       <Field label="Geography">
-        <input
-          type="text"
-          value={asset.editable.geography.join(', ')}
-          onChange={e =>
-            update(
-              'geography',
-              e.target.value
-                .split(',')
-                .map(g => g.trim())
-                .filter(Boolean),
-            )
-          }
-          className={FIELD_INPUT}
-          placeholder="comma-separated place names"
-        />
+        <div className="flex items-start gap-1.5 min-w-0">
+          <input
+            type="text"
+            value={asset.editable.geography.join(', ')}
+            onChange={e =>
+              update(
+                'geography',
+                e.target.value
+                  .split(',')
+                  .map(g => g.trim())
+                  .filter(Boolean),
+              )
+            }
+            className={`${FIELD_INPUT} flex-1 ${hasGeoGhost ? 'italic text-slate-500' : ''}`}
+            placeholder={
+              hasGeoGhost ? asset.proposal!.geography.join(', ') : 'comma-separated place names'
+            }
+          />
+          {hasGeoGhost && (
+            <AcceptRow
+              onAccept={() => update('geography', asset.proposal!.geography)}
+              onRegen={() => regenerate('geography')}
+              regenerating={regenerating === 'geography'}
+              acceptTitle="Accept AI geography"
+            />
+          )}
+        </div>
       </Field>
 
       <Field label="Price (EUR)">
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={asset.editable.price !== null ? (asset.editable.price / 100).toFixed(2) : ''}
-          onChange={e => {
-            const raw = e.target.value
-            if (raw === '') {
-              update('price', null)
-              return
+        <div className="flex items-start gap-1.5 min-w-0">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={asset.editable.price !== null ? (asset.editable.price / 100).toFixed(2) : ''}
+            onChange={e => {
+              const raw = e.target.value
+              if (raw === '') {
+                update('price', null)
+                return
+              }
+              const cents = Math.round(parseFloat(raw) * 100)
+              if (Number.isFinite(cents) && cents >= 0) update('price', cents)
+            }}
+            placeholder={
+              asset.proposal?.priceSuggestion
+                ? `${(asset.proposal.priceSuggestion.amount / 100).toFixed(2)}`
+                : ''
             }
-            const cents = Math.round(parseFloat(raw) * 100)
-            if (Number.isFinite(cents) && cents >= 0) update('price', cents)
-          }}
-          placeholder={
-            asset.proposal?.priceSuggestion
-              ? `${(asset.proposal.priceSuggestion.amount / 100).toFixed(2)}`
-              : ''
-          }
-          className={`${FIELD_INPUT} font-mono w-32`}
-        />
+            className={`${FIELD_INPUT} font-mono w-32 ${hasPriceGhost ? 'italic text-slate-500' : ''}`}
+          />
+          {hasPriceGhost && (
+            <AcceptRow
+              onAccept={() => update('price', asset.proposal!.priceSuggestion!.amount)}
+              onRegen={() => regenerate('price')}
+              regenerating={regenerating === 'price'}
+              acceptTitle="Accept engine price"
+            />
+          )}
+        </div>
       </Field>
 
       <Field label="Privacy">
@@ -431,26 +512,174 @@ function ConflictResolver({ asset, conflict }: { asset: V2Asset; conflict: Metad
   )
 }
 
-// ── AI Proposal Detail (shell only — body is C2.5) ────────────────────
+// ── Reusable AcceptRow (✓ + ↻) for FieldEditor ───────────────────────
 
-function AIProposalDetailShell() {
-  const [open, setOpen] = useState(false)
+function AcceptRow({
+  onAccept,
+  onRegen,
+  regenerating,
+  acceptTitle,
+}: {
+  onAccept: () => void
+  onRegen: () => void
+  regenerating: boolean
+  acceptTitle: string
+}) {
+  return (
+    <div className="flex flex-col gap-1 flex-shrink-0">
+      <button
+        type="button"
+        onClick={onAccept}
+        title={acceptTitle}
+        className="border border-black px-2 py-0.5 text-[10px] font-bold uppercase text-black hover:bg-black hover:text-white transition-colors"
+      >
+        ✓
+      </button>
+      <button
+        type="button"
+        onClick={onRegen}
+        disabled={regenerating}
+        title="Regenerate AI suggestion"
+        className={`border border-black px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600 hover:bg-slate-200 transition-colors ${
+          regenerating ? 'opacity-60 cursor-wait' : ''
+        }`}
+      >
+        {regenerating ? '⟳' : '↻'}
+      </button>
+    </div>
+  )
+}
+
+// ── AI Proposal Detail body — per C2.5 §1.1 + spec §7.1 anatomy ───────
+
+function AIProposalDetailSection({ asset }: { asset: V2Asset }) {
+  const { state, dispatch } = useUploadContext()
+  const [sectionOpen, setSectionOpen] = useState(false)
+
+  // Per IPV-6: independent collapse per row (multiple can be open).
+  // The "Price basis" toggle uses the reducer's TOGGLE_PRICE_BASIS_PANEL
+  // because the same panel is also reachable from Linear AssetRow (one
+  // source of truth for which asset's basis is open).
+  const [captionOpen, setCaptionOpen] = useState(false)
+  const [tagsOpen, setTagsOpen] = useState(false)
+  const priceOpen = state.ui.priceBasisOpenAssetId === asset.id
+
+  if (!asset.proposal) {
+    return (
+      <div className="border-b border-black p-3">
+        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          AI Proposal Detail
+        </div>
+        <div className="text-xs text-slate-500 italic mt-1">No AI proposal for this asset.</div>
+      </div>
+    )
+  }
+
+  const overallConfPct = Math.round(asset.proposal.confidence * 100)
+
   return (
     <div className="border-b border-black p-3">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setSectionOpen(o => !o)}
         className="text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-black transition-colors flex items-center gap-2"
-        aria-expanded={open}
+        aria-expanded={sectionOpen}
       >
-        {open ? '▼' : '▶'} AI Proposal Detail
+        {sectionOpen ? '▼' : '▶'} AI Proposal Detail
       </button>
-      {open && (
-        <div className="mt-2 text-xs text-slate-400 italic">
-          {/* TODO(C2.5): per-field rationale rows — caption, price basis, tag confidence — per spec §7.1 anatomy */}
-          Per-field AI proposal rationale lands in C2.5.
+
+      {sectionOpen && (
+        <div className="mt-2 flex flex-col gap-1 min-w-0">
+          {/* Caption rationale row */}
+          <DetailRow
+            open={captionOpen}
+            onToggle={() => setCaptionOpen(o => !o)}
+            label="Caption rationale"
+          >
+            <div className="text-xs text-slate-700">
+              {asset.proposal.rationale || (
+                <span className="italic text-slate-500">No rationale recorded.</span>
+              )}
+            </div>
+          </DetailRow>
+
+          {/* Price basis row — mounts PriceBasisPanel (per IPV-4) */}
+          <DetailRow
+            open={priceOpen}
+            onToggle={() =>
+              dispatch({ type: 'TOGGLE_PRICE_BASIS_PANEL', assetId: asset.id })
+            }
+            label="Price basis"
+            disabled={!asset.proposal.priceSuggestion}
+          >
+            {asset.proposal.priceSuggestion ? (
+              <PriceBasisPanel asset={asset} compact />
+            ) : (
+              <div className="text-xs text-slate-500 italic">No price suggestion.</div>
+            )}
+          </DetailRow>
+
+          {/* Tag confidence row */}
+          <DetailRow
+            open={tagsOpen}
+            onToggle={() => setTagsOpen(o => !o)}
+            label="Tag confidence"
+          >
+            <div className="flex flex-col gap-1 text-xs">
+              <div className="text-slate-700">
+                Overall metadata confidence:{' '}
+                <span className="font-mono text-black">{overallConfPct}%</span>
+              </div>
+              {asset.proposal.tags.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {asset.proposal.tags.map((t, i) => (
+                    <span
+                      key={`${t}-${i}`}
+                      className="text-[10px] font-bold uppercase tracking-widest border border-slate-400 text-slate-700 px-1.5 py-0.5 bg-white"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="italic text-slate-500">No tags suggested.</span>
+              )}
+            </div>
+          </DetailRow>
         </div>
       )}
+    </div>
+  )
+}
+
+function DetailRow({
+  open,
+  onToggle,
+  label,
+  disabled = false,
+  children,
+}: {
+  open: boolean
+  onToggle: () => void
+  label: string
+  disabled?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className="border border-black bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        className={`w-full text-left px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
+          disabled ? 'text-slate-400 cursor-not-allowed' : 'text-black hover:bg-slate-50'
+        }`}
+        aria-expanded={open}
+      >
+        <span>{open ? '▼' : '▶'}</span>
+        <span>{label}</span>
+      </button>
+      {open && !disabled && <div className="px-2 pb-2">{children}</div>}
     </div>
   )
 }

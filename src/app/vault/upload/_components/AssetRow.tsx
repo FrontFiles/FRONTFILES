@@ -1,13 +1,24 @@
 /**
- * Frontfiles Upload V3 — Linear-mode asset row (C2.2 §3.3)
+ * Frontfiles Upload V3 — Linear-mode asset row (C2.2 §3.3, extended in C2.5)
  *
  * Spec: UX-SPEC-V3.md §3.1 (row anatomy) + §3.2 (AI proposal visual)
- * + §3.3 (field validation).
+ * + §9 (AI proposal surfacing).
  *
  * Renders only in Linear density mode (1–5 files). Full per-row inline
  * editing of all primary metadata fields. AI suggestions render as
  * italic ghost text with one-click ✓ accept (dispatches UPDATE_ASSET_FIELD
- * per IP-5 selector-derived acceptance).
+ * per IP-5 selector-derived acceptance) and a ↻ regenerate icon (per
+ * spec §9.4 — UI stub in C2.5; real regen lands at E2).
+ *
+ * C2.5 additions:
+ *   - ✓ accept icons for title, tags, geography (caption + price already
+ *     in C2.2). Per IPV-10.
+ *   - ↻ regenerate icons next to each ✓ (per spec §9.4 + IPV-3 = UI stub).
+ *   - "Accept all suggestions" link in the row header (per spec §10.2 +
+ *     IPV-7). Loops UPDATE_ASSET_FIELD for caption + tags + geography.
+ *     NEVER price — type-level + L5 enforced.
+ *   - PriceBasisPanel mount when state.ui.priceBasisOpenAssetId === asset.id
+ *     (per IPV-4 — Linear inline + side panel both).
  *
  * Per don't-do #3: NEVER expose a "bulk-accept price suggestion"
  * affordance. Per-asset price acceptance via the row's ✓ button is fine
@@ -17,9 +28,11 @@
 
 'use client'
 
+import { useState } from 'react'
 import { useUploadContext } from './UploadContext'
 import type { V2Asset, AssetEditableFields } from '@/lib/upload/v3-types'
 import type { LicenceType, PrivacyState } from '@/lib/upload/types'
+import PriceBasisPanel from './PriceBasisPanel'
 
 const LABEL = 'block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1'
 const INPUT =
@@ -27,6 +40,14 @@ const INPUT =
 const GHOST = 'italic text-slate-500'
 const ACCEPT_BTN =
   'border border-black px-2 py-0.5 text-[10px] font-bold uppercase text-black hover:bg-black hover:text-white transition-colors'
+const REGEN_BTN =
+  'border border-black px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600 hover:bg-slate-200 transition-colors'
+const ACCEPT_ALL_LINK =
+  'text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:underline'
+
+const REGEN_FEEDBACK_MS = 600
+
+type RegenField = 'title' | 'caption' | 'tags' | 'geography' | 'price'
 
 interface Props {
   asset: V2Asset
@@ -34,6 +55,7 @@ interface Props {
 
 export default function AssetRow({ asset }: Props) {
   const { state, dispatch } = useUploadContext()
+  const [regenerating, setRegenerating] = useState<RegenField | null>(null)
 
   function update<K extends keyof AssetEditableFields>(field: K, value: AssetEditableFields[K]) {
     dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field, value })
@@ -46,18 +68,76 @@ export default function AssetRow({ asset }: Props) {
       ? state.commit.failed.find(f => f.assetId === asset.id) ?? null
       : null
 
+  // Ghost flags — per spec §9.1, suggestion visible only when the editable
+  // value is empty AND the proposal field has content.
+  const hasTitleGhost = !asset.editable.title && !!asset.proposal?.title
+  const hasCaptionGhost = !asset.editable.description && !!asset.proposal?.description
+  const hasTagsGhost =
+    asset.editable.tags.length === 0 && (asset.proposal?.tags?.length ?? 0) > 0
+  const hasGeoGhost =
+    asset.editable.geography.length === 0 && (asset.proposal?.geography?.length ?? 0) > 0
+  const hasPriceGhost = asset.editable.price === null && !!asset.proposal?.priceSuggestion
+
+  // "Accept all" appears when there's at least one non-accepted suggestion
+  // in the bulk-eligible set (caption / tags / geography). Price is excluded
+  // per L5 + spec §9.2 (must be per-asset explicit acceptance).
+  const hasAnyBulkable = hasCaptionGhost || hasTagsGhost || hasGeoGhost
+
+  function acceptTitle() {
+    if (!asset.proposal?.title) return
+    update('title', asset.proposal.title)
+  }
   function acceptCaption() {
     if (!asset.proposal?.description) return
     update('description', asset.proposal.description)
   }
-
+  function acceptTags() {
+    if (!asset.proposal?.tags?.length) return
+    update('tags', asset.proposal.tags)
+  }
+  function acceptGeography() {
+    if (!asset.proposal?.geography?.length) return
+    update('geography', asset.proposal.geography)
+  }
   function acceptPrice() {
     if (!asset.proposal?.priceSuggestion) return
     update('price', asset.proposal.priceSuggestion.amount)
   }
 
-  const hasCaptionGhost = !asset.editable.description && !!asset.proposal?.description
-  const hasPriceGhost = asset.editable.price === null && !!asset.proposal?.priceSuggestion
+  /**
+   * Per-row "Accept all suggestions" handler. Loops UPDATE_ASSET_FIELD
+   * for caption + tags + geography. NEVER price (L5 — type-level safe;
+   * runtime safe because we don't include 'price' in the field list).
+   * Dispatches in a single event handler → React 19 batches into 1 re-render.
+   */
+  function acceptAllSuggestions() {
+    if (hasCaptionGhost) acceptCaption()
+    if (hasTagsGhost) acceptTags()
+    if (hasGeoGhost) acceptGeography()
+    if (hasTitleGhost) acceptTitle()
+  }
+
+  function regenerate(field: RegenField) {
+    // Per IPV-3: UI stub. Dispatch the no-op REGENERATE_PROPOSAL action
+    // (telemetry hook) and show a brief "regenerating" state. Real regen
+    // lands at E2 (AI pipeline). The reducer-side action is currently a
+    // no-op stub per v3-state.ts line 601.
+    const proposalField = field === 'caption' ? 'caption' : field === 'price' ? 'price' : field
+    dispatch({
+      type: 'REGENERATE_PROPOSAL',
+      assetId: asset.id,
+      // V3Action shape: 'caption' | 'tags' | 'keywords' | 'price'. Map our
+      // five-field UX into the four-action shape.
+      field:
+        field === 'title' || field === 'geography'
+          ? 'tags' // closest semantic — the action set predates per-field expansion
+          : (proposalField as 'caption' | 'tags' | 'price'),
+    })
+    setRegenerating(field)
+    setTimeout(() => setRegenerating(null), REGEN_FEEDBACK_MS)
+  }
+
+  const priceBasisOpen = state.ui.priceBasisOpenAssetId === asset.id
 
   return (
     <div
@@ -76,8 +156,8 @@ export default function AssetRow({ asset }: Props) {
 
       {/* Body */}
       <div className="flex-1 min-w-0">
-        {/* Filename + exclude + (optional) commit-failed chip */}
-        <div className="flex items-center justify-between gap-2 mb-2">
+        {/* Filename + Accept-all + exclude + (optional) commit-failed chip */}
+        <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate">
               {asset.filename}
@@ -91,25 +171,51 @@ export default function AssetRow({ asset }: Props) {
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'TOGGLE_ASSET_EXCLUDED', assetId: asset.id })}
-            className="text-[10px] font-bold uppercase tracking-widest text-black hover:underline"
-            aria-pressed={asset.excluded}
-          >
-            {asset.excluded ? '↺ Include' : '✕ Exclude'}
-          </button>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {hasAnyBulkable && (
+              <button
+                type="button"
+                onClick={acceptAllSuggestions}
+                className={ACCEPT_ALL_LINK}
+                title="Accept all AI suggestions for this asset (excludes price — must be per-field)"
+              >
+                ✓ Accept all suggestions
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'TOGGLE_ASSET_EXCLUDED', assetId: asset.id })}
+              className="text-[10px] font-bold uppercase tracking-widest text-black hover:underline"
+              aria-pressed={asset.excluded}
+            >
+              {asset.excluded ? '↺ Include' : '✕ Exclude'}
+            </button>
+          </div>
         </div>
 
         {/* Title */}
         <label className="block mb-2">
           <span className={LABEL}>Title*</span>
-          <input
-            type="text"
-            value={asset.editable.title}
-            onChange={e => update('title', e.target.value)}
-            className={INPUT}
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={asset.editable.title}
+              onChange={e => update('title', e.target.value)}
+              placeholder={hasTitleGhost ? asset.proposal!.title : 'Title…'}
+              className={`${INPUT} ${hasTitleGhost ? GHOST : ''}`}
+            />
+            {hasTitleGhost && (
+              <>
+                <button type="button" onClick={acceptTitle} className={ACCEPT_BTN} title="Accept AI suggestion">
+                  ✓
+                </button>
+                <RegenButton
+                  active={regenerating === 'title'}
+                  onClick={() => regenerate('title')}
+                />
+              </>
+            )}
+          </div>
         </label>
 
         {/* Caption (with AI ghost) */}
@@ -124,9 +230,15 @@ export default function AssetRow({ asset }: Props) {
               className={`${INPUT} ${hasCaptionGhost ? GHOST : ''}`}
             />
             {hasCaptionGhost && (
-              <button type="button" onClick={acceptCaption} className={ACCEPT_BTN} title="Accept AI suggestion">
-                ✓
-              </button>
+              <>
+                <button type="button" onClick={acceptCaption} className={ACCEPT_BTN} title="Accept AI suggestion">
+                  ✓
+                </button>
+                <RegenButton
+                  active={regenerating === 'caption'}
+                  onClick={() => regenerate('caption')}
+                />
+              </>
             )}
           </div>
         </label>
@@ -134,16 +246,31 @@ export default function AssetRow({ asset }: Props) {
         {/* Tags */}
         <label className="block mb-2">
           <span className={LABEL}>Tags</span>
-          <input
-            type="text"
-            value={asset.editable.tags.join(', ')}
-            onChange={e => update('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-            placeholder="comma, separated, tags"
-            className={INPUT}
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={asset.editable.tags.join(', ')}
+              onChange={e => update('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+              placeholder={
+                hasTagsGhost ? asset.proposal!.tags.join(', ') : 'comma, separated, tags'
+              }
+              className={`${INPUT} ${hasTagsGhost ? GHOST : ''}`}
+            />
+            {hasTagsGhost && (
+              <>
+                <button type="button" onClick={acceptTags} className={ACCEPT_BTN} title="Accept AI tags">
+                  ✓
+                </button>
+                <RegenButton
+                  active={regenerating === 'tags'}
+                  onClick={() => regenerate('tags')}
+                />
+              </>
+            )}
+          </div>
         </label>
 
-        {/* Price (with engine ghost + Why?) */}
+        {/* Price (with engine ghost + Why? + PriceBasisPanel mount) */}
         <label className="block mb-2">
           <span className={LABEL}>Price (EUR)</span>
           <div className="flex items-center gap-2">
@@ -167,16 +294,28 @@ export default function AssetRow({ asset }: Props) {
                   onClick={() => dispatch({ type: 'TOGGLE_PRICE_BASIS_PANEL', assetId: asset.id })}
                   className="text-[10px] font-bold uppercase text-black hover:underline"
                   title='"Why this price?"'
+                  aria-expanded={priceBasisOpen}
                 >
-                  Why?
+                  {priceBasisOpen ? 'Hide' : 'Why?'}
                 </button>
                 <button type="button" onClick={acceptPrice} className={ACCEPT_BTN} title="Accept engine recommendation">
                   ✓
                 </button>
+                <RegenButton
+                  active={regenerating === 'price'}
+                  onClick={() => regenerate('price')}
+                />
               </>
             )}
           </div>
         </label>
+
+        {/* Inline PriceBasisPanel (per IPV-4 + spec §9.3) */}
+        {priceBasisOpen && hasPriceGhost && (
+          <div className="mb-2">
+            <PriceBasisPanel asset={asset} />
+          </div>
+        )}
 
         {/* Privacy + Licences row */}
         <div className="grid grid-cols-2 gap-2 mb-2">
@@ -216,17 +355,46 @@ export default function AssetRow({ asset }: Props) {
         {/* Geo */}
         <label className="block">
           <span className={LABEL}>Geo</span>
-          <input
-            type="text"
-            value={asset.editable.geography.join(', ')}
-            onChange={e =>
-              update('geography', e.target.value.split(',').map(g => g.trim()).filter(Boolean))
-            }
-            placeholder="City, Country"
-            className={INPUT}
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={asset.editable.geography.join(', ')}
+              onChange={e =>
+                update('geography', e.target.value.split(',').map(g => g.trim()).filter(Boolean))
+              }
+              placeholder={
+                hasGeoGhost ? asset.proposal!.geography.join(', ') : 'City, Country'
+              }
+              className={`${INPUT} ${hasGeoGhost ? GHOST : ''}`}
+            />
+            {hasGeoGhost && (
+              <>
+                <button type="button" onClick={acceptGeography} className={ACCEPT_BTN} title="Accept AI geography">
+                  ✓
+                </button>
+                <RegenButton
+                  active={regenerating === 'geography'}
+                  onClick={() => regenerate('geography')}
+                />
+              </>
+            )}
+          </div>
         </label>
       </div>
     </div>
+  )
+}
+
+function RegenButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={active}
+      className={`${REGEN_BTN} ${active ? 'opacity-60 cursor-wait' : ''}`}
+      title="Regenerate AI suggestion"
+    >
+      {active ? '⟳ regenerating…' : '↻'}
+    </button>
   )
 }

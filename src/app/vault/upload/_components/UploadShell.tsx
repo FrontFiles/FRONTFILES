@@ -21,7 +21,7 @@
 
 'use client'
 
-import { useReducer } from 'react'
+import { useEffect, useReducer, useRef } from 'react'
 import { v3Reducer, v3InitialState } from '@/lib/upload/v3-state'
 import { densityForCount } from '@/lib/upload/v3-types'
 import { hydrateV3FromV2State } from '@/lib/upload/v3-hydration'
@@ -41,11 +41,48 @@ interface Props {
   devScenarioId: ScenarioId | null
   /** Dev-only commit-failure injection (per C2.4 IPIV-5). null in production. */
   devSimulateFailure: number | null
+  /** Dev-only AI cluster banner seeding (per C2.5 IPV-5). false in production. */
+  devSeedBanners: boolean
 }
 
-export default function UploadShell({ batchId, devScenarioId, devSimulateFailure }: Props) {
+export default function UploadShell({
+  batchId,
+  devScenarioId,
+  devSimulateFailure,
+  devSeedBanners,
+}: Props) {
   const [state, dispatch] = useReducer(v3Reducer, { batchId, devScenarioId }, computeInitialState)
   const density = densityForCount(state.assetOrder.length)
+
+  // Per C2.5 IPV-5: seed AIProposalBanner with synthetic proposals so the
+  // banner is visually QAable in dev. Synthesizes 1–2 proposals from the
+  // first 1–2 storyGroups present after hydration. One-shot via a ref guard
+  // (StrictMode double-mount safe). Production never takes this path —
+  // devSeedBanners is hard-false unless ?seedBanners=1 is set in dev.
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (!devSeedBanners) return
+    if (seededRef.current) return
+    if (state.aiClusterProposals.length > 0) return // don't seed if real ones exist
+    if (state.storyGroupOrder.length === 0) return // nothing to seed from
+    seededRef.current = true
+    const seedCount = Math.min(2, state.storyGroupOrder.length)
+    for (let i = 0; i < seedCount; i++) {
+      const group = state.storyGroupsById[state.storyGroupOrder[i]]
+      if (!group) continue
+      dispatch({
+        type: 'RECEIVE_AI_CLUSTER_PROPOSAL',
+        proposal: {
+          proposalId: `seed_${i}_${Date.now().toString(36)}`,
+          clusterName: group.name,
+          proposedAssetIds: group.proposedAssetIds.slice(0, 5),
+          rationale: 'Synthetic proposal seeded for visual QA (dev: ?seedBanners=1).',
+          confidence: 0.85,
+          status: 'pending',
+        },
+      })
+    }
+  }, [devSeedBanners, state.aiClusterProposals.length, state.storyGroupOrder, state.storyGroupsById])
 
   // Per C2.4 L6 + IPIV-2: success phase replaces the entire screen body.
   // Drop zone, session defaults, asset list, side panel, commit bar all

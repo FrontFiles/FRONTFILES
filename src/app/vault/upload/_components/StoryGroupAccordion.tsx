@@ -105,15 +105,56 @@ export default function StoryGroupAccordion({ cluster, assets }: Props) {
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              // Per C2.5 IPV-2: dispatch the no-op BULK_ACCEPT_PROPOSALS_FOR_GROUP
+              // (telemetry hook per IPI-1) THEN loop UPDATE_ASSET_FIELD per
+              // asset for caption + tags + geography. NEVER price (L5 +
+              // spec §9.2 — type-level + runtime forbidden in reducer).
+              //
+              // React 19 batches synchronous dispatches in an event handler
+              // → 1 re-render even on a 60-asset cluster.
+              //
+              // Note: 'keywords' in the action's fields array is dead text —
+              // V2Asset has no 'keywords' editable field (only 'tags'). The
+              // 'keywords' fallback is preserved for telemetry-shape continuity.
               dispatch({
                 type: 'BULK_ACCEPT_PROPOSALS_FOR_GROUP',
                 clusterId: cluster.id,
                 fields: ['caption', 'tags', 'keywords'],
               })
-            }
+              for (const asset of assets) {
+                if (asset.excluded) continue
+                if (!asset.editable.description && asset.proposal?.description) {
+                  dispatch({
+                    type: 'UPDATE_ASSET_FIELD',
+                    assetId: asset.id,
+                    field: 'description',
+                    value: asset.proposal.description,
+                  })
+                }
+                if (asset.editable.tags.length === 0 && (asset.proposal?.tags?.length ?? 0) > 0) {
+                  dispatch({
+                    type: 'UPDATE_ASSET_FIELD',
+                    assetId: asset.id,
+                    field: 'tags',
+                    value: asset.proposal!.tags,
+                  })
+                }
+                if (
+                  asset.editable.geography.length === 0 &&
+                  (asset.proposal?.geography?.length ?? 0) > 0
+                ) {
+                  dispatch({
+                    type: 'UPDATE_ASSET_FIELD',
+                    assetId: asset.id,
+                    field: 'geography',
+                    value: asset.proposal!.geography,
+                  })
+                }
+              }
+            }}
             className={HEADER_BTN}
-            title="Accept all AI suggestions for caption, tags, and keywords (NOT price)"
+            title="Accept all AI suggestions for caption, tags, and geography (NOT price — per spec §9.2)"
           >
             Accept all suggestions
           </button>
