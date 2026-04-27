@@ -54,13 +54,19 @@
  *   and response.
  *
  * apiVersion freeze point (R6):
- *   '2026-03-25.dahlia' is pinned verbatim. The string is the
+ *   '2026-04-22.dahlia' is pinned verbatim. The string is the
  *   resolved value of the SDK's internal DEFAULT_API_VERSION at
- *   install time (Prompt 3). `Stripe.DEFAULT_API_VERSION` is not
- *   exposed as a top-level class static on v22 — reading it at
- *   runtime returns `undefined` — so we freeze the literal here.
- *   Future SDK major upgrades RE-RUN the install + resolution and
- *   bump both the SDK version and this string together.
+ *   install time. Originally pinned to '2026-03-25.dahlia' at
+ *   Prompt-3 resolution; bumped to '2026-04-22.dahlia' on the
+ *   2026-04-27 SDK refresh (the SDK's default-version literal
+ *   advanced and TypeScript began rejecting the old string).
+ *   `Stripe.DEFAULT_API_VERSION` is not exposed as a top-level
+ *   class static on v22 — reading it at runtime returns
+ *   `undefined` — so we freeze the literal here. Future SDK major
+ *   upgrades RE-RUN the install + resolution and bump both the
+ *   SDK version and this string together. At PR 5 (Stripe wiring
+ *   live), diff Stripe's 2026-03-25 → 2026-04-22 changelog for
+ *   any behavior-affecting changes that affect Frontfiles' usage.
  *
  * Do not:
  *   - Log, export, or stringify the secret key anywhere.
@@ -93,7 +99,7 @@ export function getStripeClient(): Stripe {
     throw new Error('Stripe not configured. Set STRIPE_SECRET_KEY.')
   }
   _client = new Stripe(key, {
-    apiVersion: '2026-03-25.dahlia',
+    apiVersion: '2026-04-22.dahlia',
     typescript: true,
   })
   return _client

@@ -14,6 +14,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { StorageAdapter as LowLevelStorage } from '@/lib/storage'
+import type { DerivativeRole } from '@/lib/storage/types'
 import type { StorageAdapter as PipelineStorage } from './pipeline'
 import { findOriginalStorageRef } from './media-row-adapter'
 
@@ -59,7 +60,12 @@ export function makePipelineStorageAdapter(
     async writeDerivative(assetId, role, buffer, contentType) {
       return storage.putDerivative({
         assetId,
-        role,
+        // PipelineStorage.writeDerivative types `role` as string; the low-level
+        // storage adapter expects the narrower DerivativeRole union. Bridge-
+        // level cast is safe because the only callers (pipeline) only ever
+        // pass valid DerivativeRole values. Deeper fix: narrow the param on
+        // PipelineStorage.writeDerivative itself (queued tech debt).
+        role: role as DerivativeRole,
         bytes: buffer,
         contentType,
       })

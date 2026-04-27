@@ -76,7 +76,7 @@ function makeAsset(
     conflicts: [],
     extractedMetadata: null,
     declarationState: null,
-    duplicateStatus: 'unique',
+    duplicateStatus: 'none',
     duplicateOfId: null,
     analysisStatus: 'complete',
     uploadProgress: 100,

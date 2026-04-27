@@ -979,7 +979,7 @@ function buildArchiveScenario(spec: ArchiveScenarioSpec): MockScenario {
       clusterAssetIndices.push(assetIndex)
       analysisTemplates.push({
         assetIndex,
-        declarationState: i % 17 === 0 ? 'provenance_pending' : 'provenance_intermediate',
+        declarationState: 'provenance_pending',
         confidence: 0.6 + (i % 4) * 0.1, // 0.6 / 0.7 / 0.8 / 0.9
         title: `${cluster.name} — frame ${i + 1}`,
         description: `Synthetic asset ${i + 1} in cluster "${cluster.name}".`,
@@ -987,7 +987,7 @@ function buildArchiveScenario(spec: ArchiveScenarioSpec): MockScenario {
         geography: ['archive-test'],
         priceSuggestionCents: 12000 + (i % 8) * 1500, // €120 to €225
         privacySuggestion: 'PUBLIC',
-        licenceSuggestions: ['EDITORIAL'],
+        licenceSuggestions: ['editorial'],
       })
       idx++
     }
