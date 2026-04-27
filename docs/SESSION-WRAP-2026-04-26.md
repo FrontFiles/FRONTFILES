@@ -1,5 +1,11 @@
 # Session Wrap — 2026-04-26
 
+> ⚠ **STALE — superseded by `docs/SESSION-WRAP-2026-04-27.md`.**
+> The "ratify C1 + compose C2" default opener in this doc is no longer
+> meaningful: C1 ratified + C2 shipped + D2.1→D2.10 + follow-ups + dnd-fix
+> all landed between 2026-04-26 and 2026-04-27. Use the newer wrap for
+> resume; this one is kept as a historical record only.
+
 **Status:** Active handoff. Use the RESUME PROMPT in §6 for a fresh Claude session.
 **Supersedes:** `docs/upload/NEXT-SESSION.md` (from 2026-04-25; that doc covered upload Phase A only and is now stale)
 **Session scope:** Vault upload Phase A briefs ratified, Phase B backend shipped (PRs 1.3 + 3 + 4), BP/Watermark trust-language defensive pass shipped, Phase C C1 UX spec composed, Phase E1 AI architecture brief composed, Phase F1 price engine architecture brief composed.
