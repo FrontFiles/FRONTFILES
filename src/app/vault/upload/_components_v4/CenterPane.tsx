@@ -36,6 +36,9 @@ import CountFooter from './CountFooter'
 // mount gating (length >= 2 + commit.phase guard) — CenterPane unconditionally
 // renders the slot; the bar early-returns null when conditions aren't met.
 import ContextualActionBar from './ContextualActionBar'
+// D2.6: compare view (2-up side-by-side). Mounts in the layout='comparing'
+// branch (replaces the D2.3 placeholder).
+import CompareView from './CompareView'
 
 export default function CenterPane() {
   const { state } = useUploadContext()
@@ -60,15 +63,15 @@ export default function CenterPane() {
           selection changes). */}
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
         {layout === 'comparing' ? (
-          <CompareViewPlaceholder />
+          <CompareView />
         ) : (
           <ContactSheet />
         )}
         {/* D2.5: contextual action bar floats at the bottom of the grid
             wrapper. Mount-gated inside the component (length >= 2 +
-            commit.phase guard). Popovers anchored to the bar buttons
-            extend upward into the grid wrapper; on short viewports they
-            may clip — acceptable trade-off. */}
+            commit.phase guard + D2.6 compareAssetIds.length === 2 suppression).
+            Popovers anchored to the bar buttons extend upward into the grid
+            wrapper; on short viewports they may clip — acceptable trade-off. */}
         <ContextualActionBar />
       </div>
 
@@ -80,14 +83,3 @@ export default function CenterPane() {
   )
 }
 
-/**
- * D2.6 will replace this with the real CompareView. For D2.3, just a
- * placeholder so the layout-state branch compiles.
- */
-function CompareViewPlaceholder() {
-  return (
-    <div className="flex-1 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
-      Compare view — placeholder for D2.6
-    </div>
-  )
-}

@@ -382,6 +382,7 @@ export default function UploadShellV4({
            * No selection → no rail.
            */}
           {state.ui.selectedAssetIds.length === 1 &&
+            state.ui.compareAssetIds.length !== 2 &&
             (state.commit.phase === 'idle' || state.commit.phase === 'summary') && (
               <div
                 data-region="right-rail"
@@ -392,6 +393,12 @@ export default function UploadShellV4({
                 // constrained by h-full = 143px (body's allotted space). With
                 // min-h-0, the wrapper truly respects h-full, and the inner
                 // aside's flex-1 min-h-0 + overflow-y-auto can finally scroll.
+                //
+                // D2.6 IPD6-3: also suppressed during compare mode to keep
+                // the 2-up focus uncluttered. Defensive — in normal compare
+                // flow selectedAssetIds stays at 2 (compare doesn't touch
+                // selection), so the length===1 gate alone would block the
+                // rail. Explicit compare check makes the intent unambiguous.
                 className="border-l border-black bg-white overflow-hidden flex flex-col h-full min-h-0"
                 style={{
                   width: '400px',

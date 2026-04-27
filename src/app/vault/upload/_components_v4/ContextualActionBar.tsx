@@ -76,6 +76,11 @@ export default function ContextualActionBar() {
   // Mount conditions per D2.5-DIRECTIVE §5.3
   if (selectedCount < 2) return null
   if (state.commit.phase !== 'idle' && state.commit.phase !== 'summary') return null
+  // D2.6 IPD6-1: bar is suppressed during compare mode (founder lock L5 —
+  // bulk is contextual on multi-select in the workspace layout, not in
+  // compare). Selection persists across compare so the bar reappears
+  // cleanly on exit (EXIT_COMPARE_MODE → compareAssetIds.length !== 2).
+  if (state.ui.compareAssetIds.length === 2) return null
 
   // ── Derived enable states ──────────────────────────────────────
   // ✓ AI enabled if at least one selected asset has a proposal
