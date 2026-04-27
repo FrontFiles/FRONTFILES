@@ -89,7 +89,18 @@ export default function RightRailInspector() {
     <aside
       role="complementary"
       aria-label={`Inspector for ${asset.filename}`}
-      className="w-full h-full flex flex-col bg-white overflow-y-auto"
+      // D2.5b (round 5): flex-1 min-h-0 instead of h-full. Diagnosis from
+      // DevTools console:
+      //   {asideOffset: 771, asideScroll: 771, body: 199, viewport: 199}
+      // The aside was growing to content size (771px) instead of being
+      // constrained to its parent (~143px). h-full was being ignored in
+      // the flex chain. flex-1 + min-h-0 forces the aside to FIT INSIDE
+      // its flex-col parent (the rail wrapper) and lets overflow-y-auto
+      // activate properly when content exceeds that.
+      //
+      // The wrapper is `flex flex-col h-full` so the aside as a flex-1
+      // child fills the wrapper's height exactly, then overflows internally.
+      className="w-full flex-1 min-h-0 flex flex-col bg-white overflow-y-auto"
     >
       <InspectorThumbnail asset={asset} />
       <SetAsCoverButton asset={asset} />

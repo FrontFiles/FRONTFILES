@@ -74,7 +74,11 @@ export default async function UploadPage({
 
   return (
     <CreatorGate tool="Upload">
-      <div className="flex-1 bg-white flex flex-col">
+      {/* D2.5b: min-h-0 is REQUIRED. Without it, this flex-1 child of body
+          (flex flex-col) gets min-height: auto = its content size, which
+          lets descendants grow beyond viewport bounds and breaks the
+          right-rail inspector's overflow-y-auto scroll chain. */}
+      <div className="flex-1 bg-white flex flex-col min-h-0">
         <UploadShellV4
           batchId={batchId}
           devScenarioId={devScenarioId}

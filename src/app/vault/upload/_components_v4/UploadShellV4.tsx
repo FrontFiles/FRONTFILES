@@ -323,7 +323,14 @@ export default function UploadShellV4({
       <FileIngestProvider value={{ openFilePicker }}>
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <div
-            className="flex flex-col min-h-screen min-w-0"
+            // D2.5b (round 6): h-full + min-h-0. Both required:
+            // - h-full sets height: 100% of parent (workspace flex-1)
+            // - min-h-0 disables the default min-height: auto on flex items
+            //   which would otherwise let this div grow to its content size
+            //   (the 771px aside) and break the entire overflow chain.
+            // Same chain repeated on every flex ancestor: page.tsx workspace,
+            // here, the row, the right-rail wrapper, and finally the aside.
+            className="flex flex-col h-full min-h-0 min-w-0"
             onDragEnter={handleDragEnter}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -378,7 +385,14 @@ export default function UploadShellV4({
             (state.commit.phase === 'idle' || state.commit.phase === 'summary') && (
               <div
                 data-region="right-rail"
-                className="border-l border-black bg-white overflow-hidden"
+                // D2.5b (round 5): h-full + flex flex-col + min-h-0. The
+                // min-h-0 is CRITICAL — without it, flex items have
+                // min-height: auto (= content size), so the wrapper grew to
+                // its child's natural 771px content height instead of being
+                // constrained by h-full = 143px (body's allotted space). With
+                // min-h-0, the wrapper truly respects h-full, and the inner
+                // aside's flex-1 min-h-0 + overflow-y-auto can finally scroll.
+                className="border-l border-black bg-white overflow-hidden flex flex-col h-full min-h-0"
                 style={{
                   width: '400px',
                   minWidth: '400px',
