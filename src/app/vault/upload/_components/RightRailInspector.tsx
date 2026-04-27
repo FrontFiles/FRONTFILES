@@ -9,10 +9,13 @@
  *
  * Layout (top → bottom):
  *   InspectorThumbnail               — sticky filename header + 16:9 thumbnail
- *   InspectorFieldEditor             — Title / Caption / Price / Privacy
- *                                     always visible; Tags / Geography /
- *                                     Licences collapsible (closed by default)
+ *   InspectorFieldEditor             — Title / Caption / Price / Privacy /
+ *                                     Social licensing always visible;
+ *                                     Tags / Geography / Licences collapsible
+ *                                     (closed by default)
  *   InspectorExceptionsSection       — collapsible (closed by default)
+ *   InspectorEmbeddedMetadataSection — collapsible (D2.10 follow-up):
+ *                                     read-only EXIF / GPS / IPTC dump
  *   InspectorAIProposalDetail        — collapsible (closed by default)
  *
  * D2.9 Move 9: SetAsCoverButton REMOVED. Cover is now set via two
@@ -46,6 +49,9 @@ import { useUploadContext } from './UploadContext'
 import InspectorThumbnail from './inspector/InspectorThumbnail'
 import InspectorFieldEditor from './inspector/InspectorFieldEditor'
 import InspectorExceptionsSection from './inspector/InspectorExceptionsSection'
+// D2.10 follow-up — read-only EXIF/GPS/IPTC surface so creators can see
+// what the file says about itself without triggering a conflict.
+import InspectorEmbeddedMetadataSection from './inspector/InspectorEmbeddedMetadataSection'
 import InspectorAIProposalDetail from './inspector/InspectorAIProposalDetail'
 
 export default function RightRailInspector() {
@@ -111,6 +117,7 @@ export default function RightRailInspector() {
       <InspectorThumbnail asset={asset} />
       <InspectorFieldEditor asset={asset} />
       <InspectorExceptionsSection asset={asset} />
+      <InspectorEmbeddedMetadataSection asset={asset} />
       <InspectorAIProposalDetail asset={asset} />
     </aside>
   )
