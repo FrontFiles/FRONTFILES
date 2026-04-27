@@ -108,6 +108,17 @@ export default function ContactSheetCard({
       role="button"
       tabIndex={0}
       aria-pressed={isSelected}
+      // dnd-kit v6 spreads `aria-describedby="DndDescribedBy-N"` here from
+      // dragAttributes. Its internal counter starts fresh on server vs
+      // client and increments at non-deterministic call orders during
+      // hydration, producing a cosmetic React hydration warning. The
+      // dndContextId prop on the parent DndContext is meant to seed this
+      // but isn't observably reaching the prop in this dnd-kit/Next.js
+      // version. Behavior is unaffected — drag works correctly. This
+      // attribute targets exactly the mismatching pair and is React's
+      // intended escape hatch for SSR/CSR id-stability noise from third-
+      // party libraries.
+      suppressHydrationWarning
       {...dragListeners}
       {...dragAttributes}
     >
