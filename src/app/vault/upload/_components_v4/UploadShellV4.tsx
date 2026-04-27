@@ -378,7 +378,13 @@ export default function UploadShellV4({
             (state.commit.phase === 'idle' || state.commit.phase === 'summary') && (
               <div
                 data-region="right-rail"
-                className="w-[400px] flex-shrink-0 border-l border-black bg-white"
+                className="border-l border-black bg-white overflow-hidden"
+                style={{
+                  width: '400px',
+                  minWidth: '400px',
+                  maxWidth: '400px',
+                  flex: '0 0 400px',
+                }}
               >
                 <RightRailInspector />
               </div>

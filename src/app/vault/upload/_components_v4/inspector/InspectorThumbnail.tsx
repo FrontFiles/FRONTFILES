@@ -45,9 +45,9 @@ export default function InspectorThumbnail({ asset }: Props) {
   }, [asset.thumbnailRef, asset.file])
 
   return (
-    <div className="flex-shrink-0">
+    <div className="flex-shrink-0 w-full max-w-full overflow-hidden">
       {/* Filename header — sticky at the top of the rail body for context */}
-      <div className="border-b border-black px-3 py-2 sticky top-0 bg-white z-10 min-w-0">
+      <div className="border-b border-black px-3 py-2 sticky top-0 bg-white z-10 min-w-0 max-w-full overflow-hidden">
         <span
           className="text-sm font-mono text-black truncate block"
           title={asset.filename}
@@ -56,14 +56,25 @@ export default function InspectorThumbnail({ asset }: Props) {
         </span>
       </div>
 
-      {/* 16:9 landscape thumbnail per L6 — fills rail width (~400 × 225) */}
-      <div className="aspect-video bg-slate-100 overflow-hidden border-b border-black flex items-center justify-center">
+      {/* 16:9 landscape thumbnail per L6 — fills rail width (~400 × 225).
+       *
+       * D2.7b defensive constraint: explicit inline width:100% + max-w:100% on
+       * the box, and explicit max-w/max-h:100% (inline, not just Tailwind) on
+       * the img. Belt-and-suspenders so an oversize natural image can't leak
+       * out of the right rail and overlap the center pane. The aspect-video
+       * class still drives the 16:9 ratio; the constraints just prevent escape.
+       */}
+      <div
+        className="aspect-video bg-slate-100 overflow-hidden border-b border-black flex items-center justify-center w-full max-w-full"
+        style={{ width: '100%', maxWidth: '100%' }}
+      >
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={url}
             alt={asset.filename}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain block max-w-full max-h-full"
+            style={{ maxWidth: '100%', maxHeight: '100%' }}
           />
         ) : (
           <div className="text-center px-4 py-2">
