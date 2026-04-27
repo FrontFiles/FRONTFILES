@@ -35,7 +35,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useUploadContext } from '../UploadContext'
 import type { V2Asset, AssetEditableFields } from '@/lib/upload/v3-types'
 import type { PrivacyState, LicenceType } from '@/lib/upload/types'
@@ -69,7 +69,7 @@ interface Props {
 }
 
 export default function InspectorFieldEditor({ asset }: Props) {
-  const { dispatch } = useUploadContext()
+  const { state, dispatch } = useUploadContext()
   const [regenerating, setRegenerating] = useState<RegenField | null>(null)
 
   // Collapsible-section local state (per IPD4-3 default = all closed).
@@ -82,6 +82,43 @@ export default function InspectorFieldEditor({ asset }: Props) {
     value: AssetEditableFields[K],
   ): void {
     dispatch({ type: 'UPDATE_ASSET_FIELD', assetId: asset.id, field, value })
+  }
+
+  // ── D2.10 — "Apply to all" per-field bulk dispatch ──
+  //
+  // Scope rule (per founder pick D): when filter.storyGroupId is set,
+  // "all" means every asset in that story (membership = asset.storyGroupId).
+  // Otherwise "all" means every asset in the batch (assetOrder).
+  // Excludes the open asset itself? No — applying overwrites the field on
+  // the currently-open asset too. The open asset's value is the source of
+  // truth being broadcast.
+  //
+  // Excluded fields per founder ratification: price (per L6 + spec §9.2 —
+  // per-asset only). Apply-to-all is forbidden for price the same way
+  // bulk-accept is forbidden.
+  const applyScope = useMemo<{ ids: string[]; label: string; storyName: string | null }>(() => {
+    const sgId = state.ui.filter.storyGroupId
+    if (sgId) {
+      const ids = state.assetOrder.filter(
+        id => state.assetsById[id]?.storyGroupId === sgId,
+      )
+      const story = state.storyGroupsById[sgId]
+      return { ids, label: 'all in story', storyName: story?.name ?? null }
+    }
+    return { ids: [...state.assetOrder], label: 'all in batch', storyName: null }
+  }, [state.ui.filter.storyGroupId, state.assetOrder, state.assetsById, state.storyGroupsById])
+
+  function applyToAll<K extends keyof AssetEditableFields>(
+    field: K,
+    value: AssetEditableFields[K],
+  ): void {
+    if (applyScope.ids.length === 0) return
+    dispatch({
+      type: 'BULK_UPDATE_FIELD',
+      assetIds: applyScope.ids,
+      field,
+      value,
+    })
   }
 
   function regenerate(field: RegenField) {
@@ -189,6 +226,11 @@ export default function InspectorFieldEditor({ asset }: Props) {
               acceptTitle="Accept AI title"
             />
           )}
+          <ApplyAll
+            onClick={() => applyToAll('title', asset.editable.title)}
+            scopeLabel={applyScope.label}
+            count={applyScope.ids.length}
+          />
         </div>
       </Field>
 
@@ -214,10 +256,18 @@ export default function InspectorFieldEditor({ asset }: Props) {
               acceptTitle="Accept AI caption"
             />
           )}
+          <ApplyAll
+            onClick={() => applyToAll('description', asset.editable.description)}
+            scopeLabel={applyScope.label}
+            count={applyScope.ids.length}
+          />
         </div>
       </Field>
 
-      {/* Price — always visible */}
+      {/* Price — always visible. Per L6 + spec §9.2, NO ApplyAll button:
+          price acceptance is per-asset only; bulk-set is reserved for the
+          contextual action bar's deliberate multi-select flow, never as a
+          quiet inspector affordance. */}
       <Field
         label="Price (EUR)"
         provenance={<FieldProvenanceTag source={priceSource} hasProposal={priceHasProposal} />}
@@ -255,21 +305,28 @@ export default function InspectorFieldEditor({ asset }: Props) {
         label="Privacy"
         provenance={<FieldProvenanceTag source={privacySource} hasProposal={false} />}
       >
-        <select
-          value={asset.editable.privacy ?? ''}
-          onChange={e => {
-            const v = e.target.value
-            update('privacy', v === '' ? null : (v as PrivacyState))
-          }}
-          className={FIELD_INPUT}
-        >
-          <option value="">— Select —</option>
-          {PRIVACY_OPTIONS.map(p => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-start gap-2 min-w-0">
+          <select
+            value={asset.editable.privacy ?? ''}
+            onChange={e => {
+              const v = e.target.value
+              update('privacy', v === '' ? null : (v as PrivacyState))
+            }}
+            className={`${FIELD_INPUT} flex-1`}
+          >
+            <option value="">— Select —</option>
+            {PRIVACY_OPTIONS.map(p => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <ApplyAll
+            onClick={() => applyToAll('privacy', asset.editable.privacy)}
+            scopeLabel={applyScope.label}
+            count={applyScope.ids.length}
+          />
+        </div>
       </Field>
 
       {/* Social licensing — standalone boolean toggle.
@@ -282,14 +339,21 @@ export default function InspectorFieldEditor({ asset }: Props) {
           <FieldProvenanceTag source={ms.socialLicensable} hasProposal={false} />
         }
       >
-        <label className="flex items-center gap-2 text-xs text-black cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={asset.editable.socialLicensable}
-            onChange={e => update('socialLicensable', e.target.checked)}
+        <div className="flex items-start gap-2 min-w-0">
+          <label className="flex items-center gap-2 text-xs text-black cursor-pointer select-none flex-1">
+            <input
+              type="checkbox"
+              checked={asset.editable.socialLicensable}
+              onChange={e => update('socialLicensable', e.target.checked)}
+            />
+            Available for social licensing
+          </label>
+          <ApplyAll
+            onClick={() => applyToAll('socialLicensable', asset.editable.socialLicensable)}
+            scopeLabel={applyScope.label}
+            count={applyScope.ids.length}
           />
-          Available for social licensing
-        </label>
+        </div>
       </Field>
 
       {/* ── Collapsibles (closed by default per IPD4-3) ── */}
@@ -325,6 +389,11 @@ export default function InspectorFieldEditor({ asset }: Props) {
               acceptTitle="Accept AI tags"
             />
           )}
+          <ApplyAll
+            onClick={() => applyToAll('tags', [...asset.editable.tags])}
+            scopeLabel={applyScope.label}
+            count={applyScope.ids.length}
+          />
         </div>
       </Collapsible>
 
@@ -361,6 +430,11 @@ export default function InspectorFieldEditor({ asset }: Props) {
               acceptTitle="Accept AI geography"
             />
           )}
+          <ApplyAll
+            onClick={() => applyToAll('geography', [...asset.editable.geography])}
+            scopeLabel={applyScope.label}
+            count={applyScope.ids.length}
+          />
         </div>
       </Collapsible>
 
@@ -393,6 +467,13 @@ export default function InspectorFieldEditor({ asset }: Props) {
               </label>
             )
           })}
+        </div>
+        <div className="flex justify-end mt-2">
+          <ApplyAll
+            onClick={() => applyToAll('licences', [...asset.editable.licences])}
+            scopeLabel={applyScope.label}
+            count={applyScope.ids.length}
+          />
         </div>
       </Collapsible>
     </div>
@@ -517,5 +598,43 @@ function ApproveRegen({
         {regenerating ? '⟳' : '↻'}
       </button>
     </div>
+  )
+}
+
+/**
+ * D2.10 — per-field "Apply to all" button. Broadcasts the open asset's
+ * field value across the configured scope (all-in-story when filtered,
+ * all-in-batch otherwise). Excluded for price per L6 + spec §9.2.
+ *
+ * Visually a small slate-bordered chip with a "→ all" affordance. Sits
+ * inline with the field controls so creators can broadcast a value
+ * without leaving the inspector.
+ */
+function ApplyAll({
+  onClick,
+  scopeLabel,
+  count,
+  disabled = false,
+}: {
+  onClick: () => void
+  scopeLabel: string
+  count: number
+  disabled?: boolean
+}) {
+  const fullDisabled = disabled || count === 0
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={fullDisabled}
+      title={`Apply this value to ${scopeLabel} (${count} asset${count === 1 ? '' : 's'})`}
+      className={`border border-slate-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest flex-shrink-0 transition-colors ${
+        fullDisabled
+          ? 'text-slate-300 cursor-not-allowed'
+          : 'text-slate-600 hover:bg-blue-600 hover:text-white hover:border-blue-600'
+      }`}
+    >
+      → all
+    </button>
   )
 }

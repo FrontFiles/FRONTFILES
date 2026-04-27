@@ -223,6 +223,11 @@ export type V3Action =
   // dispatches to learn the freshly-generated story id.
   | { type: 'CREATE_STORY_GROUP_AND_MOVE'; name: string; assetIds: string[] }
   | { type: 'RENAME_STORY_GROUP'; storyGroupId: string; name: string }
+  // D2.10 — story-level metadata (location + date) editing. Separate from
+  // RENAME_STORY_GROUP for field-narrowed dispatch and to keep RENAME's
+  // call sites unchanged. The "Apply to all in story" UI composes via
+  // BULK_UPDATE_FIELD dispatches; no dedicated APPLY action needed.
+  | { type: 'UPDATE_STORY_FIELD'; storyGroupId: string; field: 'location' | 'date'; value: string | null }
   | { type: 'DELETE_STORY_GROUP'; storyGroupId: string }
   | { type: 'MOVE_ASSET_TO_CLUSTER'; assetId: string; clusterId: string }
   | { type: 'MOVE_ASSET_TO_UNGROUPED'; assetId: string }

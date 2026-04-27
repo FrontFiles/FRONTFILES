@@ -30,6 +30,10 @@ import { getLayoutState } from '@/lib/upload/upload-selectors'
 import AIProposalBanner from './AIProposalBanner'
 import ContactSheet from './ContactSheet'
 import ContactSheetFilterChips from './ContactSheetFilterChips'
+// D2.10 — story metadata header rendered between filter chips and the
+// contact sheet when filtered to a story. Self-gates on
+// state.ui.filter.storyGroupId; CenterPane mounts unconditionally.
+import ContactSheetStoryHeader from './ContactSheetStoryHeader'
 import ZoomSlider from './ZoomSlider'
 import CountFooter from './CountFooter'
 // D2.5: contextual action bar for multi-select. Component handles its own
@@ -56,6 +60,10 @@ export default function CenterPane() {
       <AIProposalBanner />
 
       <ContactSheetFilterChips />
+
+      {/* D2.10 — story metadata header. Self-gates on filter.storyGroupId;
+          renders nothing when not filtered to a story. */}
+      <ContactSheetStoryHeader />
 
       {/* Grid wrapper is `relative` so the contextual action bar (D2.5) can
           float over the contact sheet via absolute positioning without

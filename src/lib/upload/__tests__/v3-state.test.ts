@@ -460,6 +460,92 @@ describe('story group operations', () => {
     expect(s.storyGroupsById[groupId].sequence).toEqual(['c', 'a', 'b'])
   })
 
+  // ── D2.10 — story-level metadata (location, date) ──
+  //
+  // Stories carry their own metadata for "Apply to all in story" propagation.
+  // CREATE_STORY_GROUP initializes location: '' + date: null. SPLIT_CLUSTER
+  // inherits from source. UPDATE_STORY_FIELD edits a single field at a time.
+
+  it('CREATE_STORY_GROUP initializes location="" and date=null', () => {
+    const s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const groupId = s.storyGroupOrder[0]
+    expect(s.storyGroupsById[groupId].location).toBe('')
+    expect(s.storyGroupsById[groupId].date).toBeNull()
+  })
+
+  it('UPDATE_STORY_FIELD writes location', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: groupId,
+      field: 'location',
+      value: 'Lisbon, Portugal',
+    })
+    expect(s.storyGroupsById[groupId].location).toBe('Lisbon, Portugal')
+  })
+
+  it('UPDATE_STORY_FIELD writes date and clears via null', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: groupId,
+      field: 'date',
+      value: '2026-04-15',
+    })
+    expect(s.storyGroupsById[groupId].date).toBe('2026-04-15')
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: groupId,
+      field: 'date',
+      value: null,
+    })
+    expect(s.storyGroupsById[groupId].date).toBeNull()
+  })
+
+  it('UPDATE_STORY_FIELD throws on unknown storyGroupId', () => {
+    expect(() =>
+      v3Reducer(freshState(), {
+        type: 'UPDATE_STORY_FIELD',
+        storyGroupId: 'no-such-cluster',
+        field: 'location',
+        value: 'Lisbon',
+      }),
+    ).toThrowError(/update_story_field_invalid/)
+  })
+
+  it('SPLIT_CLUSTER inherits location + date on the new cluster', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Source' })
+    const sourceId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: sourceId,
+      field: 'location',
+      value: 'Lisbon, Portugal',
+    })
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: sourceId,
+      field: 'date',
+      value: '2026-04-15',
+    })
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: sourceId })
+    s = v3Reducer(s, {
+      type: 'SPLIT_CLUSTER',
+      clusterId: sourceId,
+      assetIds: ['a'],
+      newClusterName: 'Split off',
+    })
+    const newId = s.storyGroupOrder[1]
+    expect(s.storyGroupsById[newId].location).toBe('Lisbon, Portugal')
+    expect(s.storyGroupsById[newId].date).toBe('2026-04-15')
+  })
+
   it('REMOVE_FILE strips the assetId from any cluster proposedAssetIds + sequence + coverAssetId', () => {
     let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
     const groupId = s.storyGroupOrder[0]

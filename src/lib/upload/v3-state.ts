@@ -389,6 +389,9 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         rationale: '',
         confidence: 1,
         createdAt: new Date().toISOString(),
+        // D2.10 — story-level metadata defaults.
+        location: '',
+        date: null,
       }
       return {
         ...state,
@@ -421,6 +424,9 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         confidence: 1,
         createdAt: new Date().toISOString(),
         sequence: [...movedIds],
+        // D2.10 — story-level metadata defaults.
+        location: '',
+        date: null,
       }
       const assetsById = { ...state.assetsById }
       let storyGroupsById = { ...state.storyGroupsById, [id]: group }
@@ -461,6 +467,36 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         storyGroupsById: {
           ...state.storyGroupsById,
           [action.storyGroupId]: { ...group, name: action.name },
+        },
+      }
+    }
+
+    // D2.10 — story-level metadata (location, date). Throws on unknown
+    // storyGroupId to surface stale ids quickly. Value type is string for
+    // 'location' and string | null for 'date' (caller is responsible for
+    // type alignment via the discriminated action shape).
+    case 'UPDATE_STORY_FIELD': {
+      const group = state.storyGroupsById[action.storyGroupId]
+      if (!group) {
+        throw new Error(
+          `update_story_field_invalid: storyGroupId="${action.storyGroupId}" not in storyGroupsById`,
+        )
+      }
+      if (action.field === 'location') {
+        return {
+          ...state,
+          storyGroupsById: {
+            ...state.storyGroupsById,
+            [action.storyGroupId]: { ...group, location: (action.value ?? '') as string },
+          },
+        }
+      }
+      // 'date'
+      return {
+        ...state,
+        storyGroupsById: {
+          ...state.storyGroupsById,
+          [action.storyGroupId]: { ...group, date: action.value as string | null },
         },
       }
     }
@@ -600,6 +636,9 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         confidence: 1,
         createdAt: new Date().toISOString(),
         sequence: moved,
+        // D2.10 — inherit story-level metadata from the source cluster.
+        location: sourceCluster.location ?? '',
+        date: sourceCluster.date ?? null,
       }
       const updatedSource: V2StoryGroup = {
         ...sourceCluster,
@@ -848,6 +887,10 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         rationale: proposal.rationale,
         confidence: proposal.confidence,
         createdAt: new Date().toISOString(),
+        // D2.10 — story-level metadata defaults; AI cluster proposals
+        // currently don't carry location/date, so defaults apply.
+        location: '',
+        date: null,
       }
       // Assign all proposed assets to the new group
       const assetsById = { ...state.assetsById }

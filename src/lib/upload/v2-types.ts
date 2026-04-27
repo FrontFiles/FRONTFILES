@@ -231,6 +231,19 @@ export interface V2StoryGroup {
   coverAssetId?: string | null
   /** Ordered asset ids = canonical reading order. Defaults to [...proposedAssetIds] at hydration. */
   sequence?: string[]
+  /**
+   * D2.10 — story-level location (single primary). Maps to per-asset
+   * geography via "Apply to all in story" button: each asset's
+   * editable.geography becomes [story.location] when bulk-applied.
+   * Defaults to ''.
+   */
+  location?: string
+  /**
+   * D2.10 — story-level date (ISO date, e.g., '2026-04-15').
+   * Maps to per-asset captureDate via "Apply to all in story".
+   * Defaults to null.
+   */
+  date?: string | null
 }
 
 // ── Exception Types ──

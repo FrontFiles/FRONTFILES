@@ -14,9 +14,13 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUploadContext } from './UploadContext'
 import type { V2FilterPreset } from '@/lib/upload/v3-types'
+import {
+  getFilteredSortedSearchedAssets,
+  type FilterableView,
+} from '@/lib/upload/upload-selectors'
 
 const FILTER_CHIPS: Array<{ preset: V2FilterPreset; label: string }> = [
   { preset: 'all', label: 'All' },
@@ -41,9 +45,93 @@ export default function ContactSheetFilterChips() {
     return () => clearTimeout(t)
   }, [searchInput, state.ui.searchQuery, dispatch])
 
+  // ── D2.10 — select-all-visible affordance ──
+  //
+  // Scope: assets visible after current filter + search (matches what's
+  // on screen). Indeterminate state when only some visible assets are
+  // selected. Click toggles between all-selected and none-selected.
+  // React doesn't support the `indeterminate` checkbox attribute as a
+  // prop, so we set it imperatively via a ref.
+  const filterView: FilterableView = useMemo(
+    () => ({
+      assetsById: state.assetsById,
+      assetOrder: state.assetOrder,
+      filter: state.ui.filter,
+      searchQuery: state.ui.searchQuery,
+      sortField: state.ui.sortField,
+      sortDirection: state.ui.sortDirection,
+    }),
+    [
+      state.assetsById,
+      state.assetOrder,
+      state.ui.filter,
+      state.ui.searchQuery,
+      state.ui.sortField,
+      state.ui.sortDirection,
+    ],
+  )
+  const visibleIds = useMemo(
+    () => getFilteredSortedSearchedAssets(filterView).map(a => a.id),
+    [filterView],
+  )
+  const selectedSet = useMemo(
+    () => new Set(state.ui.selectedAssetIds),
+    [state.ui.selectedAssetIds],
+  )
+  const visibleSelectedCount = useMemo(
+    () => visibleIds.reduce((acc, id) => (selectedSet.has(id) ? acc + 1 : acc), 0),
+    [visibleIds, selectedSet],
+  )
+  const allVisibleSelected = visibleIds.length > 0 && visibleSelectedCount === visibleIds.length
+  const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected
+
+  const selectAllRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSelected
+    }
+  }, [someVisibleSelected])
+
+  function handleSelectAllToggle() {
+    if (allVisibleSelected) {
+      dispatch({ type: 'DESELECT_ALL_ASSETS' })
+    } else {
+      dispatch({ type: 'SELECT_ASSETS', assetIds: visibleIds })
+    }
+  }
+
   return (
     <div className="border-b border-black bg-white px-4 py-2 flex items-center justify-between gap-4 flex-wrap min-w-0">
       <div className="flex items-center gap-2 flex-wrap min-w-0">
+        {/* D2.10 — select-all-visible. Indeterminate when partial. Disabled
+            when nothing is visible. */}
+        <label
+          className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest border border-slate-300 px-2 py-1 cursor-pointer hover:bg-slate-50 transition-colors ${
+            visibleIds.length === 0 ? 'opacity-50 cursor-not-allowed' : 'text-slate-600'
+          }`}
+          title={
+            visibleIds.length === 0
+              ? 'No visible assets'
+              : allVisibleSelected
+                ? `Deselect all ${visibleIds.length} visible`
+                : `Select all ${visibleIds.length} visible`
+          }
+        >
+          <input
+            ref={selectAllRef}
+            type="checkbox"
+            checked={allVisibleSelected}
+            onChange={handleSelectAllToggle}
+            disabled={visibleIds.length === 0}
+            aria-label="Select all visible assets"
+          />
+          {allVisibleSelected
+            ? `${visibleIds.length} selected`
+            : someVisibleSelected
+              ? `${visibleSelectedCount} of ${visibleIds.length}`
+              : 'Select all'}
+        </label>
+
         {FILTER_CHIPS.map(chip => {
           const active = state.ui.filter.preset === chip.preset
           return (
