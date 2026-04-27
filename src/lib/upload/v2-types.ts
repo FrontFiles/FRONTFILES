@@ -14,6 +14,10 @@
 import type { AssetFormat, LicenceType, PrivacyState, ValidationDeclarationState } from './types'
 import type { WatermarkMode } from '@/lib/watermark/types'
 
+// Re-export AssetFormat so consumers can import it alongside the v2-shaped
+// types. upload-selectors.ts and other v2-aware modules pull both from here.
+export type { AssetFormat } from './types'
+
 // ── Metadata Source Tracking ──
 
 export type MetadataSource = 'embedded' | 'extracted' | 'ai' | 'creator'

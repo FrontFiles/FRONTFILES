@@ -96,6 +96,13 @@ const envSchema = z.object({
     .optional()
     .describe('Supabase Storage bucket name when FFF_STORAGE_DRIVER=supabase.'),
 
+  FFF_PROCESSING_TIMEOUT_SECONDS: z
+    .string()
+    .optional()
+    .describe(
+      'Reaper stuck-row timeout in seconds. Pending rows whose processing_started_at is older than this are reset by reaper.ts. Default 600.',
+    ),
+
   // ─── Required: Newsroom verification (NR-D5b-i) ───────────────
   NEWSROOM_VERIFICATION_HMAC_SECRET: z.string().min(1, {
     message:
@@ -262,6 +269,7 @@ const rawEnv = {
   FFF_STORAGE_DRIVER: process.env.FFF_STORAGE_DRIVER,
   FFF_STORAGE_FS_ROOT: process.env.FFF_STORAGE_FS_ROOT,
   FFF_STORAGE_SUPABASE_BUCKET: process.env.FFF_STORAGE_SUPABASE_BUCKET,
+  FFF_PROCESSING_TIMEOUT_SECONDS: process.env.FFF_PROCESSING_TIMEOUT_SECONDS,
   NEWSROOM_VERIFICATION_HMAC_SECRET: process.env.NEWSROOM_VERIFICATION_HMAC_SECRET,
   SCANNER_GCV_PROJECT_ID: process.env.SCANNER_GCV_PROJECT_ID,
   SCANNER_GCV_API_KEY: process.env.SCANNER_GCV_API_KEY,

@@ -40,8 +40,8 @@ describe('v3InitialState', () => {
   it('does NOT carry currentStage or other stage-era fields', () => {
     const s = freshState()
     expect((s.batch as Record<string, unknown>).currentStage).toBeUndefined()
-    expect((s.ui as Record<string, unknown>).expressEligible).toBeUndefined()
-    expect((s.ui as Record<string, unknown>).reviewEnteredEarly).toBeUndefined()
+    expect((s.ui as unknown as Record<string, unknown>).expressEligible).toBeUndefined()
+    expect((s.ui as unknown as Record<string, unknown>).reviewEnteredEarly).toBeUndefined()
   })
 })
 
