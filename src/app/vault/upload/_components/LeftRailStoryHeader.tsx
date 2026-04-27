@@ -1,12 +1,15 @@
 /**
- * Frontfiles Upload V4 — Left Rail Story Header (D2.2 §1.1)
+ * Frontfiles Upload V4 — Left Rail Story Header (D2.2 §1.1, D2.9 Move 4)
  *
- * Spec: UX-SPEC-V4 §4.2 + §7.3 (cover) + §8.2 (DnD).
+ * Spec: UX-SPEC-V4 §4.2 + §7.3 (cover) + §8.2 (DnD) + D2.9-DIRECTIVE.md
+ * §3 Move 4 (visual story navigator).
  *
  * One row per story in the left rail. Three responsibilities:
  *
- *   1. Display: 16:9 cover thumbnail (per IPD2-2 = b at 64×36) + story name +
- *      asset/ready counts.
+ *   1. Display: 16:9 cover thumbnail at full rail-width-minus-padding (~288×162
+ *      in the 320px-wide expanded rail per D2.9 Move 4) + story name (12px
+ *      font-bold) + count line (10px slate-500) "N · M ready". Cover-first
+ *      layout — the eye lands on the image, then reads the name.
  *
  *   2. Filter trigger: click the row → dispatch SET_FILTER { storyGroupId }
  *      so the center pane narrows to this story. Per IPD2-13, also clears
@@ -19,6 +22,23 @@
  *          SET_STORY_COVER on the dragged asset
  *      The actual dispatch routing happens at UploadShell's drag-end
  *      handler; this component just registers the drop zones.
+ *
+ * D2.9 Move 4 changes vs. D2.2:
+ *   - Cover image size: 64×36 → ~288×162 (rail-width minus 16px padding,
+ *     16:9 aspect preserved per L4).
+ *   - Story name: position changed from right-of-thumbnail to below cover.
+ *   - Active (filtered) state: outline outline-2 outline-blue-600 around
+ *     the cover image only (NOT a whole-row bg shift).
+ *   - Hover: cover scales subtly (hover:scale-[1.02]).
+ *   - Drop highlight on cover sub-target: outline thickens to 4px.
+ *   - Drop highlight on body: row bg → bg-blue-50/50.
+ *   - Vertical gap between rows: 16px (handled by the row's own bottom
+ *     margin; LeftRail wrapper doesn't add gap to preserve sticky-header
+ *     behavior).
+ *   - "PHOTO" placeholder pill removed.
+ *
+ * Collapsed-rail variant: a small thumbnail with no name/counts, retains
+ * both drop zones for parity with expanded mode.
  */
 
 'use client'
@@ -70,46 +90,87 @@ export default function LeftRailStoryHeader({ story }: Props) {
     dispatch({ type: 'DESELECT_ALL_ASSETS' })
   }
 
+  // ── Collapsed variant: tiny cover, no name/counts ──
+  // Same drop targets as expanded so the rail stays usable as a DnD surface
+  // even when minimized. No hover-scale (too cramped).
+  if (collapsed) {
+    return (
+      <div
+        ref={bodyRef}
+        onClick={handleClick}
+        className={`flex items-center justify-center px-2 py-2 cursor-pointer transition-colors ${
+          isOverBody ? 'bg-blue-50/50' : ''
+        }`}
+        data-story-id={story.id}
+        role="button"
+        tabIndex={0}
+        title={story.name}
+      >
+        <div
+          ref={coverRef}
+          className={`flex-shrink-0 bg-slate-200 overflow-hidden ${
+            isOverCover
+              ? 'outline outline-4 outline-blue-600 outline-offset-0'
+              : isFiltered
+                ? 'outline outline-2 outline-blue-600 outline-offset-0'
+                : ''
+          }`}
+          style={{ width: 64, height: 36 }}
+        >
+          {coverUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={coverUrl} alt={cover?.filename ?? ''} className="w-full h-full object-cover" />
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Expanded variant: cover-first layout ──
   return (
     <div
       ref={bodyRef}
       onClick={handleClick}
-      className={`border-b border-black flex items-center gap-2 px-2 py-1.5 cursor-pointer transition-colors min-w-0 ${
-        isOverBody ? 'bg-blue-100 border-l-4 border-l-blue-600' : ''
-      } ${isFiltered ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
+      className={`px-3 pb-4 pt-2 cursor-pointer transition-colors min-w-0 ${
+        isOverBody ? 'bg-blue-50/50' : ''
+      }`}
       data-story-id={story.id}
       role="button"
       tabIndex={0}
     >
-      {/* 16:9 cover thumbnail per IPD2-2 = b (64×36). Drop sub-target per IPD2-3. */}
+      {/* 16:9 cover at rail-width minus 24px (12px padding × 2). Drop sub-
+          target. Active outline (filtered): 2px blue. Hover: subtle scale.
+          Drop hover (cover): outline thickens to 4px (overrides filtered
+          outline visually — drop intent dominates). */}
       <div
         ref={coverRef}
-        className={`flex-shrink-0 border border-black bg-slate-100 overflow-hidden flex items-center justify-center transition-colors ${
-          isOverCover ? 'border-blue-600 border-2 bg-blue-50' : ''
+        className={`relative aspect-video bg-slate-200 overflow-hidden transition-transform hover:scale-[1.02] ${
+          isOverCover
+            ? 'outline outline-4 outline-blue-600 outline-offset-0'
+            : isFiltered
+              ? 'outline outline-2 outline-blue-600 outline-offset-0'
+              : ''
         }`}
-        style={{ width: 64, height: 36 }}
         title={isOverCover ? 'Drop to set as cover' : `Cover: ${cover?.filename ?? '(none)'}`}
       >
         {coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={coverUrl} alt={cover?.filename ?? ''} className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-[8px] uppercase tracking-widest text-slate-400">
-            {cover?.format ?? '—'}
-          </span>
-        )}
+        ) : null}
       </div>
 
-      {!collapsed && (
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-black truncate" title={story.name}>
-            {story.name}
-          </div>
-          <div className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
-            {totalCount} · {readyCount} ready
-          </div>
+      {/* Below cover: 8px gap → name (12px bold) + count line (10px slate-500). */}
+      <div className="mt-2 min-w-0">
+        <div
+          className="text-xs font-bold text-black truncate"
+          title={story.name}
+        >
+          {story.name}
         </div>
-      )}
+        <div className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
+          {totalCount} · {readyCount} ready
+        </div>
+      </div>
     </div>
   )
 }

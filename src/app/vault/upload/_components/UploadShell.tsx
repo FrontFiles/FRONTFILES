@@ -164,6 +164,12 @@ export default function UploadShell({
    *   'story-{id}-cover'        → MOVE_ASSET_TO_CLUSTER + SET_STORY_COVER
    *                               (cover is single — only the dragged asset
    *                                gets set as cover, even in multi-select)
+   *   'story-{id}-cover-slot'   → same as story-{id}-cover, but the drop
+   *                               target is the in-sheet CoverSlot (D2.9
+   *                               Move 9) rather than the left-rail story
+   *                               header. Same dispatch pair (move +
+   *                               set-cover); single-asset cover even when
+   *                               multi-selected.
    *
    * Sortable peer drops (over.id is another asset id in the same SortableContext):
    *   reorder via arrayMove + dispatch REORDER_ASSETS_IN_STORY (only when
@@ -219,6 +225,35 @@ export default function UploadShell({
           } as V3Action)
         }
         // Cover is single — only the dragged asset becomes cover.
+        dispatch({
+          type: 'SET_STORY_COVER',
+          storyGroupId,
+          assetId: activeId,
+        } as V3Action)
+        return
+      }
+
+      // D2.9 Move 9: in-sheet cover slot (when the contact sheet is filtered
+      // to a story). Same dispatch pair as story-{id}-cover; the slot ID is
+      // distinct so dnd-kit can route between two co-equal cover-set surfaces
+      // (left-rail header AND in-sheet slot). Skips the move dispatch when
+      // the dragged asset is already a member of the target story (small
+      // optimization; SET_STORY_COVER alone is enough).
+      const coverSlotMatch = overId.match(/^story-(.+)-cover-slot$/)
+      if (coverSlotMatch) {
+        const storyGroupId = coverSlotMatch[1]
+        for (const id of targetAssetIds) {
+          const asset = state.assetsById[id]
+          if (asset && asset.storyGroupId !== storyGroupId) {
+            dispatch({
+              type: 'MOVE_ASSET_TO_CLUSTER',
+              assetId: id,
+              clusterId: storyGroupId,
+            } as V3Action)
+          }
+        }
+        // Cover is single — only the dragged asset becomes cover, even
+        // under multi-select (matches the story-{id}-cover semantics).
         dispatch({
           type: 'SET_STORY_COVER',
           storyGroupId,
@@ -347,7 +382,11 @@ export default function UploadShell({
                * (via LeftRailHeader's toggle button) — it always renders, just
                * at a different width.
                */}
-              <div data-region="left-rail" className="border-r border-black flex-shrink-0">
+              {/* D2.9 Move 1: pane contrast — left rail recedes (slate-50
+                  bg + 1px slate-300 border instead of black). The
+                  background lives on LeftRail's aside; the wrapper just
+                  carries the divider. */}
+              <div data-region="left-rail" className="border-r border-slate-300 flex-shrink-0">
                 <LeftRail />
               </div>
 
@@ -399,7 +438,10 @@ export default function UploadShell({
                 // flow selectedAssetIds stays at 2 (compare doesn't touch
                 // selection), so the length===1 gate alone would block the
                 // rail. Explicit compare check makes the intent unambiguous.
-                className="border-l border-black bg-white overflow-hidden flex flex-col h-full min-h-0"
+                // D2.9 Move 1: 2px black left-edge — the ONLY structural
+                // 2px black on the page. The right rail is the decisive
+                // surface; this divider is the visual hierarchy anchor.
+                className="border-l-[2px] border-black bg-white overflow-hidden flex flex-col h-full min-h-0"
                 style={{
                   width: '400px',
                   minWidth: '400px',

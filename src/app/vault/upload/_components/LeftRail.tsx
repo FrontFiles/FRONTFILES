@@ -18,8 +18,9 @@
  *   │ + New story      │   Inline input affordance
  *   └──────────────────┘
  *
- * Width: 240px when expanded, ~64px when collapsed (just enough for the
- * cover thumbs + collapse arrow). Collapse state lives in V3UIState.
+ * Width: 320px when expanded (per D2.9 Move 4 — bumped from 240 so story
+ * rows can show 16:9 covers at ~288×162), 80px when collapsed (just enough
+ * for the cover thumbs + collapse arrow). Collapse state lives in V3UIState.
  *
  * Mount gating happens at UploadShell (renders this component when
  * assetOrder.length > 0 AND not in Empty layout state).
@@ -40,7 +41,11 @@ export default function LeftRail() {
   return (
     <aside
       data-region="left-rail"
-      className={`flex flex-col bg-white min-w-0 flex-shrink-0 ${collapsed ? 'w-[80px]' : 'w-[240px]'}`}
+      // D2.9 Move 1 + Move 4: left rail recedes — slate-50 bg sets the
+      // "infrastructural" tone vs. center pane's bright white. Expanded
+      // width bumped to 320px so story rows can show a 16:9 cover image
+      // at usable size (~288×162 with 16px padding).
+      className={`flex flex-col bg-slate-50 min-w-0 flex-shrink-0 ${collapsed ? 'w-[80px]' : 'w-[320px]'}`}
       aria-label="Story navigator"
     >
       <LeftRailHeader />
@@ -51,7 +56,7 @@ export default function LeftRail() {
       {/* Stories section — header label + list. Scrollable when many stories. */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {!collapsed && state.storyGroupOrder.length > 0 && (
-          <div className="border-b border-black px-2 py-1.5 sticky top-0 bg-white z-10">
+          <div className="border-b border-slate-200 px-2 py-2 sticky top-0 bg-slate-50 z-10">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
               Stories
             </span>

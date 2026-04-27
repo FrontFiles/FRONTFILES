@@ -37,7 +37,8 @@ export default function InspectorExceptionsSection({ asset }: Props) {
   const totalIssues = exceptions.length + (hasDuplicate ? 1 : 0) + conflicts.length
 
   return (
-    <div className="border-b border-black flex-shrink-0">
+    // D2.9 Move 3: section divider descends from black to slate-200.
+    <div className="border-b border-slate-200 flex-shrink-0">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}

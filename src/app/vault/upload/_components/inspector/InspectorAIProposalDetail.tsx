@@ -38,7 +38,8 @@ export default function InspectorAIProposalDetail({ asset }: Props) {
 
   if (!asset.proposal) {
     return (
-      <div className="border-b border-black flex-shrink-0">
+      // D2.9 Move 3: section divider descends from black to slate-200.
+      <div className="border-b border-slate-200 flex-shrink-0">
         <button
           type="button"
           onClick={() => setSectionOpen(o => !o)}
@@ -62,7 +63,8 @@ export default function InspectorAIProposalDetail({ asset }: Props) {
   const overallConfPct = Math.round(asset.proposal.confidence * 100)
 
   return (
-    <div className="border-b border-black flex-shrink-0">
+    // D2.9 Move 3: section divider descends from black to slate-200.
+    <div className="border-b border-slate-200 flex-shrink-0">
       <button
         type="button"
         onClick={() => setSectionOpen(o => !o)}
@@ -151,12 +153,13 @@ function DetailRow({
   children: React.ReactNode
 }) {
   return (
-    <div className="border border-black bg-white">
+    // D2.9 Move 3: detail-row borders descend to slate-300 (was black).
+    <div className="border border-slate-300 bg-white">
       <button
         type="button"
         onClick={onToggle}
         disabled={disabled}
-        className={`w-full text-left px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
+        className={`w-full text-left px-2 py-2 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
           disabled ? 'text-slate-400 cursor-not-allowed' : 'text-black hover:bg-slate-50'
         }`}
         aria-expanded={open}

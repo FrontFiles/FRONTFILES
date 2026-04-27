@@ -56,6 +56,7 @@ import {
 } from '@/lib/upload/upload-selectors'
 import type { V2Asset } from '@/lib/upload/v3-types'
 import ContactSheetCard from './ContactSheetCard'
+import CoverSlot from './CoverSlot'
 
 const ZOOM_TO_CARD_WIDTH: Record<1 | 2 | 3 | 4 | 5, number> = {
   1: 80,
@@ -64,7 +65,10 @@ const ZOOM_TO_CARD_WIDTH: Record<1 | 2 | 3 | 4 | 5, number> = {
   4: 240,
   5: 360,
 }
-const CARD_GAP = 8
+// D2.9 Move 2: 4px cell-level gap (was 8). Cards are now image-first with
+// no internal frame, so a tighter grid reads as a contact sheet, not a
+// loose card layout.
+const CARD_GAP = 4
 
 interface CellData {
   visible: V2Asset[]
@@ -142,7 +146,10 @@ export default function ContactSheet() {
     setAnchorId(assetId)
   }
 
-  if (visible.length === 0) {
+  // Empty-filter early return — only when NOT filtered to a story. When a
+  // story is selected with zero assets, the SORTABLE path below still
+  // renders the CoverSlot so the creator can drop an asset in (D2.9 Move 9).
+  if (visible.length === 0 && !state.ui.filter.storyGroupId) {
     return (
       <div
         ref={containerRef}
@@ -155,16 +162,27 @@ export default function ContactSheet() {
 
   // SORTABLE PATH — when filter narrows to a story (per IPD2-5).
   // Non-virtualized; cards drag-reorder via @dnd-kit/sortable.
+  //
+  // D2.9 Move 9: a CoverSlot mounts as a SIBLING of SortableContext (not
+  // a sortable item) at the top of the story view. Drop another asset on
+  // the slot to set it as the cover. The slot reads getStoryCover() and
+  // renders the explicit-or-fallback cover (per IPD9-2 = a). The slot has
+  // its own drop id (`story-{id}-cover-slot`) routed by UploadShell's
+  // handleDragEnd. Defensive null-check on the story (defensive only —
+  // storyGroupId in filter implies the story exists in storyGroupsById).
   if (state.ui.filter.storyGroupId) {
+    const story = state.storyGroupsById[state.ui.filter.storyGroupId]
     return (
       <div
         ref={containerRef}
-        className="flex-1 min-w-0 min-h-0 overflow-auto p-2"
+        className="flex-1 min-w-0 min-h-0 overflow-auto p-2 flex flex-col gap-2"
         data-mode="sortable"
       >
+        {story && <CoverSlot story={story} cardSize={cardWidth} />}
         <SortableContext items={visible.map(a => a.id)} strategy={rectSortingStrategy}>
           <div
-            className="grid gap-2"
+            // D2.9 Move 2: gap-1 (4px) for the SORTABLE-path grid.
+            className="grid gap-1"
             style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
           >
             {visible.map(asset => (

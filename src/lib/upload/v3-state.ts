@@ -538,6 +538,11 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     // ── Asset field editing ────────────────────────────────────
 
     case 'UPDATE_ASSET_FIELD': {
+      // D2.9 Move 8: any creator-authored field write flips metadataSource[field]
+      // to 'creator', so FieldProvenanceTag can render "Edited by creator". The
+      // approve flow (clicking ✓ on an AI-generated field) dispatches this
+      // action with the existing proposal value, which transfers ownership
+      // without changing the value — see UX-SPEC-V4 D2.9 §3 Move 8.
       const asset = state.assetsById[action.assetId]
       if (!asset) return state
       return {
@@ -546,20 +551,36 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
           ...state.assetsById,
           [action.assetId]: {
             ...asset,
-            editable: { ...asset.editable, [action.field]: action.value },
+            editable: {
+              ...asset.editable,
+              [action.field]: action.value,
+              metadataSource: {
+                ...asset.editable.metadataSource,
+                [action.field]: 'creator' as const,
+              },
+            },
           },
         },
       }
     }
 
     case 'BULK_UPDATE_FIELD': {
+      // D2.9 Move 8: bulk creator writes flip metadataSource[field] to 'creator'
+      // for every affected asset, matching UPDATE_ASSET_FIELD semantics.
       const assetsById = { ...state.assetsById }
       for (const id of action.assetIds) {
         const asset = assetsById[id]
         if (!asset) continue
         assetsById[id] = {
           ...asset,
-          editable: { ...asset.editable, [action.field]: action.value },
+          editable: {
+            ...asset.editable,
+            [action.field]: action.value,
+            metadataSource: {
+              ...asset.editable.metadataSource,
+              [action.field]: 'creator' as const,
+            },
+          },
         }
       }
       return { ...state, assetsById }
@@ -580,6 +601,10 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     // ── Conflict resolution ────────────────────────────────────
 
     case 'RESOLVE_CONFLICT': {
+      // D2.9 Move 8 (B-scope): the conflict resolver is a creator-authoritative
+      // pick between embedded and AI values; flip metadataSource[field] to
+      // 'creator' so the inspector renders "Edited by creator" once resolved.
+      // Mirrors v2-state.ts:529 (V2 parity).
       const asset = state.assetsById[action.assetId]
       if (!asset) return state
       const conflicts = asset.conflicts.map(c =>
@@ -592,7 +617,14 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
           [action.assetId]: {
             ...asset,
             conflicts,
-            editable: { ...asset.editable, [action.field]: action.value },
+            editable: {
+              ...asset.editable,
+              [action.field]: action.value,
+              metadataSource: {
+                ...asset.editable.metadataSource,
+                [action.field]: 'creator' as const,
+              },
+            },
           },
         },
       }
@@ -702,14 +734,23 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     // ── Cluster bulk operations (Archive mode) ─────────────────
 
     case 'BULK_EDIT_CAPTION_TEMPLATE': {
-      // Apply template caption to all assets in the cluster
+      // Apply template caption to all assets in the cluster.
+      // D2.9 Move 8 (B-scope): creator-authored bulk write flips
+      // metadataSource.description to 'creator' for each affected asset.
       const assetsById = { ...state.assetsById }
       for (const id of state.assetOrder) {
         const asset = assetsById[id]
         if (asset && asset.storyGroupId === action.clusterId) {
           assetsById[id] = {
             ...asset,
-            editable: { ...asset.editable, description: action.template },
+            editable: {
+              ...asset.editable,
+              description: action.template,
+              metadataSource: {
+                ...asset.editable.metadataSource,
+                description: 'creator' as const,
+              },
+            },
           }
         }
       }
@@ -721,6 +762,8 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
       // per-asset price-acceptance rule still holds — this is a creator-
       // authoritative bulk SET, distinct from bulk-accepting an AI
       // suggestion.
+      // D2.9 Move 8 (B-scope): creator-authored bulk write flips
+      // metadataSource.price to 'creator' for each affected asset.
       if (action.priceCents < 0) {
         throw new Error(
           `bulk_set_price_invalid: priceCents=${action.priceCents} must be >= 0`,
@@ -732,7 +775,14 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         if (asset && asset.storyGroupId === action.clusterId) {
           assetsById[id] = {
             ...asset,
-            editable: { ...asset.editable, price: action.priceCents },
+            editable: {
+              ...asset.editable,
+              price: action.priceCents,
+              metadataSource: {
+                ...asset.editable.metadataSource,
+                price: 'creator' as const,
+              },
+            },
           }
         }
       }

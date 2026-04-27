@@ -56,16 +56,26 @@ function applyAIAutoAcceptSweep(
     }
     // Per IPD1-3 = (a): caption (description) + tags + geography only.
     // NEVER price (spec §9.2 + L5). NEVER title.
+    //
+    // D2.9 Move 8: each auto-accepted field flips metadataSource[field] to
+    // 'ai' so FieldProvenanceTag renders "AI generated" until the creator
+    // edits or clicks ✓ (which dispatches UPDATE_ASSET_FIELD and flips
+    // source to 'creator').
     const editable = { ...asset.editable }
+    const metadataSource = { ...editable.metadataSource }
     if (!editable.description && asset.proposal.description) {
       editable.description = asset.proposal.description
+      metadataSource.description = 'ai'
     }
     if (editable.tags.length === 0 && asset.proposal.tags?.length) {
       editable.tags = [...asset.proposal.tags]
+      metadataSource.tags = 'ai'
     }
     if (editable.geography.length === 0 && asset.proposal.geography?.length) {
       editable.geography = [...asset.proposal.geography]
+      metadataSource.geography = 'ai'
     }
+    editable.metadataSource = metadataSource
     out[id] = { ...asset, editable }
   }
   return out

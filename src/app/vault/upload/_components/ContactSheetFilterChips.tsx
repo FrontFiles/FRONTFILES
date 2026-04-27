@@ -51,10 +51,13 @@ export default function ContactSheetFilterChips() {
               key={chip.preset}
               type="button"
               onClick={() => dispatch({ type: 'SET_FILTER_PRESET', preset: chip.preset })}
-              className={`border border-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+              // D2.9 Move 5: inactive chips drop the black border + reduce
+              // contrast. Active chip retains the brutalist black-on-white
+              // language so it still anchors the row.
+              className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors ${
                 active
-                  ? 'bg-black text-white'
-                  : 'bg-white text-black hover:bg-black hover:text-white'
+                  ? 'bg-black text-white border border-black'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-black'
               }`}
               aria-pressed={active}
             >
@@ -104,7 +107,10 @@ export default function ContactSheetFilterChips() {
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="border border-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-black bg-white hover:bg-black hover:text-white transition-colors"
+            // D2.9 Move 5: search affordance recedes — no border, slate-500
+            // text. (Per directive Move 5: full magnifier-icon collapse is a
+            // small follow-up; D2.9 default keeps the "Search" word.)
+            className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-transparent hover:text-black transition-colors"
             aria-label="Open search"
           >
             Search

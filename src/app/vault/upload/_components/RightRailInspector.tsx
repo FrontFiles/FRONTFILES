@@ -9,12 +9,19 @@
  *
  * Layout (top → bottom):
  *   InspectorThumbnail               — sticky filename header + 16:9 thumbnail
- *   SetAsCoverButton                 — visible when asset has storyGroupId
  *   InspectorFieldEditor             — Title / Caption / Price / Privacy
  *                                     always visible; Tags / Geography /
  *                                     Licences collapsible (closed by default)
  *   InspectorExceptionsSection       — collapsible (closed by default)
  *   InspectorAIProposalDetail        — collapsible (closed by default)
+ *
+ * D2.9 Move 9: SetAsCoverButton REMOVED. Cover is now set via two
+ * co-equal drag paths only:
+ *   1. Drag onto the left-rail story header's cover area (existing).
+ *   2. Drag onto the in-sheet CoverSlot when the contact sheet is
+ *      filtered to a story (D2.9 Move 9).
+ * The button is gone because both paths are direct manipulation; an
+ * inspector-level CTA was redundant.
  *
  * Keyboard (rail-level):
  *   Esc → DESELECT_ALL_ASSETS (closes the rail)
@@ -37,7 +44,6 @@
 import { useEffect } from 'react'
 import { useUploadContext } from './UploadContext'
 import InspectorThumbnail from './inspector/InspectorThumbnail'
-import SetAsCoverButton from './inspector/SetAsCoverButton'
 import InspectorFieldEditor from './inspector/InspectorFieldEditor'
 import InspectorExceptionsSection from './inspector/InspectorExceptionsSection'
 import InspectorAIProposalDetail from './inspector/InspectorAIProposalDetail'
@@ -103,7 +109,6 @@ export default function RightRailInspector() {
       className="w-full flex-1 min-h-0 flex flex-col bg-white overflow-y-auto"
     >
       <InspectorThumbnail asset={asset} />
-      <SetAsCoverButton asset={asset} />
       <InspectorFieldEditor asset={asset} />
       <InspectorExceptionsSection asset={asset} />
       <InspectorAIProposalDetail asset={asset} />

@@ -98,8 +98,11 @@ export default function ContactSheetCard({
       onClick={e => onClick(asset.id, e)}
       onDoubleClick={e => onClick(asset.id, e)}
       style={{ width: cardSize, height: cardHeight, ...dragStyle }}
-      className={`relative bg-slate-100 cursor-pointer group overflow-hidden ${
-        isSelected ? 'border-2 border-blue-600' : 'border border-black'
+      // D2.9 Move 2: image IS the card. No outer black border. Selection
+      // is communicated via outline (not border) so it doesn't shift layout.
+      // outline-offset-0 keeps the outline flush to the image edge.
+      className={`relative cursor-pointer group overflow-hidden ${
+        isSelected ? 'outline outline-2 outline-blue-600 outline-offset-0' : ''
       } ${asset.excluded ? 'opacity-50' : ''} ${isDragging ? 'opacity-40' : ''}`}
       data-asset-id={asset.id}
       role="button"
@@ -108,7 +111,11 @@ export default function ContactSheetCard({
       {...dragListeners}
       {...dragAttributes}
     >
-      {/* Thumbnail or placeholder */}
+      {/* Thumbnail or placeholder.
+          D2.9 Move 2: when no thumbnail, render a solid neutral block with
+          a tiny 1-letter format pill top-left (replaces the old framed
+          placeholder). The pill carries P / V / A / D for photo / video /
+          audio / document. */}
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -118,16 +125,20 @@ export default function ContactSheetCard({
           draggable={false}
         />
       ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center text-center text-slate-400 bg-slate-100 pointer-events-none">
-          <span className="text-[8px] font-bold uppercase tracking-widest">
-            {asset.format ?? 'asset'}
-          </span>
-          {cardSize >= 160 && (
-            <span className="text-[8px] font-mono text-slate-500 mt-1 px-1 truncate w-full">
-              {asset.filename}
-            </span>
-          )}
-        </div>
+        <div className="w-full h-full bg-slate-200 pointer-events-none" aria-label={asset.format ?? 'asset'} />
+      )}
+
+      {/* D2.9 Move 2: 1-letter format pill top-left, only rendered when
+          no thumbnail (placeholder branch). 8×8, solid black, white letter.
+          Hidden under the selection checkbox on hover/select — acceptable
+          overlap since the pill is identification, the checkbox is action. */}
+      {!url && (
+        <span
+          className="absolute top-1 left-1 w-2 h-2 bg-black text-white text-[6px] font-bold uppercase leading-none flex items-center justify-center pointer-events-none"
+          aria-hidden
+        >
+          {formatLetter(asset.format)}
+        </span>
       )}
 
       {/* Selection checkbox top-left — visible on hover OR when selected */}
@@ -147,31 +158,50 @@ export default function ContactSheetCard({
         {isSelected ? '✓' : ''}
       </button>
 
-      {/* Story badge top-right (per IPD3-5 = a) */}
+      {/* Story badge top-right (per IPD3-5 = a).
+          D2.9 Move 2: 8px font (was 9px), no border, semi-transparent black
+          bg with white text — reads as a quiet content tag, not a chip. */}
       {story && cardSize >= 120 && (
         <span
-          className="absolute top-1 right-1 text-[9px] font-bold uppercase tracking-widest bg-white border border-black px-1 py-0.5 max-w-[70%] truncate pointer-events-none"
+          className="absolute top-1 right-1 text-[8px] font-bold uppercase tracking-widest bg-black/70 text-white px-1 py-0.5 max-w-[70%] truncate pointer-events-none"
           title={story.name}
         >
           {story.name}
         </span>
       )}
 
-      {/* Filename overlay on hover (bottom) — only at sizes where it's legible */}
+      {/* Filename overlay on hover (bottom) — only at sizes where it's legible.
+          D2.9 Move 2: gradient (from-black/85 → transparent at top) instead of
+          solid black bar; reads as image polish, not a UI strip. */}
       {cardSize >= 120 && (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 opacity-0 group-hover:opacity-100 truncate transition-opacity pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/85 to-transparent text-white text-[10px] font-mono px-1.5 pt-3 pb-0.5 opacity-0 group-hover:opacity-100 truncate transition-opacity pointer-events-none">
           {asset.filename}
         </div>
       )}
 
-      {/* Status dot bottom-right — small square per brutalist convention */}
+      {/* Status dot bottom-right.
+          D2.9 Move 2: 10×10 (was 8×8) with a 2px white ring. Legible against
+          any image background — light or dark. */}
       <span
-        className={`absolute bottom-1 right-1 w-2 h-2 border border-black ${dot.bg} pointer-events-none`}
+        className={`absolute bottom-1 right-1 w-2.5 h-2.5 rounded-sm border-2 border-white ${dot.bg} pointer-events-none`}
         title={dot.label}
         aria-label={dot.label}
       />
     </div>
   )
+}
+
+/**
+ * D2.9 Move 2 helper: 1-letter format identifier for the placeholder pill.
+ * P = photo, V = video, A = audio, D = document/illustration/vector, ? = unknown.
+ */
+function formatLetter(format: V2Asset['format']): string {
+  if (!format) return '?'
+  if (format === 'photo') return 'P'
+  if (format === 'video') return 'V'
+  if (format === 'audio') return 'A'
+  // illustration / infographic / vector / document → 'D'
+  return 'D'
 }
 
 /**

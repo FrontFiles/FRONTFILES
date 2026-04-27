@@ -46,10 +46,12 @@ export default function InspectorThumbnail({ asset }: Props) {
 
   return (
     <div className="flex-shrink-0 w-full max-w-full overflow-hidden">
-      {/* Filename header — sticky at the top of the rail body for context */}
-      <div className="border-b border-black px-3 py-2 sticky top-0 bg-white z-10 min-w-0 max-w-full overflow-hidden">
+      {/* Filename header — sticky at the top of the rail body for context.
+          D2.9 Move 3: smaller (text-[11px]) + slate-600 (less prominent) +
+          slate-200 divider so the thumbnail dominates. */}
+      <div className="border-b border-slate-200 px-3 py-2 sticky top-0 bg-white z-10 min-w-0 max-w-full overflow-hidden">
         <span
-          className="text-sm font-mono text-black truncate block"
+          className="text-[11px] font-mono text-slate-600 truncate block"
           title={asset.filename}
         >
           {asset.filename}
@@ -63,9 +65,12 @@ export default function InspectorThumbnail({ asset }: Props) {
        * the img. Belt-and-suspenders so an oversize natural image can't leak
        * out of the right rail and overlap the center pane. The aspect-video
        * class still drives the 16:9 ratio; the constraints just prevent escape.
+       *
+       * D2.9 Move 3: thumbnail box drops the border-b (was border-black).
+       * The 24px gap below comes from the parent RightRailInspector layout.
        */}
       <div
-        className="aspect-video bg-slate-100 overflow-hidden border-b border-black flex items-center justify-center w-full max-w-full"
+        className="aspect-video bg-slate-100 overflow-hidden flex items-center justify-center w-full max-w-full"
         style={{ width: '100%', maxWidth: '100%' }}
       >
         {url ? (

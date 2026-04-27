@@ -452,6 +452,141 @@ describe('asset field editing', () => {
     expect(s.assetsById.a.editable.licences).toEqual(['editorial', 'web'])
   })
 
+  // ── D2.9 Move 8 — metadataSource side effects on creator writes ──
+  //
+  // The reducer flips editable.metadataSource[field] to 'creator' for any
+  // creator-authored field write (UPDATE_ASSET_FIELD or BULK_UPDATE_FIELD).
+  // This drives FieldProvenanceTag's "Edited by creator" vs "AI generated"
+  // rendering in the inspector. The approve flow (clicking ✓ on an AI-
+  // generated field) is just UPDATE_ASSET_FIELD with the existing proposal
+  // value — same dispatch, same source flip — so re-affirming an AI value
+  // also transfers ownership to the creator without any new action type.
+
+  it('UPDATE_ASSET_FIELD sets metadataSource[field] = "creator"', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    expect(s.assetsById.a.editable.metadataSource.title).toBeUndefined()
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'title',
+      value: 'A creator-typed title',
+    })
+    expect(s.assetsById.a.editable.metadataSource.title).toBe('creator')
+  })
+
+  it('UPDATE_ASSET_FIELD does not disturb other fields metadataSource', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    // Seed an AI-source on description (simulates post-hydration auto-accept).
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            description: 'AI caption',
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, description: 'ai' },
+          },
+        },
+      },
+    }
+    // Creator edits a different field (title).
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'title',
+      value: 'A title',
+    })
+    expect(s.assetsById.a.editable.metadataSource.title).toBe('creator')
+    expect(s.assetsById.a.editable.metadataSource.description).toBe('ai')
+  })
+
+  it('UPDATE_ASSET_FIELD re-affirming an AI value flips source to "creator" (approve flow)', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    // Seed an AI-source caption (the ✓ approve button dispatches
+    // UPDATE_ASSET_FIELD with the same proposal value; ownership transfers).
+    const aiCaption = 'AI-suggested caption text'
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            description: aiCaption,
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, description: 'ai' },
+          },
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'description',
+      value: aiCaption, // unchanged value — pure ownership transfer
+    })
+    expect(s.assetsById.a.editable.description).toBe(aiCaption)
+    expect(s.assetsById.a.editable.metadataSource.description).toBe('creator')
+  })
+
+  it('BULK_UPDATE_FIELD sets metadataSource[field] = "creator" for every affected asset', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'c', filename: 'c.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    // Seed AI-source on tags for two of the three to confirm the bulk write
+    // overwrites prior 'ai' source with 'creator' (transfer of ownership).
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            tags: ['ai-suggested'],
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, tags: 'ai' },
+          },
+        },
+        b: {
+          ...s.assetsById.b,
+          editable: {
+            ...s.assetsById.b.editable,
+            tags: ['ai-suggested'],
+            metadataSource: { ...s.assetsById.b.editable.metadataSource, tags: 'ai' },
+          },
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'BULK_UPDATE_FIELD',
+      assetIds: ['a', 'b', 'c'],
+      field: 'tags',
+      value: ['protest', 'climate'],
+    })
+    expect(s.assetsById.a.editable.tags).toEqual(['protest', 'climate'])
+    expect(s.assetsById.b.editable.tags).toEqual(['protest', 'climate'])
+    expect(s.assetsById.c.editable.tags).toEqual(['protest', 'climate'])
+    expect(s.assetsById.a.editable.metadataSource.tags).toBe('creator')
+    expect(s.assetsById.b.editable.metadataSource.tags).toBe('creator')
+    expect(s.assetsById.c.editable.metadataSource.tags).toBe('creator')
+  })
+
   it('TOGGLE_ASSET_EXCLUDED flips excluded', () => {
     let s = v3Reducer(freshState(), {
       type: 'ADD_FILES',
@@ -503,6 +638,123 @@ describe('asset field editing', () => {
     expect(s.assetsById.a.conflicts[0].resolvedBy).toBe('creator')
     expect(s.assetsById.a.conflicts[0].resolvedValue).toBe('IPTC headline')
     expect(s.assetsById.a.editable.title).toBe('IPTC headline')
+  })
+
+  // ── D2.9 Move 8 (B-scope) — metadataSource flips for the 3 additional ──
+  // creator-authoritative editable mutations beyond UPDATE_ASSET_FIELD /
+  // BULK_UPDATE_FIELD. These were originally out of D2.9's strict scope but
+  // expanded per founder ratification (option B): every reducer case that
+  // mutates editable[field] via a creator action flips metadataSource[field]
+  // to 'creator' for V2 parity (v2-state.ts:529/548/577) and to keep
+  // FieldProvenanceTag's "Edited by creator" rendering correct in 3 paths
+  // that the strict scope would have left as buggy "AI generated" reads.
+
+  it('RESOLVE_CONFLICT also flips metadataSource[field] to "creator"', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    // Seed an AI-source on description (e.g., from auto-accept hydration)
+    // alongside a conflict on the same field.
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            description: 'AI-suggested caption',
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, description: 'ai' },
+          },
+          conflicts: [
+            {
+              field: 'description',
+              embeddedValue: 'IPTC caption',
+              aiValue: 'AI-suggested caption',
+              aiConfidence: 0.85,
+              resolvedBy: null,
+              resolvedValue: null,
+            },
+          ],
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'RESOLVE_CONFLICT',
+      assetId: 'a',
+      field: 'description',
+      value: 'IPTC caption',
+    })
+    expect(s.assetsById.a.editable.description).toBe('IPTC caption')
+    expect(s.assetsById.a.editable.metadataSource.description).toBe('creator')
+  })
+
+  it('BULK_EDIT_CAPTION_TEMPLATE flips metadataSource.description to "creator" cluster-wide', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'c', filename: 'c.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    // Create a story group; assign 'a' and 'b' (not 'c') to it.
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const clusterId = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId })
+    // Seed AI-source on description for 'a' to confirm the bulk write
+    // overwrites prior 'ai' source with 'creator'.
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            description: 'AI caption',
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, description: 'ai' },
+          },
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'BULK_EDIT_CAPTION_TEMPLATE',
+      clusterId,
+      template: 'Lisbon Climate March, March 2026',
+    })
+    expect(s.assetsById.a.editable.description).toBe('Lisbon Climate March, March 2026')
+    expect(s.assetsById.b.editable.description).toBe('Lisbon Climate March, March 2026')
+    expect(s.assetsById.a.editable.metadataSource.description).toBe('creator')
+    expect(s.assetsById.b.editable.metadataSource.description).toBe('creator')
+    // 'c' is outside the cluster — untouched.
+    expect(s.assetsById.c.editable.description).toBe('')
+    expect(s.assetsById.c.editable.metadataSource.description).toBeUndefined()
+  })
+
+  it('BULK_SET_PRICE_FOR_CLUSTER flips metadataSource.price to "creator" cluster-wide', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const clusterId = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId })
+    s = v3Reducer(s, {
+      type: 'BULK_SET_PRICE_FOR_CLUSTER',
+      clusterId,
+      priceCents: 24000,
+    })
+    expect(s.assetsById.a.editable.price).toBe(24000)
+    expect(s.assetsById.b.editable.price).toBe(24000)
+    expect(s.assetsById.a.editable.metadataSource.price).toBe('creator')
+    expect(s.assetsById.b.editable.metadataSource.price).toBe('creator')
   })
 })
 
