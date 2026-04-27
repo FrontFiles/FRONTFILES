@@ -65,6 +65,7 @@ export function hydrateFromScenario(
         privacy: null,
         licences: [],
         price: null,
+        socialLicensable: false,
         metadataSource: {},
       },
       conflicts: [],

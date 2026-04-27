@@ -99,7 +99,7 @@ export default function LeftRailStoryHeader({ story }: Props) {
         ref={bodyRef}
         onClick={handleClick}
         className={`flex items-center justify-center px-2 py-2 cursor-pointer transition-colors ${
-          isOverBody ? 'bg-blue-50/50' : ''
+          isOverBody ? 'bg-blue-100' : ''
         }`}
         data-story-id={story.id}
         role="button"
@@ -131,8 +131,10 @@ export default function LeftRailStoryHeader({ story }: Props) {
     <div
       ref={bodyRef}
       onClick={handleClick}
+      // D2.9 follow-up: drop highlight bumped from bg-blue-50/50 (too subtle
+      // over slate-50) to bg-blue-100 (clearly visible).
       className={`px-3 pb-4 pt-2 cursor-pointer transition-colors min-w-0 ${
-        isOverBody ? 'bg-blue-50/50' : ''
+        isOverBody ? 'bg-blue-100' : ''
       }`}
       data-story-id={story.id}
       role="button"

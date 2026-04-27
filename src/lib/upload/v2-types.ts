@@ -149,6 +149,13 @@ export interface AssetEditableFields {
   privacy: PrivacyState | null
   licences: LicenceType[]
   price: number | null    // EUR cents
+  /**
+   * D2.9 follow-up — creator-controlled flag indicating whether the asset
+   * is available for social-platform licensing (Instagram, TikTok, X, etc.).
+   * Independent of the `licences` checklist (which carries the contractual
+   * use-rights). Defaults to false; toggled in the inspector.
+   */
+  socialLicensable: boolean
   metadataSource: Partial<Record<keyof Omit<AssetEditableFields, 'metadataSource'>, MetadataSource>>
 }
 

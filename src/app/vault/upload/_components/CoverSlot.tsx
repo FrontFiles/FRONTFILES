@@ -30,10 +30,16 @@ import type { V2StoryGroup } from '@/lib/upload/v3-types'
 
 interface Props {
   story: V2StoryGroup
-  cardSize: number
+  /**
+   * Reserved — kept on the prop signature for parity with the asset cards
+   * (which derive their height from cardSize × 9/16). The slot itself
+   * fills its grid cell width and uses `aspect-video` for the 16:9 ratio,
+   * so the cell width comes from the grid's `auto-fill` track sizing.
+   */
+  cardSize?: number
 }
 
-export default function CoverSlot({ story, cardSize }: Props) {
+export default function CoverSlot({ story }: Props) {
   const { state } = useUploadContext()
   const cover = getStoryCover(story, state.assetsById)
 
@@ -42,14 +48,11 @@ export default function CoverSlot({ story, cardSize }: Props) {
     data: { kind: 'cover-slot', storyGroupId: story.id },
   })
 
-  const aspectStyle = {
-    width: cardSize,
-    height: Math.round((cardSize * 9) / 16),
-  } as const
-
-  // 16:9 to match the rest of the contact sheet (founder lock L4).
-  // Outline is always 4px blue per directive Move 9; thickens visually on
-  // hover-while-dragging via increased opacity (outline-offset stays 0).
+  // 16:9 to match the rest of the contact sheet (founder lock L4). The
+  // slot fills the full width of its grid cell (no explicit width) so it
+  // sits seamlessly as the first card in the contact-sheet row.
+  // Outline is always 4px blue per directive Move 9; intensifies on
+  // hover-while-dragging via a ring overlay.
   const outlineClass = isOver
     ? 'outline outline-4 outline-blue-700 outline-offset-0 ring-4 ring-blue-200'
     : 'outline outline-4 outline-blue-600 outline-offset-0'
@@ -57,8 +60,7 @@ export default function CoverSlot({ story, cardSize }: Props) {
   return (
     <div
       ref={setNodeRef}
-      style={aspectStyle}
-      className={`relative bg-slate-50 ${outlineClass} flex items-center justify-center overflow-hidden`}
+      className={`relative aspect-video w-full bg-slate-50 ${outlineClass} flex items-center justify-center overflow-hidden`}
       data-cover-slot={story.id}
       aria-label={`Cover for story ${story.name}. Drop an asset here to set it as cover.`}
     >

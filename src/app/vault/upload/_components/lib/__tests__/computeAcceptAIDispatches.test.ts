@@ -35,6 +35,7 @@ function emptyEditable(): AssetEditableFields {
     privacy: null,
     licences: [],
     price: null,
+    socialLicensable: false,
     metadataSource: {},
   }
 }

@@ -40,6 +40,7 @@ function makeAsset(overrides: Partial<V2Asset> & { id: string; filename: string 
       privacy: overrides.editable?.privacy ?? null,
       licences: overrides.editable?.licences ?? [],
       price: overrides.editable?.price ?? null,
+      socialLicensable: overrides.editable?.socialLicensable ?? false,
       metadataSource: overrides.editable?.metadataSource ?? {},
     },
     conflicts: overrides.conflicts ?? [],
@@ -113,7 +114,7 @@ describe('getFilteredSortedSearchedAssets', () => {
         storyGroupId: 'g-1',
         editable: {
           title: 't', privacy: 'PRIVATE', licences: [], price: null, description: '', tags: [],
-          geography: [], captureDate: null, metadataSource: {},
+          geography: [], captureDate: null, socialLicensable: false, metadataSource: {},
         },
       }),
       makeAsset({
@@ -121,7 +122,7 @@ describe('getFilteredSortedSearchedAssets', () => {
         filename: 'b.jpg',
         editable: {
           title: '', privacy: null, licences: [], price: null, description: '', tags: [],
-          geography: [], captureDate: null, metadataSource: {},
+          geography: [], captureDate: null, socialLicensable: false, metadataSource: {},
         },
       }),
       makeAsset({ id: 'excluded', filename: 'x.jpg', excluded: true }),

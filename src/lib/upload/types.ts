@@ -260,6 +260,7 @@ export type LicenceType =
   | 'digital'
   | 'web'
   | 'merchandise'
+  | 'creative_commons'
 
 export const LICENCE_TYPE_LABELS: Record<LicenceType, string> = {
   editorial: 'Editorial',
@@ -269,6 +270,7 @@ export const LICENCE_TYPE_LABELS: Record<LicenceType, string> = {
   digital: 'Digital',
   web: 'Web',
   merchandise: 'Merchandise',
+  creative_commons: 'Creative Commons',
 }
 
 // ── Upload Job ──

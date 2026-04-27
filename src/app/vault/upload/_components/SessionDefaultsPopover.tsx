@@ -40,6 +40,7 @@ const LICENCE_OPTIONS: LicenceType[] = [
   'digital',
   'web',
   'merchandise',
+  'creative_commons',
 ]
 const WATERMARK_OPTIONS: WatermarkMode[] = ['none', 'subtle', 'standard', 'strong']
 

@@ -45,6 +45,10 @@ const LICENCE_PREMIUM: Record<LicenceType, number> = {
   digital: 0,
   web: -0.05,
   merchandise: 0.25,
+  // Creative Commons is a public-licence path — no commercial premium.
+  // Final price math may still set this to free (handled at the recommendation
+  // layer); 0 here keeps the multiplier neutral relative to the base.
+  creative_commons: 0,
 }
 
 export function generatePriceRecommendation(params: {

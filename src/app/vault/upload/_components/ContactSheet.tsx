@@ -163,10 +163,14 @@ export default function ContactSheet() {
   // SORTABLE PATH — when filter narrows to a story (per IPD2-5).
   // Non-virtualized; cards drag-reorder via @dnd-kit/sortable.
   //
-  // D2.9 Move 9: a CoverSlot mounts as a SIBLING of SortableContext (not
-  // a sortable item) at the top of the story view. Drop another asset on
-  // the slot to set it as the cover. The slot reads getStoryCover() and
-  // renders the explicit-or-fallback cover (per IPD9-2 = a). The slot has
+  // D2.9 Move 9 (corrected): the CoverSlot is rendered INSIDE the grid
+  // as the first cell so the rest of the row fills with asset cards
+  // continuously (one continuous contact sheet, not "cover slot floating
+  // above the grid"). It is still OUTSIDE SortableContext (since
+  // SortableContext is a React context provider, not a DOM element, its
+  // children render inline at its DOM position — so the SortableCellRenderers
+  // that follow CoverSlot inside the grid are still wrapped by sortable
+  // context, while CoverSlot itself is not a sortable item). The slot has
   // its own drop id (`story-{id}-cover-slot`) routed by UploadShell's
   // handleDragEnd. Defensive null-check on the story (defensive only —
   // storyGroupId in filter implies the story exists in storyGroupsById).
@@ -175,16 +179,16 @@ export default function ContactSheet() {
     return (
       <div
         ref={containerRef}
-        className="flex-1 min-w-0 min-h-0 overflow-auto p-2 flex flex-col gap-2"
+        className="flex-1 min-w-0 min-h-0 overflow-auto p-2"
         data-mode="sortable"
       >
-        {story && <CoverSlot story={story} cardSize={cardWidth} />}
-        <SortableContext items={visible.map(a => a.id)} strategy={rectSortingStrategy}>
-          <div
-            // D2.9 Move 2: gap-1 (4px) for the SORTABLE-path grid.
-            className="grid gap-1"
-            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
-          >
+        <div
+          // D2.9 Move 2: gap-1 (4px) for the SORTABLE-path grid.
+          className="grid gap-1"
+          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cardWidth}px, 1fr))` }}
+        >
+          {story && <CoverSlot story={story} cardSize={cardWidth} />}
+          <SortableContext items={visible.map(a => a.id)} strategy={rectSortingStrategy}>
             {visible.map(asset => (
               <SortableCellRenderer
                 key={asset.id}
@@ -193,8 +197,8 @@ export default function ContactSheet() {
                 onClick={handleCardClick}
               />
             ))}
-          </div>
-        </SortableContext>
+          </SortableContext>
+        </div>
       </div>
     )
   }

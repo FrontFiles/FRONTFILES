@@ -51,6 +51,7 @@ const LICENCE_OPTIONS: LicenceType[] = [
   'digital',
   'web',
   'merchandise',
+  'creative_commons',
 ]
 
 // D2.9 Move 3: field-input borders descend from black to slate-300.
@@ -269,6 +270,26 @@ export default function InspectorFieldEditor({ asset }: Props) {
             </option>
           ))}
         </select>
+      </Field>
+
+      {/* Social licensing — standalone boolean toggle.
+          Independent of the `licences` checklist (which carries contractual
+          use-rights). Indicates whether the asset can be licensed for use
+          on social platforms (Instagram, TikTok, X, etc.). */}
+      <Field
+        label="Social licensing"
+        provenance={
+          <FieldProvenanceTag source={ms.socialLicensable} hasProposal={false} />
+        }
+      >
+        <label className="flex items-center gap-2 text-xs text-black cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={asset.editable.socialLicensable}
+            onChange={e => update('socialLicensable', e.target.checked)}
+          />
+          Available for social licensing
+        </label>
       </Field>
 
       {/* ── Collapsibles (closed by default per IPD4-3) ── */}

@@ -350,6 +350,136 @@ describe('story group operations', () => {
     s = v3Reducer(s, { type: 'TOGGLE_CLUSTER_EXPANDED', clusterId: 'c1' })
     expect(s.ui.expandedClusterIds).toEqual([])
   })
+
+  // ── D2.9 follow-up — story membership tracking ──
+  //
+  // MOVE_ASSET_TO_CLUSTER, MOVE_ASSET_TO_UNGROUPED, CREATE_STORY_GROUP_AND_MOVE,
+  // SPLIT_CLUSTER, MERGE_CLUSTERS, REMOVE_FILE all maintain story.proposedAssetIds
+  // and story.sequence in step with asset.storyGroupId. Without this,
+  // REORDER_ASSETS_IN_STORY silently no-ops on manually-created stories
+  // (sequence index lookup returns -1).
+
+  it('MOVE_ASSET_TO_CLUSTER pushes assetId into target proposedAssetIds (manual flow)', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual([])
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual(['a'])
+    expect(s.assetsById.a.storyGroupId).toBe(groupId)
+  })
+
+  it('MOVE_ASSET_TO_CLUSTER is idempotent on repeated dispatch', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual(['a'])
+  })
+
+  it('MOVE_ASSET_TO_CLUSTER from one cluster to another removes from prior', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'g1' })
+    const g1 = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'g2' })
+    const g2 = s.storyGroupOrder[1]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: g1 })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: g2 })
+    expect(s.storyGroupsById[g1].proposedAssetIds).toEqual([])
+    expect(s.storyGroupsById[g2].proposedAssetIds).toEqual(['a'])
+    expect(s.assetsById.a.storyGroupId).toBe(g2)
+  })
+
+  it('MOVE_ASSET_TO_CLUSTER preserves prior cluster cover unless the moved asset was the cover', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'g1' })
+    const g1 = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'g2' })
+    const g2 = s.storyGroupOrder[1]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: g1 })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId: g1 })
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: g1, assetId: 'a' })
+    expect(s.storyGroupsById[g1].coverAssetId).toBe('a')
+    // Move 'a' (the cover) to g2 — g1's cover should clear.
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: g2 })
+    expect(s.storyGroupsById[g1].coverAssetId).toBeNull()
+    expect(s.storyGroupsById[g1].proposedAssetIds).toEqual(['b'])
+    expect(s.storyGroupsById[g2].proposedAssetIds).toEqual(['a'])
+  })
+
+  it('MOVE_ASSET_TO_UNGROUPED removes assetId from prior cluster proposedAssetIds', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_UNGROUPED', assetId: 'a' })
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual([])
+    expect(s.assetsById.a.storyGroupId).toBeNull()
+  })
+
+  it('REORDER_ASSETS_IN_STORY works after manual creation + manual moves', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'c', filename: 'c.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'c', clusterId: groupId })
+    expect(s.storyGroupsById[groupId].sequence).toEqual(['a', 'b', 'c'])
+    // Reorder c → first position.
+    s = v3Reducer(s, {
+      type: 'REORDER_ASSETS_IN_STORY',
+      storyGroupId: groupId,
+      sequence: ['c', 'a', 'b'],
+    })
+    expect(s.storyGroupsById[groupId].sequence).toEqual(['c', 'a', 'b'])
+  })
+
+  it('REMOVE_FILE strips the assetId from any cluster proposedAssetIds + sequence + coverAssetId', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId: groupId })
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: 'a' })
+    expect(s.storyGroupsById[groupId].coverAssetId).toBe('a')
+    s = v3Reducer(s, { type: 'REMOVE_FILE', assetId: 'a' })
+    expect(s.assetsById.a).toBeUndefined()
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual(['b'])
+    expect(s.storyGroupsById[groupId].sequence).toEqual(['b'])
+    expect(s.storyGroupsById[groupId].coverAssetId).toBeNull()
+  })
 })
 
 // ── Asset field editing ──────────────────────────────────────────
