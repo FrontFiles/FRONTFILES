@@ -218,6 +218,10 @@ export type V3Action =
 
   // ── Story group manual operations (per spec §8.4) ──
   | { type: 'CREATE_STORY_GROUP'; name: string }
+  // D2.5 IPD5-1 = (d): composite action for "Assign Story → + New story" flow.
+  // Atomic create-then-move so the UI doesn't have to read state between
+  // dispatches to learn the freshly-generated story id.
+  | { type: 'CREATE_STORY_GROUP_AND_MOVE'; name: string; assetIds: string[] }
   | { type: 'RENAME_STORY_GROUP'; storyGroupId: string; name: string }
   | { type: 'DELETE_STORY_GROUP'; storyGroupId: string }
   | { type: 'MOVE_ASSET_TO_CLUSTER'; assetId: string; clusterId: string }

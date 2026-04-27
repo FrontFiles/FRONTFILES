@@ -32,6 +32,10 @@ import ContactSheet from './ContactSheet'
 import ContactSheetFilterChips from './ContactSheetFilterChips'
 import ZoomSlider from './ZoomSlider'
 import CountFooter from './CountFooter'
+// D2.5: contextual action bar for multi-select. Component handles its own
+// mount gating (length >= 2 + commit.phase guard) — CenterPane unconditionally
+// renders the slot; the bar early-returns null when conditions aren't met.
+import ContextualActionBar from './ContextualActionBar'
 
 export default function CenterPane() {
   const { state } = useUploadContext()
@@ -50,12 +54,22 @@ export default function CenterPane() {
 
       <ContactSheetFilterChips />
 
-      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+      {/* Grid wrapper is `relative` so the contextual action bar (D2.5) can
+          float over the contact sheet via absolute positioning without
+          taking layout space (no jiggle when the bar mounts/unmounts on
+          selection changes). */}
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
         {layout === 'comparing' ? (
           <CompareViewPlaceholder />
         ) : (
           <ContactSheet />
         )}
+        {/* D2.5: contextual action bar floats at the bottom of the grid
+            wrapper. Mount-gated inside the component (length >= 2 +
+            commit.phase guard). Popovers anchored to the bar buttons
+            extend upward into the grid wrapper; on short viewports they
+            may clip — acceptable trade-off. */}
+        <ContextualActionBar />
       </div>
 
       <div className="flex items-center justify-between gap-4 border-t border-black px-4 py-2 min-w-0">

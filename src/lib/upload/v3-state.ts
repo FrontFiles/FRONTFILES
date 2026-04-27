@@ -370,6 +370,38 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
       }
     }
 
+    // D2.5 IPD5-1 = (d): composite action. Same shape as CREATE_STORY_GROUP
+    // (so parity holds) PLUS bulk move of the named assets. Skips silently
+    // for any assetId not in state.assetsById (defensive — selection might
+    // have stale ids if assets were removed concurrently).
+    case 'CREATE_STORY_GROUP_AND_MOVE': {
+      const id = genId('story')
+      const group: V2StoryGroup = {
+        id,
+        name: action.name,
+        kind: 'creator',
+        proposedAssetIds: [],
+        existingStoryId: null,
+        existingStoryTitle: null,
+        existingStoryAssetCount: null,
+        rationale: '',
+        confidence: 1,
+        createdAt: new Date().toISOString(),
+      }
+      const assetsById = { ...state.assetsById }
+      for (const assetId of action.assetIds) {
+        const asset = assetsById[assetId]
+        if (!asset) continue
+        assetsById[assetId] = { ...asset, storyGroupId: id }
+      }
+      return {
+        ...state,
+        storyGroupsById: { ...state.storyGroupsById, [id]: group },
+        storyGroupOrder: [...state.storyGroupOrder, id],
+        assetsById,
+      }
+    }
+
     case 'RENAME_STORY_GROUP': {
       const group = state.storyGroupsById[action.storyGroupId]
       if (!group) return state
