@@ -167,6 +167,7 @@ export function v2Reducer(state: V2State, action: V2Action): V2State {
             privacy: state.defaults.privacy,
             licences: [...state.defaults.licences],
             price: null,
+            socialLicensable: false,
             metadataSource: {},
           },
           conflicts: [],

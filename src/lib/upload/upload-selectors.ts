@@ -49,6 +49,62 @@ export interface DefaultsView {
   defaults: V2Defaults
 }
 
+// ── D2.1 — Layout state + story cover (per UX-SPEC-V4 §2 + §7) ──
+
+/**
+ * Layout state for the V4 three-pane progressive disclosure shell.
+ *
+ * Three states (per UX-SPEC-V4 §2 + the external-review correction
+ * captured in §2.0.1):
+ *   'empty'      — no assets yet; UploadShell renders EmptyState
+ *   'workspace'  — assets present; three-pane shell with placeholders/content
+ *   'comparing'  — Compare mode active (compareAssetIds.length === 2 per IPV4-3)
+ *
+ * Replaces the C2-era `densityForCount` selector. Returns a string union
+ * (per IPD1-5 = a) — components derive pane visibility from selectedAssetIds /
+ * leftRailCollapsed separately.
+ */
+export type V4LayoutState = 'empty' | 'workspace' | 'comparing'
+
+export interface LayoutStateView extends AssetsView {
+  compareAssetIds?: string[] // optional so V2 fixtures parse (no compare in V2)
+}
+
+export function getLayoutState(view: LayoutStateView): V4LayoutState {
+  if ((view.compareAssetIds?.length ?? 0) === 2) return 'comparing'
+  if (view.assetOrder.length === 0) return 'empty'
+  return 'workspace'
+}
+
+/**
+ * Effective cover for a Story. Returns the explicit coverAssetId asset if
+ * set; otherwise falls back to the first asset in `sequence` (or
+ * proposedAssetIds for legacy stories that lack sequence). Returns null if
+ * the story has no assets at all OR the resolved id isn't in assetsById.
+ *
+ * Used by LeftRailStoryHeader thumbnail rendering and any other surface
+ * that displays a story's representative image. Per UX-SPEC-V4 §7 + spec §7.3
+ * cover-leaves-story behavior (IPV4-2 default = silent fallback).
+ */
+export function getStoryCover(
+  group: V2StoryGroup,
+  assetsById: Record<string, V2Asset>,
+): V2Asset | null {
+  const explicitId = group.coverAssetId
+  if (explicitId) {
+    const asset = assetsById[explicitId]
+    if (asset) return asset
+    // Cover asset has left the story (excluded / reassigned). Per IPV4-2 = a:
+    // silent fallback to first in sequence. No prompt.
+  }
+  const fallbackList = group.sequence ?? group.proposedAssetIds
+  for (const id of fallbackList) {
+    const asset = assetsById[id]
+    if (asset) return asset
+  }
+  return null
+}
+
 // ── Basic Getters ──
 
 export function getAssets(view: AssetsView): V2Asset[] {

@@ -79,12 +79,21 @@ describe('V2/V3 Parity Contract — getAssets / getIncludedAssets', () => {
 })
 
 describe('V2/V3 Parity Contract — getStoryGroups', () => {
+  // D2.1 spec exception (per UX-SPEC-V4 §15.3 + IPD1-9): V3 stories now
+  // carry coverAssetId + sequence (populated at hydration). V2 stories
+  // don't. Strip those V4-only fields before comparison so the parity
+  // assertion still pins the shared shape.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const stripV4Fields = ({ coverAssetId, sequence, ...rest }: ReturnType<typeof getStoryGroups>[number]) => rest
+
   for (const fixture of FIXTURES) {
     for (const target of TARGETS) {
       it(`${fixture.name} @ ${target}`, () => {
         const v2State = hydrateFromScenario(fixture.scenario, target)
         const v3State = hydrateV3FromV2State(v2State)
-        expect(getStoryGroups(v3State)).toEqual(getStoryGroups(v2State))
+        expect(getStoryGroups(v3State).map(stripV4Fields)).toEqual(
+          getStoryGroups(v2State).map(stripV4Fields),
+        )
       })
     }
   }
@@ -183,17 +192,57 @@ describe('V2/V3 Parity Contract — getAnalysisProgress', () => {
 
 describe('V2/V3 Parity Contract — V3 hydration preserves V2Asset shape', () => {
   for (const fixture of FIXTURES) {
-    it(`${fixture.name} — assetsById entries are reference-equal`, () => {
+    it(`${fixture.name} — V3 hydration preserves the data-model contract`, () => {
       const v2State = hydrateFromScenario(fixture.scenario, 'review-ready')
       const v3State = hydrateV3FromV2State(v2State)
-      // V3 hydration MUST share the same V2Asset references (or at least
-      // structurally identical) — V2Asset is the data-model contract per
-      // UX-BRIEF v3 §4.7.
-      expect(v3State.assetsById).toBe(v2State.assetsById)
+
+      // D2.1 spec exception (per UX-SPEC-V4 §11.1 + §15.3 + L3 + IPD1-9):
+      // The reference-equality invariant from C2.1 is replaced with a
+      // structural-equality invariant for assetsById and storyGroupsById.
+      // Two transforms now run at hydration:
+      //   - applyAIAutoAcceptSweep (assets with proposal.confidence ≥
+      //     AI_AUTO_ACCEPT_THRESHOLD get their proposal description/tags/
+      //     geography copied into editable fields → new asset object).
+      //   - applyStoryDefaults (every story gets coverAssetId + sequence
+      //     populated → new story object).
+      //
+      // The data-model SHAPE (V2Asset / V2StoryGroup interfaces) is
+      // preserved unchanged — only specific field VALUES are touched.
+      // V2Asset is still the canonical contract per UX-BRIEF v3 §4.7.
+
+      // Maps have identical key sets:
+      expect(Object.keys(v3State.assetsById).sort()).toEqual(
+        Object.keys(v2State.assetsById).sort(),
+      )
+      expect(Object.keys(v3State.storyGroupsById).sort()).toEqual(
+        Object.keys(v2State.storyGroupsById).sort(),
+      )
+
+      // Order arrays + defaults still reference-equal (no transforms touch them):
       expect(v3State.assetOrder).toBe(v2State.assetOrder)
-      expect(v3State.storyGroupsById).toBe(v2State.storyGroupsById)
       expect(v3State.storyGroupOrder).toBe(v2State.storyGroupOrder)
       expect(v3State.defaults).toBe(v2State.defaults)
+
+      // Per-asset shape preservation: every V3 asset has all V2Asset fields
+      // present with the same types. The non-editable fields are unchanged.
+      for (const id of Object.keys(v2State.assetsById)) {
+        const v2 = v2State.assetsById[id]
+        const v3 = v3State.assetsById[id]
+        expect(v3.id).toBe(v2.id)
+        expect(v3.filename).toBe(v2.filename)
+        expect(v3.fileSize).toBe(v2.fileSize)
+        expect(v3.format).toBe(v2.format)
+        expect(v3.storyGroupId).toBe(v2.storyGroupId)
+        expect(v3.proposal).toBe(v2.proposal) // proposal is read-only; reference preserved
+        expect(v3.duplicateStatus).toBe(v2.duplicateStatus)
+        expect(v3.declarationState).toBe(v2.declarationState)
+        // editable.title / .privacy / .price / .licences / .captureDate
+        // unchanged (auto-accept doesn't touch them per IPD1-3):
+        expect(v3.editable.title).toBe(v2.editable.title)
+        expect(v3.editable.privacy).toBe(v2.editable.privacy)
+        expect(v3.editable.price).toBe(v2.editable.price)
+        expect(v3.editable.licences).toEqual(v2.editable.licences)
+      }
     })
   }
 })

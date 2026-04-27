@@ -19,6 +19,10 @@
  */
 
 import { CreatorGate } from '@/components/platform/CreatorGate'
+// D2.1: route to V4 shell. The C2 UploadShell at ./_components/UploadShell
+// is now dormant (per D2.1 §8 dormant-flag pass) and is no longer imported
+// from any production code path. Rollback safety: flip this import back
+// to './_components/UploadShell' to revert.
 import UploadShell from './_components/UploadShell'
 import { SCENARIO_IDS, type ScenarioId } from '@/lib/upload/v2-scenario-registry'
 
@@ -70,7 +74,11 @@ export default async function UploadPage({
 
   return (
     <CreatorGate tool="Upload">
-      <div className="flex-1 bg-white flex flex-col">
+      {/* D2.5b: min-h-0 is REQUIRED. Without it, this flex-1 child of body
+          (flex flex-col) gets min-height: auto = its content size, which
+          lets descendants grow beyond viewport bounds and breaks the
+          right-rail inspector's overflow-y-auto scroll chain. */}
+      <div className="flex-1 bg-white flex flex-col min-h-0">
         <UploadShell
           batchId={batchId}
           devScenarioId={devScenarioId}

@@ -60,6 +60,10 @@ function defaultUIState(): V3UIState {
     sortDirection: 'asc',
     sessionDefaultsBarCollapsed: false,
     priceBasisOpenAssetId: null,
+    // ── D2.1 additions (per UX-SPEC-V4 §15.2) ────────────────────
+    contactSheetZoom: 3, // default middle step (per spec §3.5)
+    leftRailCollapsed: false,
+    compareAssetIds: [],
   }
 }
 
@@ -129,6 +133,7 @@ function makeAsset(input: {
       privacy: null,
       licences: [],
       price: null,
+      socialLicensable: false,
       metadataSource: {},
     },
     conflicts: [],
@@ -170,11 +175,31 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     }
 
     case 'REMOVE_FILE': {
-      const { [action.assetId]: _removed, ...rest } = state.assetsById
+      // D2.9 follow-up — also strip the removed assetId from any cluster's
+      // proposedAssetIds, sequence, and coverAssetId.
+      const removed = state.assetsById[action.assetId]
+      const { [action.assetId]: _r, ...rest } = state.assetsById
+      let storyGroupsById = state.storyGroupsById
+      if (removed?.storyGroupId) {
+        const prior = storyGroupsById[removed.storyGroupId]
+        if (prior) {
+          storyGroupsById = {
+            ...storyGroupsById,
+            [removed.storyGroupId]: {
+              ...prior,
+              proposedAssetIds: prior.proposedAssetIds.filter(id => id !== action.assetId),
+              sequence: (prior.sequence ?? []).filter(id => id !== action.assetId),
+              coverAssetId:
+                prior.coverAssetId === action.assetId ? null : prior.coverAssetId,
+            },
+          }
+        }
+      }
       return {
         ...state,
         assetsById: rest,
         assetOrder: state.assetOrder.filter(id => id !== action.assetId),
+        storyGroupsById,
         ui: {
           ...state.ui,
           selectedAssetIds: state.ui.selectedAssetIds.filter(id => id !== action.assetId),
@@ -346,23 +371,91 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     // ── Story group manual operations ──────────────────────────
 
     case 'CREATE_STORY_GROUP': {
+      // D2.9 follow-up — sequence initialized to [] (was undefined). The
+      // membership reducers (MOVE_ASSET_TO_CLUSTER etc.) append/filter
+      // sequence in step with proposedAssetIds; without this initial value,
+      // REORDER_ASSETS_IN_STORY would no-op on every manually-created story
+      // because sequence stayed undefined through subsequent moves.
       const id = genId('story')
       const group: V2StoryGroup = {
         id,
         name: action.name,
         kind: 'creator',
         proposedAssetIds: [],
+        sequence: [],
         existingStoryId: null,
         existingStoryTitle: null,
         existingStoryAssetCount: null,
         rationale: '',
         confidence: 1,
         createdAt: new Date().toISOString(),
+        // D2.10 — story-level metadata defaults.
+        location: '',
+        date: null,
       }
       return {
         ...state,
         storyGroupsById: { ...state.storyGroupsById, [id]: group },
         storyGroupOrder: [...state.storyGroupOrder, id],
+      }
+    }
+
+    // D2.5 IPD5-1 = (d): composite action. Same shape as CREATE_STORY_GROUP
+    // (so parity holds) PLUS bulk move of the named assets. Skips silently
+    // for any assetId not in state.assetsById (defensive — selection might
+    // have stale ids if assets were removed concurrently).
+    case 'CREATE_STORY_GROUP_AND_MOVE': {
+      // D2.9 follow-up — initial proposedAssetIds reflects the moved assets,
+      // and any prior cluster membership is cleared (mirrors MOVE_ASSET_TO_CLUSTER
+      // semantics applied across the batch).
+      const id = genId('story')
+      // Filter to assets that actually exist in state (defensive — same as
+      // pre-fix behavior).
+      const movedIds = action.assetIds.filter(aid => state.assetsById[aid])
+      const group: V2StoryGroup = {
+        id,
+        name: action.name,
+        kind: 'creator',
+        proposedAssetIds: [...movedIds],
+        existingStoryId: null,
+        existingStoryTitle: null,
+        existingStoryAssetCount: null,
+        rationale: '',
+        confidence: 1,
+        createdAt: new Date().toISOString(),
+        sequence: [...movedIds],
+        // D2.10 — story-level metadata defaults.
+        location: '',
+        date: null,
+      }
+      const assetsById = { ...state.assetsById }
+      let storyGroupsById = { ...state.storyGroupsById, [id]: group }
+      for (const assetId of movedIds) {
+        const asset = assetsById[assetId]
+        if (!asset) continue
+        // Remove from prior cluster if any.
+        if (asset.storyGroupId && asset.storyGroupId !== id) {
+          const prior = storyGroupsById[asset.storyGroupId]
+          if (prior) {
+            storyGroupsById = {
+              ...storyGroupsById,
+              [asset.storyGroupId]: {
+                ...prior,
+                proposedAssetIds: prior.proposedAssetIds.filter(x => x !== assetId),
+                sequence: (prior.sequence ?? []).filter(x => x !== assetId),
+                coverAssetId:
+                  prior.coverAssetId === assetId ? null : prior.coverAssetId,
+              },
+            }
+          }
+        }
+        assetsById[assetId] = { ...asset, storyGroupId: id }
+      }
+      return {
+        ...state,
+        storyGroupsById,
+        storyGroupOrder: [...state.storyGroupOrder, id],
+        assetsById,
       }
     }
 
@@ -374,6 +467,36 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         storyGroupsById: {
           ...state.storyGroupsById,
           [action.storyGroupId]: { ...group, name: action.name },
+        },
+      }
+    }
+
+    // D2.10 — story-level metadata (location, date). Throws on unknown
+    // storyGroupId to surface stale ids quickly. Value type is string for
+    // 'location' and string | null for 'date' (caller is responsible for
+    // type alignment via the discriminated action shape).
+    case 'UPDATE_STORY_FIELD': {
+      const group = state.storyGroupsById[action.storyGroupId]
+      if (!group) {
+        throw new Error(
+          `update_story_field_invalid: storyGroupId="${action.storyGroupId}" not in storyGroupsById`,
+        )
+      }
+      if (action.field === 'location') {
+        return {
+          ...state,
+          storyGroupsById: {
+            ...state.storyGroupsById,
+            [action.storyGroupId]: { ...group, location: (action.value ?? '') as string },
+          },
+        }
+      }
+      // 'date'
+      return {
+        ...state,
+        storyGroupsById: {
+          ...state.storyGroupsById,
+          [action.storyGroupId]: { ...group, date: action.value as string | null },
         },
       }
     }
@@ -397,6 +520,12 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     }
 
     case 'MOVE_ASSET_TO_CLUSTER': {
+      // D2.9 follow-up — story membership tracking. In addition to setting
+      // asset.storyGroupId, maintain story.proposedAssetIds (and story.sequence
+      // when defined) so downstream selectors (REORDER_ASSETS_IN_STORY,
+      // getStoryCoverageSummary, etc.) see the correct membership for
+      // manually-created stories. Without this, manual-flow stories had
+      // empty proposedAssetIds and reorder dispatched silent no-ops.
       const asset = state.assetsById[action.assetId]
       if (!asset) return state
       if (!state.storyGroupsById[action.clusterId]) {
@@ -404,8 +533,41 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
           `move_asset_to_cluster_invalid: clusterId="${action.clusterId}" does not exist in storyGroupsById`,
         )
       }
+      let storyGroupsById = state.storyGroupsById
+      // Remove from prior cluster if any (and not the same as target).
+      if (asset.storyGroupId && asset.storyGroupId !== action.clusterId) {
+        const prior = storyGroupsById[asset.storyGroupId]
+        if (prior) {
+          storyGroupsById = {
+            ...storyGroupsById,
+            [asset.storyGroupId]: {
+              ...prior,
+              proposedAssetIds: prior.proposedAssetIds.filter(id => id !== action.assetId),
+              sequence: (prior.sequence ?? []).filter(id => id !== action.assetId),
+              // If the removed asset was this cluster's explicit cover, drop it
+              // (selector will fall back to first-in-sequence; explicit re-set
+              // via SET_STORY_COVER if creator picks another).
+              coverAssetId:
+                prior.coverAssetId === action.assetId ? null : prior.coverAssetId,
+            },
+          }
+        }
+      }
+      // Append to target cluster's proposedAssetIds (idempotent).
+      const target = storyGroupsById[action.clusterId]
+      if (target && !target.proposedAssetIds.includes(action.assetId)) {
+        storyGroupsById = {
+          ...storyGroupsById,
+          [action.clusterId]: {
+            ...target,
+            proposedAssetIds: [...target.proposedAssetIds, action.assetId],
+            sequence: [...(target.sequence ?? []), action.assetId],
+          },
+        }
+      }
       return {
         ...state,
+        storyGroupsById,
         assetsById: {
           ...state.assetsById,
           [action.assetId]: { ...asset, storyGroupId: action.clusterId },
@@ -414,10 +576,29 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     }
 
     case 'MOVE_ASSET_TO_UNGROUPED': {
+      // D2.9 follow-up — also remove from prior cluster's proposedAssetIds
+      // and sequence; clear coverAssetId if this asset was the cover.
       const asset = state.assetsById[action.assetId]
       if (!asset) return state
+      let storyGroupsById = state.storyGroupsById
+      if (asset.storyGroupId) {
+        const prior = storyGroupsById[asset.storyGroupId]
+        if (prior) {
+          storyGroupsById = {
+            ...storyGroupsById,
+            [asset.storyGroupId]: {
+              ...prior,
+              proposedAssetIds: prior.proposedAssetIds.filter(id => id !== action.assetId),
+              sequence: (prior.sequence ?? []).filter(id => id !== action.assetId),
+              coverAssetId:
+                prior.coverAssetId === action.assetId ? null : prior.coverAssetId,
+            },
+          }
+        }
+      }
       return {
         ...state,
+        storyGroupsById,
         assetsById: {
           ...state.assetsById,
           [action.assetId]: { ...asset, storyGroupId: null },
@@ -426,6 +607,8 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     }
 
     case 'SPLIT_CLUSTER': {
+      // D2.9 follow-up — also rebalance proposedAssetIds + sequence between
+      // the source (loses moved ids) and the new cluster (gains them).
       const sourceCluster = state.storyGroupsById[action.clusterId]
       if (!sourceCluster) {
         throw new Error(
@@ -433,34 +616,60 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         )
       }
       const newId = genId('story')
+      // Only move ids that are actually in the source cluster + exist as assets.
+      const movedSet = new Set(
+        action.assetIds.filter(
+          id =>
+            state.assetsById[id] && state.assetsById[id].storyGroupId === action.clusterId,
+        ),
+      )
+      const moved = [...movedSet]
       const newGroup: V2StoryGroup = {
         id: newId,
         name: action.newClusterName,
         kind: 'creator',
-        proposedAssetIds: [],
+        proposedAssetIds: moved,
         existingStoryId: null,
         existingStoryTitle: null,
         existingStoryAssetCount: null,
         rationale: 'Split from ' + sourceCluster.name,
         confidence: 1,
         createdAt: new Date().toISOString(),
+        sequence: moved,
+        // D2.10 — inherit story-level metadata from the source cluster.
+        location: sourceCluster.location ?? '',
+        date: sourceCluster.date ?? null,
+      }
+      const updatedSource: V2StoryGroup = {
+        ...sourceCluster,
+        proposedAssetIds: sourceCluster.proposedAssetIds.filter(id => !movedSet.has(id)),
+        sequence: (sourceCluster.sequence ?? []).filter(id => !movedSet.has(id)),
+        coverAssetId:
+          sourceCluster.coverAssetId && movedSet.has(sourceCluster.coverAssetId)
+            ? null
+            : sourceCluster.coverAssetId,
       }
       const assetsById = { ...state.assetsById }
-      for (const id of action.assetIds) {
+      for (const id of moved) {
         const asset = assetsById[id]
-        if (asset && asset.storyGroupId === action.clusterId) {
-          assetsById[id] = { ...asset, storyGroupId: newId }
-        }
+        if (!asset) continue
+        assetsById[id] = { ...asset, storyGroupId: newId }
       }
       return {
         ...state,
-        storyGroupsById: { ...state.storyGroupsById, [newId]: newGroup },
+        storyGroupsById: {
+          ...state.storyGroupsById,
+          [action.clusterId]: updatedSource,
+          [newId]: newGroup,
+        },
         storyGroupOrder: [...state.storyGroupOrder, newId],
         assetsById,
       }
     }
 
     case 'MERGE_CLUSTERS': {
+      // D2.9 follow-up — target cluster's proposedAssetIds + sequence absorb
+      // the source's, with deduplication. Source cluster is then removed.
       const source = state.storyGroupsById[action.sourceClusterId]
       const target = state.storyGroupsById[action.targetClusterId]
       if (!source || !target) {
@@ -468,7 +677,24 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
           `merge_clusters_invalid: source="${action.sourceClusterId}" or target="${action.targetClusterId}" does not exist`,
         )
       }
-      // Move all source-cluster assets to target
+      const targetSet = new Set(target.proposedAssetIds)
+      const mergedProposedAssetIds = [
+        ...target.proposedAssetIds,
+        ...source.proposedAssetIds.filter(id => !targetSet.has(id)),
+      ]
+      const targetSeq = target.sequence ?? []
+      const sourceSeq = source.sequence ?? []
+      const seqSet = new Set(targetSeq)
+      const mergedSequence = [
+        ...targetSeq,
+        ...sourceSeq.filter(id => !seqSet.has(id)),
+      ]
+      const updatedTarget: V2StoryGroup = {
+        ...target,
+        proposedAssetIds: mergedProposedAssetIds,
+        sequence: mergedSequence,
+      }
+      // Move all source-cluster assets to target.
       const assetsById = { ...state.assetsById }
       for (const id of state.assetOrder) {
         const asset = assetsById[id]
@@ -476,11 +702,10 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
           assetsById[id] = { ...asset, storyGroupId: action.targetClusterId }
         }
       }
-      // Remove source cluster
       const { [action.sourceClusterId]: _removed, ...rest } = state.storyGroupsById
       return {
         ...state,
-        storyGroupsById: rest,
+        storyGroupsById: { ...rest, [action.targetClusterId]: updatedTarget },
         storyGroupOrder: state.storyGroupOrder.filter(id => id !== action.sourceClusterId),
         assetsById,
       }
@@ -502,6 +727,11 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     // ── Asset field editing ────────────────────────────────────
 
     case 'UPDATE_ASSET_FIELD': {
+      // D2.9 Move 8: any creator-authored field write flips metadataSource[field]
+      // to 'creator', so FieldProvenanceTag can render "Edited by creator". The
+      // approve flow (clicking ✓ on an AI-generated field) dispatches this
+      // action with the existing proposal value, which transfers ownership
+      // without changing the value — see UX-SPEC-V4 D2.9 §3 Move 8.
       const asset = state.assetsById[action.assetId]
       if (!asset) return state
       return {
@@ -510,20 +740,36 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
           ...state.assetsById,
           [action.assetId]: {
             ...asset,
-            editable: { ...asset.editable, [action.field]: action.value },
+            editable: {
+              ...asset.editable,
+              [action.field]: action.value,
+              metadataSource: {
+                ...asset.editable.metadataSource,
+                [action.field]: 'creator' as const,
+              },
+            },
           },
         },
       }
     }
 
     case 'BULK_UPDATE_FIELD': {
+      // D2.9 Move 8: bulk creator writes flip metadataSource[field] to 'creator'
+      // for every affected asset, matching UPDATE_ASSET_FIELD semantics.
       const assetsById = { ...state.assetsById }
       for (const id of action.assetIds) {
         const asset = assetsById[id]
         if (!asset) continue
         assetsById[id] = {
           ...asset,
-          editable: { ...asset.editable, [action.field]: action.value },
+          editable: {
+            ...asset.editable,
+            [action.field]: action.value,
+            metadataSource: {
+              ...asset.editable.metadataSource,
+              [action.field]: 'creator' as const,
+            },
+          },
         }
       }
       return { ...state, assetsById }
@@ -544,6 +790,10 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     // ── Conflict resolution ────────────────────────────────────
 
     case 'RESOLVE_CONFLICT': {
+      // D2.9 Move 8 (B-scope): the conflict resolver is a creator-authoritative
+      // pick between embedded and AI values; flip metadataSource[field] to
+      // 'creator' so the inspector renders "Edited by creator" once resolved.
+      // Mirrors v2-state.ts:529 (V2 parity).
       const asset = state.assetsById[action.assetId]
       if (!asset) return state
       const conflicts = asset.conflicts.map(c =>
@@ -556,7 +806,14 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
           [action.assetId]: {
             ...asset,
             conflicts,
-            editable: { ...asset.editable, [action.field]: action.value },
+            editable: {
+              ...asset.editable,
+              [action.field]: action.value,
+              metadataSource: {
+                ...asset.editable.metadataSource,
+                [action.field]: 'creator' as const,
+              },
+            },
           },
         },
       }
@@ -630,6 +887,10 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         rationale: proposal.rationale,
         confidence: proposal.confidence,
         createdAt: new Date().toISOString(),
+        // D2.10 — story-level metadata defaults; AI cluster proposals
+        // currently don't carry location/date, so defaults apply.
+        location: '',
+        date: null,
       }
       // Assign all proposed assets to the new group
       const assetsById = { ...state.assetsById }
@@ -666,14 +927,23 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
     // ── Cluster bulk operations (Archive mode) ─────────────────
 
     case 'BULK_EDIT_CAPTION_TEMPLATE': {
-      // Apply template caption to all assets in the cluster
+      // Apply template caption to all assets in the cluster.
+      // D2.9 Move 8 (B-scope): creator-authored bulk write flips
+      // metadataSource.description to 'creator' for each affected asset.
       const assetsById = { ...state.assetsById }
       for (const id of state.assetOrder) {
         const asset = assetsById[id]
         if (asset && asset.storyGroupId === action.clusterId) {
           assetsById[id] = {
             ...asset,
-            editable: { ...asset.editable, description: action.template },
+            editable: {
+              ...asset.editable,
+              description: action.template,
+              metadataSource: {
+                ...asset.editable.metadataSource,
+                description: 'creator' as const,
+              },
+            },
           }
         }
       }
@@ -685,6 +955,8 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
       // per-asset price-acceptance rule still holds — this is a creator-
       // authoritative bulk SET, distinct from bulk-accepting an AI
       // suggestion.
+      // D2.9 Move 8 (B-scope): creator-authored bulk write flips
+      // metadataSource.price to 'creator' for each affected asset.
       if (action.priceCents < 0) {
         throw new Error(
           `bulk_set_price_invalid: priceCents=${action.priceCents} must be >= 0`,
@@ -696,7 +968,14 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         if (asset && asset.storyGroupId === action.clusterId) {
           assetsById[id] = {
             ...asset,
-            editable: { ...asset.editable, price: action.priceCents },
+            editable: {
+              ...asset.editable,
+              price: action.priceCents,
+              metadataSource: {
+                ...asset.editable.metadataSource,
+                price: 'creator' as const,
+              },
+            },
           }
         }
       }
@@ -757,9 +1036,17 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
       }
 
     case 'SET_FILTER_PRESET':
+      // Per D2.2 IPD2-14 = (a): switching the preset chip also clears
+      // the storyGroupId filter. Intent: clicking a category filter
+      // means "I want to filter by category, not by story". The user
+      // re-applies storyGroupId by clicking a story header in the
+      // left rail (which dispatches SET_FILTER { storyGroupId }).
       return {
         ...state,
-        ui: { ...state.ui, filter: { ...state.ui.filter, preset: action.preset } },
+        ui: {
+          ...state.ui,
+          filter: { ...state.ui.filter, preset: action.preset, storyGroupId: null },
+        },
       }
 
     case 'SET_SORT':
@@ -884,6 +1171,86 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
 
     case 'RESET_FLOW':
       return v3InitialState(state.batch.id)
+
+    // ── D2.1 additions (per UX-SPEC-V4 + D2.1-DIRECTIVE §4.2) ──
+
+    case 'SET_STORY_COVER': {
+      const group = state.storyGroupsById[action.storyGroupId]
+      if (!group) {
+        throw new Error(
+          `set_story_cover_invalid_group: storyGroupId="${action.storyGroupId}" not in storyGroupsById`,
+        )
+      }
+      if (action.assetId !== null && !state.assetsById[action.assetId]) {
+        throw new Error(
+          `set_story_cover_invalid_asset: assetId="${action.assetId}" not in assetsById`,
+        )
+      }
+      return {
+        ...state,
+        storyGroupsById: {
+          ...state.storyGroupsById,
+          [action.storyGroupId]: { ...group, coverAssetId: action.assetId },
+        },
+      }
+    }
+
+    case 'REORDER_ASSETS_IN_STORY': {
+      const group = state.storyGroupsById[action.storyGroupId]
+      if (!group) {
+        throw new Error(
+          `reorder_assets_invalid_group: storyGroupId="${action.storyGroupId}" not in storyGroupsById`,
+        )
+      }
+      // Set-equality check: new sequence must contain exactly the same ids
+      // currently in the story (membership unchanged; only order differs).
+      const current = new Set(group.sequence ?? group.proposedAssetIds)
+      const next = new Set(action.sequence)
+      if (current.size !== next.size || [...current].some(id => !next.has(id))) {
+        throw new Error(
+          `reorder_assets_set_mismatch: new sequence membership differs from current. ` +
+            `REORDER_ASSETS_IN_STORY changes order, not membership. Use MOVE_ASSET_TO_CLUSTER ` +
+            `or MOVE_ASSET_TO_UNGROUPED to change membership.`,
+        )
+      }
+      return {
+        ...state,
+        storyGroupsById: {
+          ...state.storyGroupsById,
+          [action.storyGroupId]: { ...group, sequence: [...action.sequence] },
+        },
+      }
+    }
+
+    case 'SET_CONTACT_SHEET_ZOOM': {
+      if (action.zoom < 1 || action.zoom > 5 || !Number.isInteger(action.zoom)) {
+        throw new Error(
+          `set_contact_sheet_zoom_invalid: zoom must be an integer 1-5, got ${action.zoom}`,
+        )
+      }
+      return { ...state, ui: { ...state.ui, contactSheetZoom: action.zoom } }
+    }
+
+    case 'TOGGLE_LEFT_RAIL_COLLAPSED':
+      return { ...state, ui: { ...state.ui, leftRailCollapsed: !state.ui.leftRailCollapsed } }
+
+    case 'ENTER_COMPARE_MODE': {
+      // Per IPD1-4 default (a) + IPV4-3 default (a): strict 2-only.
+      if (action.assetIds.length !== 2) {
+        throw new Error(
+          `compare_invalid_count: ENTER_COMPARE_MODE requires exactly 2 assetIds (per IPV4-3 = a strict 2-only), got ${action.assetIds.length}`,
+        )
+      }
+      for (const id of action.assetIds) {
+        if (!state.assetsById[id]) {
+          throw new Error(`compare_invalid_asset: assetId="${id}" not in assetsById`)
+        }
+      }
+      return { ...state, ui: { ...state.ui, compareAssetIds: [...action.assetIds] } }
+    }
+
+    case 'EXIT_COMPARE_MODE':
+      return { ...state, ui: { ...state.ui, compareAssetIds: [] } }
 
     // ── Exhaustive check ────────────────────────────────────────
     default: {

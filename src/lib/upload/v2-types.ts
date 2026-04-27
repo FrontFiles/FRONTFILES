@@ -149,6 +149,13 @@ export interface AssetEditableFields {
   privacy: PrivacyState | null
   licences: LicenceType[]
   price: number | null    // EUR cents
+  /**
+   * D2.9 follow-up — creator-controlled flag indicating whether the asset
+   * is available for social-platform licensing (Instagram, TikTok, X, etc.).
+   * Independent of the `licences` checklist (which carries the contractual
+   * use-rights). Defaults to false; toggled in the inspector.
+   */
+  socialLicensable: boolean
   metadataSource: Partial<Record<keyof Omit<AssetEditableFields, 'metadataSource'>, MetadataSource>>
 }
 
@@ -214,6 +221,29 @@ export interface V2StoryGroup {
   rationale: string
   confidence: number         // 0-1
   createdAt: string
+  // ── D2.1 additions (per UX-SPEC-V4 §15.3 / D-PLAN §3.2 spec exception) ──
+  //
+  // These two fields are optional on V2StoryGroup so existing v2-*
+  // construction sites compile unchanged. v3-hydration.ts ALWAYS sets
+  // them when bridging to V3State, so V3 consumers see them as populated.
+  // (V3 components may treat them as required via narrowed type if needed.)
+  /** Explicit cover asset; null = no explicit, render falls back to first in sequence. */
+  coverAssetId?: string | null
+  /** Ordered asset ids = canonical reading order. Defaults to [...proposedAssetIds] at hydration. */
+  sequence?: string[]
+  /**
+   * D2.10 — story-level location (single primary). Maps to per-asset
+   * geography via "Apply to all in story" button: each asset's
+   * editable.geography becomes [story.location] when bulk-applied.
+   * Defaults to ''.
+   */
+  location?: string
+  /**
+   * D2.10 — story-level date (ISO date, e.g., '2026-04-15').
+   * Maps to per-asset captureDate via "Apply to all in story".
+   * Defaults to null.
+   */
+  date?: string | null
 }
 
 // ── Exception Types ──

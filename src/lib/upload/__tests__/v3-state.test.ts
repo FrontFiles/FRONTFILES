@@ -350,6 +350,222 @@ describe('story group operations', () => {
     s = v3Reducer(s, { type: 'TOGGLE_CLUSTER_EXPANDED', clusterId: 'c1' })
     expect(s.ui.expandedClusterIds).toEqual([])
   })
+
+  // ── D2.9 follow-up — story membership tracking ──
+  //
+  // MOVE_ASSET_TO_CLUSTER, MOVE_ASSET_TO_UNGROUPED, CREATE_STORY_GROUP_AND_MOVE,
+  // SPLIT_CLUSTER, MERGE_CLUSTERS, REMOVE_FILE all maintain story.proposedAssetIds
+  // and story.sequence in step with asset.storyGroupId. Without this,
+  // REORDER_ASSETS_IN_STORY silently no-ops on manually-created stories
+  // (sequence index lookup returns -1).
+
+  it('MOVE_ASSET_TO_CLUSTER pushes assetId into target proposedAssetIds (manual flow)', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual([])
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual(['a'])
+    expect(s.assetsById.a.storyGroupId).toBe(groupId)
+  })
+
+  it('MOVE_ASSET_TO_CLUSTER is idempotent on repeated dispatch', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual(['a'])
+  })
+
+  it('MOVE_ASSET_TO_CLUSTER from one cluster to another removes from prior', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'g1' })
+    const g1 = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'g2' })
+    const g2 = s.storyGroupOrder[1]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: g1 })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: g2 })
+    expect(s.storyGroupsById[g1].proposedAssetIds).toEqual([])
+    expect(s.storyGroupsById[g2].proposedAssetIds).toEqual(['a'])
+    expect(s.assetsById.a.storyGroupId).toBe(g2)
+  })
+
+  it('MOVE_ASSET_TO_CLUSTER preserves prior cluster cover unless the moved asset was the cover', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'g1' })
+    const g1 = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'g2' })
+    const g2 = s.storyGroupOrder[1]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: g1 })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId: g1 })
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: g1, assetId: 'a' })
+    expect(s.storyGroupsById[g1].coverAssetId).toBe('a')
+    // Move 'a' (the cover) to g2 — g1's cover should clear.
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: g2 })
+    expect(s.storyGroupsById[g1].coverAssetId).toBeNull()
+    expect(s.storyGroupsById[g1].proposedAssetIds).toEqual(['b'])
+    expect(s.storyGroupsById[g2].proposedAssetIds).toEqual(['a'])
+  })
+
+  it('MOVE_ASSET_TO_UNGROUPED removes assetId from prior cluster proposedAssetIds', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_UNGROUPED', assetId: 'a' })
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual([])
+    expect(s.assetsById.a.storyGroupId).toBeNull()
+  })
+
+  it('REORDER_ASSETS_IN_STORY works after manual creation + manual moves', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'c', filename: 'c.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'c', clusterId: groupId })
+    expect(s.storyGroupsById[groupId].sequence).toEqual(['a', 'b', 'c'])
+    // Reorder c → first position.
+    s = v3Reducer(s, {
+      type: 'REORDER_ASSETS_IN_STORY',
+      storyGroupId: groupId,
+      sequence: ['c', 'a', 'b'],
+    })
+    expect(s.storyGroupsById[groupId].sequence).toEqual(['c', 'a', 'b'])
+  })
+
+  // ── D2.10 — story-level metadata (location, date) ──
+  //
+  // Stories carry their own metadata for "Apply to all in story" propagation.
+  // CREATE_STORY_GROUP initializes location: '' + date: null. SPLIT_CLUSTER
+  // inherits from source. UPDATE_STORY_FIELD edits a single field at a time.
+
+  it('CREATE_STORY_GROUP initializes location="" and date=null', () => {
+    const s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const groupId = s.storyGroupOrder[0]
+    expect(s.storyGroupsById[groupId].location).toBe('')
+    expect(s.storyGroupsById[groupId].date).toBeNull()
+  })
+
+  it('UPDATE_STORY_FIELD writes location', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: groupId,
+      field: 'location',
+      value: 'Lisbon, Portugal',
+    })
+    expect(s.storyGroupsById[groupId].location).toBe('Lisbon, Portugal')
+  })
+
+  it('UPDATE_STORY_FIELD writes date and clears via null', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: groupId,
+      field: 'date',
+      value: '2026-04-15',
+    })
+    expect(s.storyGroupsById[groupId].date).toBe('2026-04-15')
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: groupId,
+      field: 'date',
+      value: null,
+    })
+    expect(s.storyGroupsById[groupId].date).toBeNull()
+  })
+
+  it('UPDATE_STORY_FIELD throws on unknown storyGroupId', () => {
+    expect(() =>
+      v3Reducer(freshState(), {
+        type: 'UPDATE_STORY_FIELD',
+        storyGroupId: 'no-such-cluster',
+        field: 'location',
+        value: 'Lisbon',
+      }),
+    ).toThrowError(/update_story_field_invalid/)
+  })
+
+  it('SPLIT_CLUSTER inherits location + date on the new cluster', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Source' })
+    const sourceId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: sourceId,
+      field: 'location',
+      value: 'Lisbon, Portugal',
+    })
+    s = v3Reducer(s, {
+      type: 'UPDATE_STORY_FIELD',
+      storyGroupId: sourceId,
+      field: 'date',
+      value: '2026-04-15',
+    })
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: sourceId })
+    s = v3Reducer(s, {
+      type: 'SPLIT_CLUSTER',
+      clusterId: sourceId,
+      assetIds: ['a'],
+      newClusterName: 'Split off',
+    })
+    const newId = s.storyGroupOrder[1]
+    expect(s.storyGroupsById[newId].location).toBe('Lisbon, Portugal')
+    expect(s.storyGroupsById[newId].date).toBe('2026-04-15')
+  })
+
+  it('REMOVE_FILE strips the assetId from any cluster proposedAssetIds + sequence + coverAssetId', () => {
+    let s = v3Reducer(freshState(), { type: 'CREATE_STORY_GROUP', name: 'Lisbon' })
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId: groupId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId: groupId })
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: 'a' })
+    expect(s.storyGroupsById[groupId].coverAssetId).toBe('a')
+    s = v3Reducer(s, { type: 'REMOVE_FILE', assetId: 'a' })
+    expect(s.assetsById.a).toBeUndefined()
+    expect(s.storyGroupsById[groupId].proposedAssetIds).toEqual(['b'])
+    expect(s.storyGroupsById[groupId].sequence).toEqual(['b'])
+    expect(s.storyGroupsById[groupId].coverAssetId).toBeNull()
+  })
 })
 
 // ── Asset field editing ──────────────────────────────────────────
@@ -452,6 +668,141 @@ describe('asset field editing', () => {
     expect(s.assetsById.a.editable.licences).toEqual(['editorial', 'web'])
   })
 
+  // ── D2.9 Move 8 — metadataSource side effects on creator writes ──
+  //
+  // The reducer flips editable.metadataSource[field] to 'creator' for any
+  // creator-authored field write (UPDATE_ASSET_FIELD or BULK_UPDATE_FIELD).
+  // This drives FieldProvenanceTag's "Edited by creator" vs "AI generated"
+  // rendering in the inspector. The approve flow (clicking ✓ on an AI-
+  // generated field) is just UPDATE_ASSET_FIELD with the existing proposal
+  // value — same dispatch, same source flip — so re-affirming an AI value
+  // also transfers ownership to the creator without any new action type.
+
+  it('UPDATE_ASSET_FIELD sets metadataSource[field] = "creator"', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    expect(s.assetsById.a.editable.metadataSource.title).toBeUndefined()
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'title',
+      value: 'A creator-typed title',
+    })
+    expect(s.assetsById.a.editable.metadataSource.title).toBe('creator')
+  })
+
+  it('UPDATE_ASSET_FIELD does not disturb other fields metadataSource', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    // Seed an AI-source on description (simulates post-hydration auto-accept).
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            description: 'AI caption',
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, description: 'ai' },
+          },
+        },
+      },
+    }
+    // Creator edits a different field (title).
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'title',
+      value: 'A title',
+    })
+    expect(s.assetsById.a.editable.metadataSource.title).toBe('creator')
+    expect(s.assetsById.a.editable.metadataSource.description).toBe('ai')
+  })
+
+  it('UPDATE_ASSET_FIELD re-affirming an AI value flips source to "creator" (approve flow)', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    // Seed an AI-source caption (the ✓ approve button dispatches
+    // UPDATE_ASSET_FIELD with the same proposal value; ownership transfers).
+    const aiCaption = 'AI-suggested caption text'
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            description: aiCaption,
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, description: 'ai' },
+          },
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'UPDATE_ASSET_FIELD',
+      assetId: 'a',
+      field: 'description',
+      value: aiCaption, // unchanged value — pure ownership transfer
+    })
+    expect(s.assetsById.a.editable.description).toBe(aiCaption)
+    expect(s.assetsById.a.editable.metadataSource.description).toBe('creator')
+  })
+
+  it('BULK_UPDATE_FIELD sets metadataSource[field] = "creator" for every affected asset', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'c', filename: 'c.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    // Seed AI-source on tags for two of the three to confirm the bulk write
+    // overwrites prior 'ai' source with 'creator' (transfer of ownership).
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            tags: ['ai-suggested'],
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, tags: 'ai' },
+          },
+        },
+        b: {
+          ...s.assetsById.b,
+          editable: {
+            ...s.assetsById.b.editable,
+            tags: ['ai-suggested'],
+            metadataSource: { ...s.assetsById.b.editable.metadataSource, tags: 'ai' },
+          },
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'BULK_UPDATE_FIELD',
+      assetIds: ['a', 'b', 'c'],
+      field: 'tags',
+      value: ['protest', 'climate'],
+    })
+    expect(s.assetsById.a.editable.tags).toEqual(['protest', 'climate'])
+    expect(s.assetsById.b.editable.tags).toEqual(['protest', 'climate'])
+    expect(s.assetsById.c.editable.tags).toEqual(['protest', 'climate'])
+    expect(s.assetsById.a.editable.metadataSource.tags).toBe('creator')
+    expect(s.assetsById.b.editable.metadataSource.tags).toBe('creator')
+    expect(s.assetsById.c.editable.metadataSource.tags).toBe('creator')
+  })
+
   it('TOGGLE_ASSET_EXCLUDED flips excluded', () => {
     let s = v3Reducer(freshState(), {
       type: 'ADD_FILES',
@@ -503,6 +854,123 @@ describe('asset field editing', () => {
     expect(s.assetsById.a.conflicts[0].resolvedBy).toBe('creator')
     expect(s.assetsById.a.conflicts[0].resolvedValue).toBe('IPTC headline')
     expect(s.assetsById.a.editable.title).toBe('IPTC headline')
+  })
+
+  // ── D2.9 Move 8 (B-scope) — metadataSource flips for the 3 additional ──
+  // creator-authoritative editable mutations beyond UPDATE_ASSET_FIELD /
+  // BULK_UPDATE_FIELD. These were originally out of D2.9's strict scope but
+  // expanded per founder ratification (option B): every reducer case that
+  // mutates editable[field] via a creator action flips metadataSource[field]
+  // to 'creator' for V2 parity (v2-state.ts:529/548/577) and to keep
+  // FieldProvenanceTag's "Edited by creator" rendering correct in 3 paths
+  // that the strict scope would have left as buggy "AI generated" reads.
+
+  it('RESOLVE_CONFLICT also flips metadataSource[field] to "creator"', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [{ id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null }],
+    })
+    // Seed an AI-source on description (e.g., from auto-accept hydration)
+    // alongside a conflict on the same field.
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            description: 'AI-suggested caption',
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, description: 'ai' },
+          },
+          conflicts: [
+            {
+              field: 'description',
+              embeddedValue: 'IPTC caption',
+              aiValue: 'AI-suggested caption',
+              aiConfidence: 0.85,
+              resolvedBy: null,
+              resolvedValue: null,
+            },
+          ],
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'RESOLVE_CONFLICT',
+      assetId: 'a',
+      field: 'description',
+      value: 'IPTC caption',
+    })
+    expect(s.assetsById.a.editable.description).toBe('IPTC caption')
+    expect(s.assetsById.a.editable.metadataSource.description).toBe('creator')
+  })
+
+  it('BULK_EDIT_CAPTION_TEMPLATE flips metadataSource.description to "creator" cluster-wide', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'c', filename: 'c.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    // Create a story group; assign 'a' and 'b' (not 'c') to it.
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const clusterId = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId })
+    // Seed AI-source on description for 'a' to confirm the bulk write
+    // overwrites prior 'ai' source with 'creator'.
+    s = {
+      ...s,
+      assetsById: {
+        ...s.assetsById,
+        a: {
+          ...s.assetsById.a,
+          editable: {
+            ...s.assetsById.a.editable,
+            description: 'AI caption',
+            metadataSource: { ...s.assetsById.a.editable.metadataSource, description: 'ai' },
+          },
+        },
+      },
+    }
+    s = v3Reducer(s, {
+      type: 'BULK_EDIT_CAPTION_TEMPLATE',
+      clusterId,
+      template: 'Lisbon Climate March, March 2026',
+    })
+    expect(s.assetsById.a.editable.description).toBe('Lisbon Climate March, March 2026')
+    expect(s.assetsById.b.editable.description).toBe('Lisbon Climate March, March 2026')
+    expect(s.assetsById.a.editable.metadataSource.description).toBe('creator')
+    expect(s.assetsById.b.editable.metadataSource.description).toBe('creator')
+    // 'c' is outside the cluster — untouched.
+    expect(s.assetsById.c.editable.description).toBe('')
+    expect(s.assetsById.c.editable.metadataSource.description).toBeUndefined()
+  })
+
+  it('BULK_SET_PRICE_FOR_CLUSTER flips metadataSource.price to "creator" cluster-wide', () => {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: [
+        { id: 'a', filename: 'a.jpg', fileSize: 100, format: 'photo', file: null },
+        { id: 'b', filename: 'b.jpg', fileSize: 100, format: 'photo', file: null },
+      ],
+    })
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'Lisbon March' })
+    const clusterId = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'a', clusterId })
+    s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: 'b', clusterId })
+    s = v3Reducer(s, {
+      type: 'BULK_SET_PRICE_FOR_CLUSTER',
+      clusterId,
+      priceCents: 24000,
+    })
+    expect(s.assetsById.a.editable.price).toBe(24000)
+    expect(s.assetsById.b.editable.price).toBe(24000)
+    expect(s.assetsById.a.editable.metadataSource.price).toBe('creator')
+    expect(s.assetsById.b.editable.metadataSource.price).toBe('creator')
   })
 })
 
@@ -656,6 +1124,205 @@ describe('RESOLVE_DUPLICATE', () => {
   })
 })
 
+// ── D2.1 — Story cover + sequence + zoom + left rail + compare ───
+//
+// Per UX-SPEC-V4 §15.4 + D2.1-DIRECTIVE §4. Six new actions; happy-path
+// + invariant throws per IPD1-7 default = (a).
+
+describe('D2.1: SET_STORY_COVER', () => {
+  function withGroupAndAssets() {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ['a', 'b'].map(id => ({
+        id,
+        filename: `${id}.jpg`,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'My story' })
+    return s
+  }
+
+  it('writes coverAssetId on the named story', () => {
+    let s = withGroupAndAssets()
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: 'a' })
+    expect(s.storyGroupsById[groupId].coverAssetId).toBe('a')
+  })
+
+  it('clears cover when assetId is null', () => {
+    let s = withGroupAndAssets()
+    const groupId = s.storyGroupOrder[0]
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: 'a' })
+    s = v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: null })
+    expect(s.storyGroupsById[groupId].coverAssetId).toBeNull()
+  })
+
+  it('THROWS set_story_cover_invalid_group on unknown storyGroupId', () => {
+    const s = withGroupAndAssets()
+    expect(() =>
+      v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: 'ghost', assetId: 'a' }),
+    ).toThrowError(/set_story_cover_invalid_group/)
+  })
+
+  it('THROWS set_story_cover_invalid_asset on unknown assetId', () => {
+    const s = withGroupAndAssets()
+    const groupId = s.storyGroupOrder[0]
+    expect(() =>
+      v3Reducer(s, { type: 'SET_STORY_COVER', storyGroupId: groupId, assetId: 'ghost' }),
+    ).toThrowError(/set_story_cover_invalid_asset/)
+  })
+})
+
+describe('D2.1: REORDER_ASSETS_IN_STORY', () => {
+  function withGroupContaining(ids: string[]) {
+    let s = v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ids.map(id => ({
+        id,
+        filename: `${id}.jpg`,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+    s = v3Reducer(s, { type: 'CREATE_STORY_GROUP', name: 'My story' })
+    const groupId = s.storyGroupOrder[0]
+    for (const id of ids) {
+      s = v3Reducer(s, { type: 'MOVE_ASSET_TO_CLUSTER', assetId: id, clusterId: groupId })
+    }
+    // Seed the sequence so REORDER_ASSETS_IN_STORY has membership to compare.
+    const group = s.storyGroupsById[groupId]
+    s = {
+      ...s,
+      storyGroupsById: {
+        ...s.storyGroupsById,
+        [groupId]: { ...group, sequence: [...ids] },
+      },
+    }
+    return { state: s, groupId }
+  }
+
+  it('replaces sequence with new order', () => {
+    const { state, groupId } = withGroupContaining(['a', 'b', 'c'])
+    const s = v3Reducer(state, {
+      type: 'REORDER_ASSETS_IN_STORY',
+      storyGroupId: groupId,
+      sequence: ['c', 'a', 'b'],
+    })
+    expect(s.storyGroupsById[groupId].sequence).toEqual(['c', 'a', 'b'])
+  })
+
+  it('THROWS reorder_assets_invalid_group on unknown storyGroupId', () => {
+    const { state } = withGroupContaining(['a', 'b'])
+    expect(() =>
+      v3Reducer(state, {
+        type: 'REORDER_ASSETS_IN_STORY',
+        storyGroupId: 'ghost',
+        sequence: ['a', 'b'],
+      }),
+    ).toThrowError(/reorder_assets_invalid_group/)
+  })
+
+  it('THROWS reorder_assets_set_mismatch when membership differs', () => {
+    const { state, groupId } = withGroupContaining(['a', 'b', 'c'])
+    expect(() =>
+      v3Reducer(state, {
+        type: 'REORDER_ASSETS_IN_STORY',
+        storyGroupId: groupId,
+        sequence: ['a', 'b'], // missing 'c'
+      }),
+    ).toThrowError(/reorder_assets_set_mismatch/)
+  })
+})
+
+describe('D2.1: SET_CONTACT_SHEET_ZOOM', () => {
+  it('writes zoom 1-5', () => {
+    let s = freshState()
+    s = v3Reducer(s, { type: 'SET_CONTACT_SHEET_ZOOM', zoom: 5 })
+    expect(s.ui.contactSheetZoom).toBe(5)
+    s = v3Reducer(s, { type: 'SET_CONTACT_SHEET_ZOOM', zoom: 1 })
+    expect(s.ui.contactSheetZoom).toBe(1)
+  })
+
+  it('THROWS set_contact_sheet_zoom_invalid on out-of-range', () => {
+    const s = freshState()
+    expect(() =>
+      v3Reducer(s, { type: 'SET_CONTACT_SHEET_ZOOM', zoom: 0 as never }),
+    ).toThrowError(/set_contact_sheet_zoom_invalid/)
+    expect(() =>
+      v3Reducer(s, { type: 'SET_CONTACT_SHEET_ZOOM', zoom: 6 as never }),
+    ).toThrowError(/set_contact_sheet_zoom_invalid/)
+  })
+})
+
+describe('D2.1: TOGGLE_LEFT_RAIL_COLLAPSED', () => {
+  it('flips the collapsed state', () => {
+    let s = freshState()
+    expect(s.ui.leftRailCollapsed).toBe(false)
+    s = v3Reducer(s, { type: 'TOGGLE_LEFT_RAIL_COLLAPSED' })
+    expect(s.ui.leftRailCollapsed).toBe(true)
+    s = v3Reducer(s, { type: 'TOGGLE_LEFT_RAIL_COLLAPSED' })
+    expect(s.ui.leftRailCollapsed).toBe(false)
+  })
+})
+
+describe('D2.1: ENTER_COMPARE_MODE / EXIT_COMPARE_MODE', () => {
+  function withTwoAssets() {
+    return v3Reducer(freshState(), {
+      type: 'ADD_FILES',
+      files: ['a', 'b'].map(id => ({
+        id,
+        filename: `${id}.jpg`,
+        fileSize: 100,
+        format: 'photo' as const,
+        file: null,
+      })),
+    })
+  }
+
+  it('writes compareAssetIds for length-2', () => {
+    const s = v3Reducer(withTwoAssets(), {
+      type: 'ENTER_COMPARE_MODE',
+      assetIds: ['a', 'b'],
+    })
+    expect(s.ui.compareAssetIds).toEqual(['a', 'b'])
+  })
+
+  it('THROWS compare_invalid_count when length !== 2 (per IPV4-3 = a strict 2-only)', () => {
+    const s = withTwoAssets()
+    expect(() => v3Reducer(s, { type: 'ENTER_COMPARE_MODE', assetIds: ['a'] })).toThrowError(
+      /compare_invalid_count/,
+    )
+    expect(() =>
+      v3Reducer(s, { type: 'ENTER_COMPARE_MODE', assetIds: ['a', 'b', 'c' as never] }),
+    ).toThrowError(/compare_invalid_count/)
+  })
+
+  it('THROWS compare_invalid_asset on unknown id', () => {
+    const s = withTwoAssets()
+    expect(() =>
+      v3Reducer(s, { type: 'ENTER_COMPARE_MODE', assetIds: ['a', 'ghost'] }),
+    ).toThrowError(/compare_invalid_asset/)
+  })
+
+  it('EXIT_COMPARE_MODE clears compareAssetIds', () => {
+    let s = v3Reducer(withTwoAssets(), {
+      type: 'ENTER_COMPARE_MODE',
+      assetIds: ['a', 'b'],
+    })
+    s = v3Reducer(s, { type: 'EXIT_COMPARE_MODE' })
+    expect(s.ui.compareAssetIds).toEqual([])
+  })
+
+  it('EXIT_COMPARE_MODE is idempotent (no throw on already-empty)', () => {
+    const s = freshState()
+    expect(() => v3Reducer(s, { type: 'EXIT_COMPARE_MODE' })).not.toThrow()
+  })
+})
+
 // ── Commit flow state machine ────────────────────────────────────
 
 describe('commit flow state machine', () => {
@@ -734,6 +1401,24 @@ describe('filter / sort / search actions', () => {
   it('SET_FILTER_PRESET writes preset', () => {
     const s = v3Reducer(freshState(), { type: 'SET_FILTER_PRESET', preset: 'blocking' })
     expect(s.ui.filter.preset).toBe('blocking')
+  })
+
+  // D2.2 IPD2-14: SET_FILTER_PRESET also clears storyGroupId.
+  // Intent: clicking a category chip means "filter by category, not by
+  // story". User re-applies story filter by clicking a story header in
+  // the left rail (which dispatches SET_FILTER { storyGroupId }).
+  it('SET_FILTER_PRESET clears storyGroupId (D2.2 IPD2-14)', () => {
+    let s = freshState()
+    // Seed: pretend user previously selected a story bucket.
+    s = {
+      ...s,
+      ui: { ...s.ui, filter: { ...s.ui.filter, storyGroupId: 'g-prev' } },
+    }
+    expect(s.ui.filter.storyGroupId).toBe('g-prev')
+
+    s = v3Reducer(s, { type: 'SET_FILTER_PRESET', preset: 'all' })
+    expect(s.ui.filter.preset).toBe('all')
+    expect(s.ui.filter.storyGroupId).toBeNull()
   })
 
   it('SET_SORT writes field+direction', () => {

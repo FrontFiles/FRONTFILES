@@ -65,6 +65,7 @@ export function hydrateFromScenario(
         privacy: null,
         licences: [],
         price: null,
+        socialLicensable: false,
         metadataSource: {},
       },
       conflicts: [],
@@ -288,6 +289,10 @@ function addStoryGroupProposals(
       rationale: gt.rationale,
       confidence: gt.confidence,
       createdAt: new Date().toISOString(),
+      // D2.10 — story-level metadata defaults; scenario fixtures don't
+      // currently carry location/date templates.
+      location: '',
+      date: null,
     }
     storyGroupOrder.push(groupId)
   }
