@@ -28,7 +28,7 @@
 
 'use client'
 
-import { useCallback, useReducer, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useId, useReducer, useRef, useState, type DragEvent } from 'react'
 import {
   DndContext,
   PointerSensor,
@@ -84,6 +84,17 @@ export default function UploadShell({
   // (no movement) still register as clicks; only mouse-down + drag past
   // the threshold initiates a drag. Prevents accidental drags on click.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  // D2.10 follow-up — stable DndContext id seeded via React.useId() so the
+  // accessibility-id counter (`DndDescribedBy-N`) produces matching values
+  // on the server and the client. Without this, dnd-kit's internal counter
+  // starts at 0 in both environments but increments at different points
+  // depending on hydration order, producing the cosmetic
+  //   "A tree hydrated but some attributes of the server rendered HTML
+  //    didn't match the client properties"
+  // warning on every <DraggableGridCell>. useId() is the canonical React
+  // 18+ fix for SSR/CSR id-stability problems.
+  const dndContextId = useId()
 
   // ── D2.7 file ingest plumbing ────────────────────────────────
   //
@@ -356,7 +367,7 @@ export default function UploadShell({
   return (
     <UploadContextProvider state={state} dispatch={dispatch}>
       <FileIngestProvider value={{ openFilePicker }}>
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <DndContext id={dndContextId} sensors={sensors} onDragEnd={handleDragEnd}>
           <div
             // D2.5b (round 6): h-full + min-h-0. Both required:
             // - h-full sets height: 100% of parent (workspace flex-1)
