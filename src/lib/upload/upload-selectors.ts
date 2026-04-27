@@ -56,7 +56,7 @@ export interface DefaultsView {
  *
  * Three states (per UX-SPEC-V4 §2 + the external-review correction
  * captured in §2.0.1):
- *   'empty'      — no assets yet; UploadShellV4 renders EmptyState
+ *   'empty'      — no assets yet; UploadShell renders EmptyState
  *   'workspace'  — assets present; three-pane shell with placeholders/content
  *   'comparing'  — Compare mode active (compareAssetIds.length === 2 per IPV4-3)
  *

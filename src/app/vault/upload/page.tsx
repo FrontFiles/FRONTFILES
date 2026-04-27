@@ -23,7 +23,7 @@ import { CreatorGate } from '@/components/platform/CreatorGate'
 // is now dormant (per D2.1 §8 dormant-flag pass) and is no longer imported
 // from any production code path. Rollback safety: flip this import back
 // to './_components/UploadShell' to revert.
-import UploadShellV4 from './_components_v4/UploadShellV4'
+import UploadShell from './_components/UploadShell'
 import { SCENARIO_IDS, type ScenarioId } from '@/lib/upload/v2-scenario-registry'
 
 export const dynamic = 'force-dynamic'
@@ -79,7 +79,7 @@ export default async function UploadPage({
           lets descendants grow beyond viewport bounds and breaks the
           right-rail inspector's overflow-y-auto scroll chain. */}
       <div className="flex-1 bg-white flex flex-col min-h-0">
-        <UploadShellV4
+        <UploadShell
           batchId={batchId}
           devScenarioId={devScenarioId}
           devSimulateFailure={devSimulateFailure}
