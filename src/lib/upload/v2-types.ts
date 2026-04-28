@@ -128,6 +128,21 @@ export interface StoryCandidate {
 }
 
 // ── Asset Proposal (system-generated, read-only) ──
+//
+// Multi-pillar aggregator. Different fields come from different sources:
+//   AI pipeline:    description (caption), tags, keywords, cluster_id +
+//                   per-field confidences (E6 §6.2)
+//   Price engine:   priceSuggestion (Phase F)
+//   Privacy infer.: privacySuggestion (separate pillar; currently sim)
+//   Licence infer.: licenceSuggestions (separate pillar; currently sim)
+//   EXIF GPS:       geography (NOT AI per E6 §6.5)
+//   Synthesized:    rationale (deterministic per E6 §6.3; not AI-generated)
+//
+// E6.A widened additively — old `confidence` field stays for backward-compat
+// (populated as MAX-of-per-field by hydration) so V4 components that read
+// `proposal.confidence` continue to work without churn. New per-field
+// confidences are optional; callers that want per-field UX should prefer
+// them over the overall.
 
 export interface AssetProposal {
   title: string
@@ -137,9 +152,21 @@ export interface AssetProposal {
   priceSuggestion: V2PriceSuggestion | null
   privacySuggestion: PrivacyState | null
   licenceSuggestions: LicenceType[]
-  confidence: number      // 0-1, overall metadata confidence
+  /** @deprecated v1 single overall; use per-field confidences when available. */
+  confidence: number      // 0-1, overall metadata confidence (MAX-of-per-field at hydration)
   rationale: string
   storyCandidates: StoryCandidate[]
+
+  // ── E6 widening (additive; per E6 §6.2) ──
+  /** Per-field confidence — caption (V4 store calls it 'description'). */
+  description_confidence?: number
+  /** AI-suggested keywords; missing in pre-E3 simulation fixtures. */
+  keywords?: string[]
+  keywords_confidence?: number
+  tags_confidence?: number
+  /** AI clustering reference (E5). NULL until clustering runs. */
+  cluster_id?: string | null
+  cluster_confidence?: number | null
 }
 
 // ── Asset Editable Fields (creator-authoritative) ──
