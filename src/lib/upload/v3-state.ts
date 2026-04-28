@@ -26,6 +26,7 @@ import type {
   V2StoryGroup,
   V2Defaults,
   AssetEditableFields,
+  AssetProposal,
 } from './v3-types'
 import { getFilteredSortedSearchedAssets } from './upload-selectors'
 

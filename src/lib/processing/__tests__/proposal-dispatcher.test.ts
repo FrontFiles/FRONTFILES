@@ -11,16 +11,21 @@ const mockSelectClaim = vi.fn(() => ({ maybeSingle: mockMaybeSingleClaim }))
 const mockEqClaim = vi.fn(() => ({ eq: mockEqClaim, select: mockSelectClaim }))
 const mockUpdateClaim = vi.fn(() => ({ eq: mockEqClaim }))
 
+// vault_assets has two distinct query chains in the dispatcher path:
+//   - lookup: .from('vault_assets').select('format,creator_id,users!inner(ai_region)').eq('id',_).maybeSingle()
+//   - taxonomy: .from('vault_assets').select('tags').eq('creator_id',_).not('tags','is',null)
+// Both end on .eq() but diverge at the next call (maybeSingle vs not). Combine
+// both terminators on the shared mockEqLookup so either chain resolves.
 const mockMaybeSingleLookup = vi.fn()
-const mockEqLookup = vi.fn(() => ({ maybeSingle: mockMaybeSingleLookup }))
+const mockNotTaxo = vi.fn().mockResolvedValue({ data: [], error: null })
+const mockEqLookup = vi.fn(() => ({
+  maybeSingle: mockMaybeSingleLookup,
+  not: mockNotTaxo,
+}))
 const mockSelectLookup = vi.fn(() => ({ eq: mockEqLookup }))
 
 const mockEqUpdate = vi.fn(() => Promise.resolve({ error: null }))
 const mockUpdateRow = vi.fn(() => ({ eq: mockEqUpdate }))
-
-const mockNotTaxo = vi.fn().mockResolvedValue({ data: [], error: null })
-const mockEqTaxo = vi.fn(() => ({ not: mockNotTaxo }))
-const mockSelectTaxo = vi.fn(() => ({ eq: mockEqTaxo }))
 
 const mockFrom = vi.fn((table: string) => {
   switch (table) {
@@ -78,6 +83,7 @@ const STORAGE_ADAPTER = {
   getBytes: vi.fn().mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff, 0xe0])),
   exists: vi.fn(),
   delete: vi.fn(),
+  signedPutUrl: vi.fn(),
 }
 
 const ASSET = '00000000-0000-0000-0000-000000000001'

@@ -38,7 +38,7 @@ describe('buildPrompt', () => {
   })
 
   it('throws on non-image format (defensive)', () => {
-    // @ts-expect-error testing unsupported format
+    // 'video' is a valid AssetFormat at type level; runtime rejects per format gate
     expect(() => buildPrompt('video', [])).toThrow(/unsupported format/)
   })
 })

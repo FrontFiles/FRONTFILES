@@ -32,12 +32,13 @@ const PROD_DEFAULTS = {
 beforeEach(() => {
   invalidateSettingsCache()
   mockSingle.mockResolvedValue({ data: PROD_DEFAULTS, error: null })
-  process.env.NODE_ENV = 'production' // disable dev multiplier for predictable caps
+  vi.stubEnv('NODE_ENV', 'production') // disable dev multiplier for predictable caps
   mockRpc.mockReset()
 })
 
 afterEach(() => {
   invalidateSettingsCache()
+  vi.unstubAllEnvs()
 })
 
 describe('checkSpendOrFail', () => {
@@ -48,9 +49,13 @@ describe('checkSpendOrFail', () => {
   })
 
   it('throws QuotaExceededError("daily") when daily cap reached', async () => {
-    mockRpc.mockResolvedValueOnce({ data: 50000, error: null }) // = cap
+    // mockResolvedValue (persistent) — function runs twice in this test so
+    // both invocations need the cap value. Was mockResolvedValueOnce in v1
+    // which exhausted after the first call and caused a destructure error
+    // on the second invocation.
+    mockRpc.mockResolvedValue({ data: 50000, error: null }) // = cap
     await expect(checkSpendOrFail()).rejects.toThrow(QuotaExceededError)
-    await expect(checkSpendOrFail.bind(null)).rejects.toThrow(/daily/)
+    await expect(checkSpendOrFail()).rejects.toThrow(/daily/)
   })
 
   it('throws QuotaExceededError("monthly") when monthly cap reached', async () => {

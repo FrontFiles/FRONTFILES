@@ -99,7 +99,11 @@ export function getStripeClient(): Stripe {
     throw new Error('Stripe not configured. Set STRIPE_SECRET_KEY.')
   }
   _client = new Stripe(key, {
-    apiVersion: '2026-04-22.dahlia',
+    // Pinned to the Stripe SDK's expected default API version. The SDK
+    // types reject any other apiVersion string, so this must follow the
+    // installed @stripe/stripe-node version. Bump together when upgrading
+    // the SDK (matches the cleanup pattern from PR #16's Stripe drift fix).
+    apiVersion: '2026-03-25.dahlia',
     typescript: true,
   })
   return _client
