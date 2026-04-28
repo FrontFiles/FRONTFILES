@@ -1,13 +1,15 @@
 # Frontfiles Price Engine — Architecture Brief
 
-**Status:** DRAFT v3 — awaiting founder ratification before any Phase F directive composes
-**Date:** 2026-04-26 (third revision same day, after second external review)
+**Status:** REVISED v4 2026-04-28 (post-L1-v2 corrigendum) — v3 was ratified 2026-04-26; v4 awaits founder ratification before L5 implementation composes. v4 applies L1 (Licence Taxonomy Brief) v2 + α decision changes to §4.1 + §4.3 + §4.4 + §4.5: engine returns `AssetRecommendations` (one wrapper + N per-class `Recommendation` entries), CC class uses absolute-price branch (discriminated union), `pricing_recommendations` schema gains `licence_class` column. See §13 v4 entry.
+**Date:** 2026-04-26 (v3); 2026-04-28 (v4)
 **Scope:** Frontfiles pricing platform — recommendation engine, integration surfaces, governance, consolidation of existing pricing logic
 **Governs:** Phase F (price engine) — runs in parallel with Phases B (backend), C (UI rebuild), and E (AI suggestion pipeline) of the upload rebuild
 **Supersedes:**
-  - v1 (same date, earliest) — treated external benchmarks as a deferred runtime adapter; wrong for FF's internal-only-at-runtime posture
-  - v2 (same date, after first review) — fixed external benchmarks framing but had a residual contradiction in §5.4 (still mentioned an "external benchmarks opt-in" toggle gated by a non-existent F6 directive); also bundled all 5 audit events in v1 when `recommendation_shown` is high-noise/low-value and belongs in v2
+  - v1 (2026-04-26) — treated external benchmarks as a deferred runtime adapter; wrong for FF's internal-only-at-runtime posture
+  - v2 (2026-04-26) — fixed external benchmarks framing but had a residual contradiction in §5.4 (still mentioned an "external benchmarks opt-in" toggle gated by a non-existent F6 directive); also bundled all 5 audit events in v1 when `recommendation_shown` is high-noise/low-value and belongs in v2
+  - v3 (2026-04-26, ratified) — assumed single-`Recommendation`-per-asset shape; superseded by v4 after L1 v2 introduced multi-class licence taxonomy that requires `Recommendation[]` per asset
 **v3 changes:** §5.4 restructured into v1/v2 control sets with no external benchmarks toggle; §7.2 audit trail split into 4 v1 events + 1 v2 event (`recommendation_shown` deferred); §8 F2.5 snapshots softened to "optional v2+" rather than firm v2 commitment; §5.4 weight tuning UI deferred to v2 (schema provisioned in v1); §11 don't-do list extended with three guards against premature code work and v1 over-exposure
+**v4 changes:** §4.1 recommendPrice signature returns `AssetRecommendations` (was single `Recommendation`); §4.3 composer iterates per enabled licence_class (one Recommendation per class, plus a CC-specific branch for absolute pricing); §4.4 output shape replaced with discriminated-union `StandardRecommendation | CcRecommendation` wrapped in `AssetRecommendations`; §4.5 schema adds `licence_class TEXT NOT NULL` to `pricing_recommendations` with new UNIQUE on `(asset_id, licence_class, generated_at)`. No architectural change to authority model (§3 F2), trust posture (§7), or surfaces (§5) — only the SHAPE of the engine's output changes per L1 v2 + α decision (`Recommendation[]` per asset, with the buyer picking ONE class+sublabel+tier tuple at checkout).
 **Reads underlying:** `docs/upload/UX-BRIEF.md` v3, `src/lib/offer/pricing.ts`, `src/app/vault/pricing/page.tsx`, `src/lib/types.ts`, `src/lib/special-offer/`, `vault_assets` schema
 
 ---
@@ -72,21 +74,27 @@ The engine is **additive**, not a replacement. It sits upstream of the existing 
 
 ## 4. Engine architecture
 
-### 4.1 Pure recommendation function
+### 4.1 Pure recommendation function (v4)
 
 The engine's core is a pure function:
 
 ```
-recommendPrice(asset, context) → Recommendation
+recommendPrice(asset, context) → AssetRecommendations
 ```
 
 Where:
 
-- `asset` is a `VaultAsset` (format, format_family, dimensions, intrusion_level, declaration_state, creator_id, capture_date, geography, tags)
+- `asset` is a `VaultAsset` (format, intrusion_level, declaration_state, creator_id, capture_date, geography, tags, **enabled_licences** — the SET of dotted `class.sublabel` entries per L1 v2)
 - `context` includes the current timestamp, the creator's pricing settings (§4.6), the platform's current multiplier table, and any explicit basis-weight overrides
-- `Recommendation` is the output shape (§4.4)
+- `AssetRecommendations` is the output shape (§4.4) — a wrapper carrying ONE `Recommendation` entry per enabled licence_class on the asset (zero or more standard-class entries + zero or one CC entry, depending on what the creator enabled)
 
-The function is deterministic given its inputs and the snapshot of input data at call time. Reproducibility is a hard requirement: given the same asset + context + input snapshot, the engine returns the same recommendation. This is what makes the audit trail meaningful.
+The function is deterministic given its inputs and the snapshot of input data at call time. Reproducibility is a hard requirement: given the same asset + context + input snapshot, the engine returns the same set of per-class recommendations. This is what makes the audit trail meaningful.
+
+**Per-class iteration semantics (v4):** the engine groups enabled sublabels by class, then dispatches per-class:
+- For `editorial`, `commercial`, `advertising` — runs the standard composer (§4.3) producing a `StandardRecommendation` keyed on `(format, intrusion_level, licence_class)` against `pricing_format_defaults`, with sublabel + use_tier multipliers applied.
+- For `creative_commons` — does NOT run the standard composer; instead reads absolute prices from `pricing_cc_variants` for each enabled CC variant the creator has on this asset, producing a `CcRecommendation` (per L1 v2 §5.4 — CC pricing is variant-driven absolute, not adapter-composed).
+
+If the asset has no enabled licences, the engine returns `recommendations: []` (empty array). Creator must enable at least one licence before pricing is meaningful.
 
 ### 4.2 Input adapters (three runtime adapters; external as calibration only)
 
@@ -172,18 +180,49 @@ External market data is a **calibration input**, not a runtime adapter. The engi
 
 ### 4.3 Composer / weighting
 
-The composer takes the partial recommendations from enabled adapters and combines them into a single recommendation:
+The composer takes the partial recommendations from enabled adapters and combines them into a per-class `StandardRecommendation` (v4 — was a single `Recommendation` in v3).
+
+The composer runs **once per enabled non-CC licence class** on the asset. For an asset with `enabled_licences: ['editorial.news', 'commercial.brand_content']`, the composer runs twice (once for `editorial`, once for `commercial`). Creative Commons does NOT go through the composer — it uses absolute pricing per `pricing_cc_variants` (per L1 v2 §5.4 + §4.1 above).
 
 ```
-compose(partials, weights) → Recommendation {
-  recommendedCents: weighted average of partial.recommendedCents
+composeStandard(partials, weights, licence_class) → StandardRecommendation {
+  licence_class: 'editorial' | 'commercial' | 'advertising'
+  base_cents: weighted average of partial.recommendedCents (against pricing_format_defaults
+    cell for (format, intrusion_level, licence_class))
   confidence: aggregate confidence (lowest of contributing adapters, weighted)
-  basisBreakdown: [
-    { adapter: 'creator_history', weight: 0.5, contribution: cents, sampleSize, basisStatement }
-    { adapter: 'frontfiles_comparables', weight: 0.3, contribution: cents, sampleSize, basisStatement }
-    { adapter: 'format_defaults', weight: 0.2, contribution: cents, basisStatement }
+  basis_breakdown: [
+    { adapter: 'creator_history', weight: 0.5, contribution_cents, sample_size, basis_statement }
+    { adapter: 'frontfiles_comparables', weight: 0.3, contribution_cents, sample_size, basis_statement }
+    { adapter: 'format_defaults', weight: 0.2, contribution_cents, basis_statement }
   ]
-  basisSummary: human-readable composite, e.g. "Recommended €240. Based primarily on your past sales of similar photos (7 sales, median €230), supported by Frontfiles comparables (28 similar assets, median €260) and standard rate for major-publication editorial photos."
+  // Per L1 v2 γ: full N×4 tier matrix surfaced at upload
+  tier_matrix: [
+    { use_tier: 'tier_1', recommended_cents: base × use_tier_multiplier(class, 'tier_1') × default_sublabel_multiplier }
+    { use_tier: 'tier_2', recommended_cents: base × 1.0 × default_sublabel_multiplier }   // anchor
+    { use_tier: 'tier_3', recommended_cents: base × use_tier_multiplier(class, 'tier_3') × default_sublabel_multiplier }
+    { use_tier: 'tier_4', recommended_cents: base × use_tier_multiplier(class, 'tier_4') × default_sublabel_multiplier }
+  ]
+  // Per-sublabel breakdown (one row per enabled sublabel in this class on the asset)
+  sublabel_prices: [
+    { sublabel: 'editorial.news', multiplier: 1.000, base_at_anchor_tier: base × 1.000 }
+    ...
+  ]
+  basis_summary: human-readable composite, e.g. "Editorial: recommended €240 base (mid_pub anchor tier). Based primarily on your past sales of similar photos (7 sales, median €230), supported by standard rate for editorial-class photos at standard intrusion. Tier matrix: small_pub €120 / mid_pub €240 / major_pub €480 / wire €720."
+}
+```
+
+For Creative Commons, no composition is done — the CC branch directly reads from `pricing_cc_variants`:
+
+```
+buildCc(asset_enabled_cc_sublabels, currency) → CcRecommendation {
+  licence_class: 'creative_commons'
+  cc_variants: [
+    { cc_variant: 'cc_by', price_cents: <absolute from pricing_cc_variants> }
+    { cc_variant: 'cc_by_nc', price_cents: <absolute from pricing_cc_variants> }
+    ... (one entry per enabled CC variant on this asset)
+  ]
+  basis_summary: e.g. "Creative Commons absolute prices: CC0 free, CC-BY €5, CC-BY-NC €40."
+  model_version: <version string>
 }
 ```
 
@@ -198,40 +237,88 @@ Default weights (v2, after `frontfiles_comparables` ships):
 
 If the creator has set custom weights via pricing admin (§5.4), those override the defaults. If all data-driven adapters return null (new creator, no comparables match), the composer falls back to `format_defaults` only and emits a recommendation with explicit "limited data — Frontfiles standard rate" basis statement. The recommendation is still emitted; absence of data does not silently fail.
 
-### 4.4 Output shape
+### 4.4 Output shape (v4 — discriminated union per licence class, wrapped in `AssetRecommendations`)
+
+The engine returns ONE `AssetRecommendations` wrapper per call, carrying ZERO OR MORE `Recommendation` entries — one per enabled licence_class on the asset. Per L1 v2 §5.6 (α decision), this replaces v3's single-`Recommendation`-per-asset shape.
 
 ```typescript
-type Recommendation = {
+type AssetRecommendations = {
   asset_id: string
   generated_at: ISODateTime
-  recommended_cents: number
   currency: string                    // matches creator's preferred currency
+  recommendations: Recommendation[]   // one per enabled licence_class on the asset
+  model_version: string               // engine version + adapter versions (shared across all per-class recommendations)
+  input_snapshot_id: UUID | null      // FK to pricing_inputs table for reproducibility (v2+; null in v1)
+}
+
+// Discriminated union: one shape for editorial/commercial/advertising,
+// a separate shape for creative_commons (per L1 v2 §5.4 — absolute pricing).
+type Recommendation = StandardRecommendation | CcRecommendation
+
+type StandardRecommendation = {
+  type: 'standard'
+  licence_class: 'editorial' | 'commercial' | 'advertising'
+  base_cents: number                  // baseline from pricing_format_defaults at the (format, intrusion, class) cell
   confidence: number                  // 0..1
   basis_summary: string               // creator-readable composite (1-2 sentences)
   basis_breakdown: BasisContribution[]
-  comparables: Comparable[]           // drillable evidence (anonymized for cross-creator)
-  model_version: string               // engine version + adapter versions
-  input_snapshot_id: UUID             // FK to pricing_inputs table for reproducibility
+  // Per L1 v2 γ — full tier matrix shown at upload
+  tier_matrix: TierMatrixEntry[]      // 4 entries: tier_1..tier_4
+  // Per-sublabel breakdown (one entry per enabled sublabel on this asset within this class)
+  sublabel_prices: SublabelPrice[]
+  comparables: Comparable[]           // drillable evidence (anonymized for cross-creator; v2+)
+}
+
+type CcRecommendation = {
+  type: 'cc'
+  licence_class: 'creative_commons'
+  // Absolute prices per CC variant the creator has enabled on this asset
+  cc_variants: CcVariantPrice[]       // one entry per enabled creative_commons.* sublabel
+  basis_summary: string               // e.g., "Creative Commons absolute prices per variant"
+  // No basis_breakdown / tier_matrix / sublabel_prices for CC — CC pricing
+  // is variant-driven absolute, not adapter-composed.
 }
 
 type BasisContribution = {
   adapter: 'creator_history' | 'frontfiles_comparables' | 'format_defaults'
-  weight: number                      // 0..1, applied weight in this recommendation
-  contribution_cents: number          // this adapter's recommendation
+  weight: number                      // 0..1, applied weight
+  contribution_cents: number          // this adapter's contribution to base_cents
   confidence: number                  // this adapter's confidence
   sample_size: number
-  basis_statement: string             // adapter-specific human-readable basis
+  basis_statement: string
+}
+
+type TierMatrixEntry = {
+  use_tier: 'tier_1' | 'tier_2' | 'tier_3' | 'tier_4'
+  recommended_cents: number           // base_cents × use_tier_multiplier(class, tier) × default_sublabel_multiplier
+}
+
+type SublabelPrice = {
+  sublabel: string                    // dotted 'class.sublabel' per L1 v2 §4.2 (excluding CC)
+  multiplier: number                  // from pricing_sublabel_multipliers
+  base_at_anchor_tier: number         // base_cents × multiplier (at tier_2 anchor)
+}
+
+type CcVariantPrice = {
+  cc_variant: 'cc0' | 'cc_by' | 'cc_by_sa' | 'cc_by_nc' | 'cc_by_nd' | 'cc_by_nc_sa' | 'cc_by_nc_nd'
+  sublabel: string                    // 'creative_commons.cc0' etc. — full dotted form for round-trip with enabled_licences
+  price_cents: number                 // absolute from pricing_cc_variants
 }
 
 type Comparable = {
   comparable_id: UUID                 // not the underlying asset id (anonymization)
   format: string
   intrusion_level: string
+  licence_class: string               // v4: included for cohort matching
   sold_price_cents: number
   sold_at: ISODate                    // bucketed for anonymization (e.g., month, not day)
   context: 'creator_own' | 'frontfiles_anon' | 'format_default'  // 'frontfiles_anon' only appears in v2+
 }
 ```
+
+**Cart / offer / transaction state** carries the SINGLE (class, sublabel, use_tier) tuple the buyer picks at checkout, NOT the whole `AssetRecommendations` array. The array is the engine's output to the creator-facing UI for display + bulk-accept; the buyer-facing transaction picks one path through it.
+
+**Audit trail** (per §7.2): one `recommendation_generated` event per `AssetRecommendations` call (records `recommendation_id` referring to the parent row in `pricing_recommendations` per §4.5). Per-class generation is implied by the row's `licence_class` column. Creator accept/override/dismiss events reference a specific (asset_id, licence_class) tuple via the recommendation_id FK.
 
 ### 4.5 Schema additions
 
@@ -240,27 +327,47 @@ New tables in Phase F migrations. v1 ships three tables; v2 adds the snapshot ta
 **v1 tables (Phase F2):**
 
 ```sql
+-- v4: schema gains licence_class (one row per asset per licence_class per generation).
+-- Each AssetRecommendations call inserts N rows, one per enabled licence_class.
+-- For Creative Commons rows, base_cents is NULL and cc_variants JSONB carries the
+-- absolute prices (per L1 v2 §5.4 + §4.4 above).
+
 CREATE TABLE pricing_recommendations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_id UUID NOT NULL REFERENCES vault_assets(id) ON DELETE CASCADE,
+  licence_class TEXT NOT NULL,                -- v4: 'editorial' | 'commercial' | 'advertising' | 'creative_commons'
   generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  recommended_cents INTEGER NOT NULL,
+  -- Standard-class fields (NULL when licence_class = 'creative_commons')
+  base_cents INTEGER,                         -- v4: was 'recommended_cents' single column; now base; NULL for CC
+  tier_matrix JSONB,                          -- v4: TierMatrixEntry[] for standard; NULL for CC
+  sublabel_prices JSONB,                      -- v4: SublabelPrice[] for standard; NULL for CC
+  basis_breakdown JSONB,                      -- BasisContribution[] for standard; NULL for CC
+  -- CC-class fields (NULL for standard)
+  cc_variants JSONB,                          -- v4: CcVariantPrice[] for CC; NULL for standard
+  -- Common fields
   currency TEXT NOT NULL,
-  confidence NUMERIC(3,2) NOT NULL,           -- 0.00 to 1.00
+  confidence NUMERIC(3,2),                    -- 0.00 to 1.00 for standard; NULL for CC (CC is absolute, no confidence)
   basis_summary TEXT NOT NULL,
-  basis_breakdown JSONB NOT NULL,             -- BasisContribution[]
   comparables JSONB NOT NULL,                 -- Comparable[] (anonymized; empty in v1)
   model_version TEXT NOT NULL,
-  format_defaults_version INTEGER NOT NULL,   -- which format_defaults table version produced this (monotonic counter; matches pricing_format_defaults.table_version per F1 §3.1)
+  format_defaults_version INTEGER,            -- v4: NULL for CC (CC doesn't read format_defaults); INTEGER for standard
   input_snapshot_id UUID,                     -- nullable in v1; FK added in v2 when pricing_inputs ships
-  superseded_at TIMESTAMPTZ                   -- set when a newer recommendation is generated
+  superseded_at TIMESTAMPTZ,                  -- set when a newer recommendation is generated
+  CONSTRAINT pricing_recommendations_class_valid CHECK (
+    licence_class IN ('editorial', 'commercial', 'advertising', 'creative_commons')
+  ),
+  -- Discriminated-union enforcement: standard rows have base_cents + tier_matrix; CC rows have cc_variants
+  CONSTRAINT pricing_recommendations_shape CHECK (
+    (licence_class != 'creative_commons' AND base_cents IS NOT NULL AND tier_matrix IS NOT NULL AND cc_variants IS NULL) OR
+    (licence_class = 'creative_commons' AND base_cents IS NULL AND tier_matrix IS NULL AND cc_variants IS NOT NULL)
+  )
 );
 
-CREATE INDEX pricing_recommendations_asset_id_generated_at
-  ON pricing_recommendations(asset_id, generated_at DESC);
+CREATE INDEX pricing_recommendations_asset_class_generated
+  ON pricing_recommendations(asset_id, licence_class, generated_at DESC);
 
-CREATE INDEX pricing_recommendations_active
-  ON pricing_recommendations(asset_id) WHERE superseded_at IS NULL;
+CREATE UNIQUE INDEX pricing_recommendations_active
+  ON pricing_recommendations(asset_id, licence_class) WHERE superseded_at IS NULL;
 
 CREATE TABLE pricing_admin_settings (
   creator_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
