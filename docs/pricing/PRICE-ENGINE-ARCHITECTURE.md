@@ -1,6 +1,6 @@
 # Frontfiles Price Engine — Architecture Detail Brief (F1)
 
-**Status:** REVISED 2026-04-28 (post-ratification corrections; supersedes 2026-04-26 draft) — awaiting founder ratification of this revision before F2 (schema migration) composes
+**Status:** RATIFIED 2026-04-28 (post-corrections version landed via PR #20). F2 (schema migration) is gated on `PRICE-ENGINE-CALIBRATION-V1.md` (F1.5) Stage A ratification + Stage B calibration completion per F1.5 §13 — NOT on this brief, which is locked. Status block updated in the AI-track status-hygiene PR (2026-04-28); directive body unchanged from the ratified post-corrections version.
 **Date:** 2026-04-28
 **Predecessor:** `docs/pricing/PRICE-ENGINE-BRIEF.md` v3 (locks scope, authority model, inputs, surfaces, trust posture, v1/v2 staging)
 **Scope:** Architecture detail that PRICE-ENGINE-BRIEF v3 deferred to "F1 architecture work." Resolves the 9 open decisions in PRICE-ENGINE-BRIEF v3 §9. Specifies engine internals (composer, confidence), format_defaults table structure, platform floors structure, currency handling, refresh cadence, recalibration cadence, anonymization parameters (v2), analytics requirements, and engine quality measurement plan.
