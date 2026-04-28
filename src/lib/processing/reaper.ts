@@ -174,3 +174,63 @@ function logReset(reapedRow: ReapedRow): void {
     }),
   )
 }
+
+// ── E4 — asset_proposals reaper ─────────────────────────────
+//
+// Parallel function for the AI proposal layer. Same shape as
+// reapStuckProcessingRows but operates on asset_proposals instead
+// of asset_media. Per E4-DIRECTIVE.md §9 design choice — parallel
+// function preferred over a generic `reapStuckRows(table, ...)` to
+// keep table names typed at the call site (no SQL-injection vector
+// from generic table-name strings).
+
+export async function reapStuckProposalRows(
+  timeoutSeconds?: number,
+): Promise<ReapedRow[]> {
+  const effectiveTimeout = timeoutSeconds ?? readTimeoutFromEnv()
+
+  if (!isSupabaseEnvPresent()) {
+    return []
+  }
+
+  const client = getSupabaseClient()
+  const cutoffIso = new Date(Date.now() - effectiveTimeout * 1000).toISOString()
+
+  const { data, error } = await client
+    .from('asset_proposals')
+    .update({
+      generation_status: 'pending',
+      processing_started_at: null,
+    })
+    .eq('generation_status', 'processing')
+    .lt('processing_started_at', cutoffIso)
+    .select('asset_id, processing_started_at')
+
+  if (error) {
+    throw new Error(
+      `reaper: reapStuckProposalRows failed (${error.message ?? 'unknown'})`,
+    )
+  }
+
+  const rows = (data ?? []) as Array<{
+    asset_id: string
+    processing_started_at: string | null
+  }>
+
+  const now = Date.now()
+  return rows.map(r => {
+    const stuckMs = r.processing_started_at
+      ? now - new Date(r.processing_started_at).getTime()
+      : 0
+    const reapedRow: ReapedRow = {
+      assetId: r.asset_id,
+      // Synthetic media_role — proposals don't have a media_role column;
+      // the synthetic value lets the existing ReapedRow type carry both
+      // kinds without restructuring. Logged output makes the kind visible.
+      mediaRole: 'ai_proposal',
+      stuckDurationSeconds: Math.round(stuckMs / 1000),
+    }
+    logReset(reapedRow)
+    return reapedRow
+  })
+}

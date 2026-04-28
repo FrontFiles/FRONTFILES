@@ -29,6 +29,8 @@ import type { StorageAdapter } from '@/lib/storage'
 
 import { enqueueDerivativeRows } from '@/lib/processing/enqueue'
 import { dispatchAssetForProcessing } from '@/lib/processing/dispatcher'
+import { enqueueAssetProposalRow } from '@/lib/processing/enqueue-proposal'
+import { dispatchAssetProposalForProcessing } from '@/lib/processing/proposal-dispatcher'
 
 import {
   validateUploadBytes,
@@ -287,6 +289,44 @@ export async function commitUpload(
         }),
       )
     })
+
+    // E4 — AI proposal enqueue + fire-and-forget dispatch. Mirrors the
+    // derivative path above. Errors are logged but do NOT roll back the
+    // commit (the asset row is canonical; the reaper + next worker tick
+    // recover from any dispatch-time crash). Per E4-DIRECTIVE.md §10.
+    //
+    // Format is currently hardcoded 'photo' upstream (line 233 — format
+    // detection lands in a future PR). The enqueue gates on image
+    // formats; non-image formats get 'not_applicable' rows so the audit
+    // trail is complete; only 'pending' rows trigger dispatch.
+    enqueueAssetProposalRow(assetId, input.format).then(result => {
+      if (result.kind === 'error') {
+        // eslint-disable-next-line no-console
+        console.error(
+          'commit.enqueue: proposal_enqueue_failed',
+          JSON.stringify({
+            code: 'proposal_enqueue_failed',
+            asset_id: assetId,
+            error: result.message,
+          }),
+        )
+        return
+      }
+      if (result.kind === 'ok' && result.status === 'pending') {
+        dispatchAssetProposalForProcessing(assetId, deps.adapter).catch(err => {
+          // eslint-disable-next-line no-console
+          console.error(
+            'commit.dispatch: proposal_dispatch_failed',
+            JSON.stringify({
+              code: 'proposal_dispatch_failed',
+              asset_id: assetId,
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          )
+        })
+      }
+    })
+
     return { ok: true, outcome: 'created', assetId }
   }
 

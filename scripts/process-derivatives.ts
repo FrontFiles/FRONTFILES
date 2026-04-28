@@ -24,43 +24,78 @@
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client'
 import { getStorageAdapter } from '@/lib/storage'
 
-import { reapStuckProcessingRows } from '@/lib/processing/reaper'
+import { reapStuckProcessingRows, reapStuckProposalRows } from '@/lib/processing/reaper'
 import { dispatchAssetForProcessing } from '@/lib/processing/dispatcher'
+import { dispatchAssetProposalForProcessing } from '@/lib/processing/proposal-dispatcher'
 
 interface PendingAsset {
   assetId: string
 }
 
 async function main(): Promise<void> {
-  // 1. Reaper — reset stuck-processing rows
+  // 1a. Reaper — derivative stuck-processing rows
   // eslint-disable-next-line no-console
-  console.info('process-derivatives: starting reaper')
-  const reaped = await reapStuckProcessingRows()
+  console.info('process-derivatives: starting derivative reaper')
+  const reapedDerivatives = await reapStuckProcessingRows()
   // eslint-disable-next-line no-console
-  console.info(`process-derivatives: reaper reset ${reaped.length} stuck row(s)`)
+  console.info(
+    `process-derivatives: derivative reaper reset ${reapedDerivatives.length} stuck row(s)`,
+  )
 
-  // 2. Find all assets with pending rows
-  const pendingAssets = await findPendingAssets()
+  // 1b. Reaper — AI proposal stuck-processing rows (E4)
+  const reapedProposals = await reapStuckProposalRows()
   // eslint-disable-next-line no-console
-  console.info(`process-derivatives: found ${pendingAssets.length} asset(s) with pending derivatives`)
+  console.info(
+    `process-derivatives: proposal reaper reset ${reapedProposals.length} stuck row(s)`,
+  )
 
-  if (pendingAssets.length === 0) return
+  // 2a. Find pending derivative assets
+  const pendingDerivatives = await findPendingAssets()
+  // 2b. Find pending proposal assets (E4)
+  const pendingProposals = await findPendingProposalAssets()
+  // eslint-disable-next-line no-console
+  console.info(
+    `process-derivatives: pending — derivatives=${pendingDerivatives.length} proposals=${pendingProposals.length}`,
+  )
 
-  // 3. Dispatch each asset
+  if (pendingDerivatives.length === 0 && pendingProposals.length === 0) return
+
+  // 3. Dispatch each kind
   const storage = getStorageAdapter()
-  let dispatched = 0
-  let failed = 0
-  for (const asset of pendingAssets) {
+
+  let dispatchedDerivatives = 0
+  let failedDerivatives = 0
+  for (const asset of pendingDerivatives) {
     try {
       await dispatchAssetForProcessing(asset.assetId, storage)
-      dispatched++
+      dispatchedDerivatives++
     } catch (err) {
-      failed++
+      failedDerivatives++
       // eslint-disable-next-line no-console
       console.error(
-        'process-derivatives: dispatch_failed',
+        'process-derivatives: derivative_dispatch_failed',
         JSON.stringify({
-          code: 'dispatch_failed',
+          code: 'derivative_dispatch_failed',
+          asset_id: asset.assetId,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      )
+    }
+  }
+
+  let dispatchedProposals = 0
+  let failedProposals = 0
+  for (const asset of pendingProposals) {
+    try {
+      await dispatchAssetProposalForProcessing(asset.assetId, storage)
+      dispatchedProposals++
+    } catch (err) {
+      failedProposals++
+      // eslint-disable-next-line no-console
+      console.error(
+        'process-derivatives: proposal_dispatch_failed',
+        JSON.stringify({
+          code: 'proposal_dispatch_failed',
           asset_id: asset.assetId,
           error: err instanceof Error ? err.message : String(err),
         }),
@@ -70,8 +105,23 @@ async function main(): Promise<void> {
 
   // eslint-disable-next-line no-console
   console.info(
-    `process-derivatives: complete — dispatched=${dispatched} failed=${failed}`,
+    `process-derivatives: complete — derivatives=${dispatchedDerivatives}/${failedDerivatives} proposals=${dispatchedProposals}/${failedProposals}`,
   )
+}
+
+async function findPendingProposalAssets(): Promise<PendingAsset[]> {
+  if (!isSupabaseConfigured()) return []
+  const client = getSupabaseClient()
+  const { data, error } = await client
+    .from('asset_proposals')
+    .select('asset_id')
+    .eq('generation_status', 'pending')
+  if (error) {
+    throw new Error(
+      `process-derivatives: findPendingProposalAssets failed (${error.message})`,
+    )
+  }
+  return ((data ?? []) as Array<{ asset_id: string }>).map(r => ({ assetId: r.asset_id }))
 }
 
 async function findPendingAssets(): Promise<PendingAsset[]> {
