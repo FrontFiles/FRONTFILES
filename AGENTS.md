@@ -17,3 +17,13 @@ If any of the three fail, the work to unblock is not design — it's naming (A.0
 
 This rule is a lightweight, in-session instance of the `FEATURE_APPROVAL_ROADMAP.md` §Phase A Track 1 template (scope sentence + evidence pack + open items + decision + sign-off). When the two diverge, the Feature Approval Roadmap wins.
 <!-- END:ui-design-gate -->
+
+<!-- BEGIN:test-runner -->
+# Test runner
+
+Run tests with `bun run test` (or `npx vitest run`), **not** `bun test`.
+
+`bun test` is Bun's built-in test runner — a separate runner from vitest. It does NOT read `vitest.config.ts` and therefore skips the env-loading workaround at the top of that file. Without that workaround, `src/lib/env.ts` throws at module-load time (required Supabase env vars missing in the test worker), which cascades into a TDZ error at `src/lib/logger.ts:37` (`isProd` referenced before initialization, because env.ts's evaluation aborted mid-module). The result is a flood of false-positive test failures (~234 tests / 25 errors observed 2026-04-28) that disappear entirely under the correct runner.
+
+Project test script is `vitest run` (per `package.json` `"test"`). Use `bun run test` to invoke it. Bun's built-in `bun test` is not a supported entry point for this codebase.
+<!-- END:test-runner -->
