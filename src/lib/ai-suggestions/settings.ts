@@ -31,6 +31,8 @@ export interface EffectiveSettings {
   // E5: clustering knobs (per E5 §8.3 + migration 20260428000004)
   cluster_min_size: number
   cluster_min_samples: number | null
+  // E6: per-field auto-accept threshold (UX-SPEC-V4 IPV4-5 lock = 0.85)
+  auto_accept_threshold: number
 }
 
 const DEV_MULTIPLIER = 0.1 // 10% of production cost ceilings in dev/preview
@@ -88,6 +90,11 @@ export async function getEffectiveSettings(): Promise<EffectiveSettings> {
     cluster_min_size: data.cluster_min_size ?? 3,
     cluster_min_samples:
       data.cluster_min_samples === undefined ? null : data.cluster_min_samples,
+    // E6: default 0.85 per UX-SPEC-V4 IPV4-5; pre-migration fallback
+    auto_accept_threshold:
+      data.auto_accept_threshold === undefined
+        ? 0.85
+        : Number(data.auto_accept_threshold),
   }
 
   _cachedRow = result
