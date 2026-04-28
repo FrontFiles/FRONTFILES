@@ -1,0 +1,13 @@
+licence_class,use_tier,multiplier
+editorial,tier_1,
+editorial,tier_2,1.000
+editorial,tier_3,
+editorial,tier_4,
+commercial,tier_1,
+commercial,tier_2,1.000
+commercial,tier_3,
+commercial,tier_4,
+advertising,tier_1,
+advertising,tier_2,1.000
+advertising,tier_3,
+advertising,tier_4,
