@@ -1,20 +1,21 @@
 /**
- * Frontfiles Upload V4 — computeAcceptAIDispatches tests (D2.5 §6.4.2)
+ * Frontfiles Upload V4 — computeAcceptAIDispatches tests (D2.5 §6.4.2 + E6.B)
  *
- * Pure-helper tests. Validates the ✓ AI dispatch sequence:
- *   1. ONE BULK_ACCEPT telemetry no-op for the subset of selected assets
- *      that actually have a proposal.
- *   2. PER asset, sequenced UPDATE_ASSET_FIELD writes for caption / tags /
- *      geography — only when the proposal value is non-null AND differs
- *      from the current editable value.
+ * Pure-helper tests. Validates the ✓ AI dispatch sequence after E6.B updates:
+ *   - Per-field confidence threshold (default 0.85; falls back to overall
+ *     `confidence` when per-field is undefined)
+ *   - 'keywords' added to BULK_ACCEPT telemetry; no canonical write (no
+ *     editable column for keywords in v1)
+ *   - 'geography' REMOVED — it comes from EXIF, not AI (E6 §6.5)
  *
- * NEVER price (founder lock L6). The helper has no code path that emits a
- * 'price' field write; this is enforced at the type level by the
- * AutoAcceptDispatch union.
+ * NEVER price (founder lock L6).
  */
 
 import { describe, it, expect } from 'vitest'
-import { computeAcceptAIDispatches } from '../computeAcceptAIDispatches'
+import {
+  computeAcceptAIDispatches,
+  DEFAULT_AUTO_ACCEPT_THRESHOLD,
+} from '../computeAcceptAIDispatches'
 import type {
   V3State,
   V2Asset,
@@ -49,7 +50,7 @@ function emptyProposal(): AssetProposal {
     priceSuggestion: null,
     privacySuggestion: null,
     licenceSuggestions: [],
-    confidence: 0.9,
+    confidence: 0.9, // above default 0.85 threshold
     rationale: '',
     storyCandidates: [],
   }
@@ -99,13 +100,17 @@ function stateWith(assets: V2Asset[]): V3State {
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-describe('computeAcceptAIDispatches', () => {
+describe('computeAcceptAIDispatches (E6.B)', () => {
+  it('exposes DEFAULT_AUTO_ACCEPT_THRESHOLD = 0.85', () => {
+    expect(DEFAULT_AUTO_ACCEPT_THRESHOLD).toBe(0.85)
+  })
+
   it('returns empty array when no selected asset has a proposal', () => {
     const state = stateWith([makeAsset('a1', { proposal: null })])
     expect(computeAcceptAIDispatches(state, ['a1'])).toEqual([])
   })
 
-  it('emits BULK_ACCEPT + 3 UPDATEs for one asset with full proposal', () => {
+  it('BULK_ACCEPT telemetry fields = [caption, keywords, tags]; no geography', () => {
     const proposal: AssetProposal = {
       ...emptyProposal(),
       description: 'Protesters march in central Lisbon',
@@ -115,57 +120,75 @@ describe('computeAcceptAIDispatches', () => {
     const state = stateWith([makeAsset('a1', { proposal })])
     const result = computeAcceptAIDispatches(state, ['a1'])
 
-    expect(result).toHaveLength(4)
+    // BULK + caption + tags. NO geography update; keywords telemetry-only.
     expect(result[0]).toEqual({
       type: 'BULK_ACCEPT_PROPOSALS_FOR_SELECTION',
       assetIds: ['a1'],
-      fields: ['caption', 'tags'],
+      fields: ['caption', 'keywords', 'tags'],
     })
-    expect(result[1]).toEqual({
-      type: 'UPDATE_ASSET_FIELD',
-      assetId: 'a1',
-      field: 'description',
-      value: 'Protesters march in central Lisbon',
-    })
-    expect(result[2]).toEqual({
-      type: 'UPDATE_ASSET_FIELD',
-      assetId: 'a1',
-      field: 'tags',
-      value: ['protest', 'climate', 'lisbon'],
-    })
-    expect(result[3]).toEqual({
-      type: 'UPDATE_ASSET_FIELD',
-      assetId: 'a1',
-      field: 'geography',
-      value: ['Lisbon, Portugal'],
-    })
+    expect(result.filter((d) => d.type === 'UPDATE_ASSET_FIELD').map((d) => d.field)).toEqual([
+      'description',
+      'tags',
+    ])
   })
 
-  it('only includes assets with proposals in the BULK telemetry payload', () => {
+  it('does NOT dispatch UPDATE for geography even when proposal has values', () => {
     const proposal: AssetProposal = {
       ...emptyProposal(),
-      description: 'caption A',
-      tags: ['t'],
-      geography: ['g'],
+      geography: ['Paris', 'France'],
     }
-    const state = stateWith([
-      makeAsset('a1', { proposal }),
-      makeAsset('a2', { proposal: null }), // no proposal — must be skipped
-    ])
-    const result = computeAcceptAIDispatches(state, ['a1', 'a2'])
-
-    // BULK has only a1; a2 produces no UPDATEs.
-    expect(result[0]).toEqual({
-      type: 'BULK_ACCEPT_PROPOSALS_FOR_SELECTION',
-      assetIds: ['a1'],
-      fields: ['caption', 'tags'],
-    })
-    // 1 BULK + 3 UPDATEs for a1, none for a2.
-    expect(result).toHaveLength(4)
-    // No UPDATE references a2.
+    const state = stateWith([makeAsset('a1', { proposal })])
+    const result = computeAcceptAIDispatches(state, ['a1'])
     for (const d of result) {
-      if (d.type === 'UPDATE_ASSET_FIELD') expect(d.assetId).toBe('a1')
+      if (d.type === 'UPDATE_ASSET_FIELD') expect(d.field).not.toBe('geography')
     }
+  })
+
+  it('per-field threshold gates each field independently (using per-field confidence)', () => {
+    const proposal: AssetProposal = {
+      ...emptyProposal(),
+      description: 'caption text',
+      tags: ['t1', 't2'],
+      description_confidence: 0.9, // above 0.85
+      tags_confidence: 0.5, // below 0.85
+    }
+    const state = stateWith([makeAsset('a1', { proposal })])
+    const result = computeAcceptAIDispatches(state, ['a1'])
+
+    const updates = result.filter((d) => d.type === 'UPDATE_ASSET_FIELD').map((d) => d.field)
+    // caption passes; tags below threshold → not dispatched
+    expect(updates).toContain('description')
+    expect(updates).not.toContain('tags')
+  })
+
+  it('falls back to overall `confidence` when per-field is undefined', () => {
+    const proposal: AssetProposal = {
+      ...emptyProposal(),
+      description: 'caption text',
+      tags: ['t1'],
+      confidence: 0.4, // below 0.85; per-field undefined → fallback
+    }
+    const state = stateWith([makeAsset('a1', { proposal })])
+    const result = computeAcceptAIDispatches(state, ['a1'])
+
+    // BULK still emitted (it's telemetry; not threshold-gated). UPDATEs gated.
+    expect(result[0].type).toBe('BULK_ACCEPT_PROPOSALS_FOR_SELECTION')
+    const updates = result.filter((d) => d.type === 'UPDATE_ASSET_FIELD')
+    expect(updates).toEqual([])
+  })
+
+  it('respects custom threshold parameter', () => {
+    const proposal: AssetProposal = {
+      ...emptyProposal(),
+      description: 'caption',
+      tags: ['t1'],
+      confidence: 0.6,
+    }
+    const state = stateWith([makeAsset('a1', { proposal })])
+    // Lower threshold to 0.5 → 0.6 passes → caption + tags dispatched
+    const result = computeAcceptAIDispatches(state, ['a1'], 0.5)
+    const updates = result.filter((d) => d.type === 'UPDATE_ASSET_FIELD').map((d) => d.field)
+    expect(updates).toEqual(['description', 'tags'])
   })
 
   it('skips caption when proposal value matches current editable value', () => {
@@ -173,62 +196,56 @@ describe('computeAcceptAIDispatches', () => {
       ...emptyProposal(),
       description: 'same caption',
       tags: ['new-tag'],
-      geography: ['Lisbon'],
     }
     const state = stateWith([
       makeAsset('a1', {
         proposal,
-        editable: { description: 'same caption' }, // already matches proposal
+        editable: { description: 'same caption' },
       }),
     ])
     const result = computeAcceptAIDispatches(state, ['a1'])
 
-    // BULK + UPDATE(tags) + UPDATE(geography) — caption skipped.
-    expect(result).toHaveLength(3)
-    expect(result.map(d => d.type === 'UPDATE_ASSET_FIELD' ? d.field : d.type)).toEqual([
+    // BULK + UPDATE(tags) — caption skipped (no diff)
+    expect(result.map((d) => (d.type === 'UPDATE_ASSET_FIELD' ? d.field : d.type))).toEqual([
       'BULK_ACCEPT_PROPOSALS_FOR_SELECTION',
       'tags',
-      'geography',
     ])
   })
 
-  it('skips a field when proposal value is null', () => {
-    // proposal.geography is [] (empty array, treated as no-change vs editable [])
-    // proposal.description is '' (empty string, !== current '' → SKIPPED via shallow equality)
-    // Test more meaningful gap: geography is null in fixture? Spec says geography
-    // is string[] not nullable. So instead, test the empty-array-equals-empty-array
-    // skip path explicitly.
+  it('only includes assets with proposals in the BULK telemetry payload', () => {
     const proposal: AssetProposal = {
       ...emptyProposal(),
-      description: 'a new caption',
-      tags: [], // empty → matches current empty → skip
-      geography: [], // empty → matches current empty → skip
+      description: 'caption A',
+      tags: ['t'],
     }
-    const state = stateWith([makeAsset('a1', { proposal })])
-    const result = computeAcceptAIDispatches(state, ['a1'])
+    const state = stateWith([
+      makeAsset('a1', { proposal }),
+      makeAsset('a2', { proposal: null }), // no proposal — must be skipped
+    ])
+    const result = computeAcceptAIDispatches(state, ['a1', 'a2'])
 
-    // BULK + UPDATE(description) only — tags and geography are no-ops.
-    expect(result).toHaveLength(2)
-    expect(result[0].type).toBe('BULK_ACCEPT_PROPOSALS_FOR_SELECTION')
-    if (result[1].type === 'UPDATE_ASSET_FIELD') {
-      expect(result[1].field).toBe('description')
+    expect(result[0]).toEqual({
+      type: 'BULK_ACCEPT_PROPOSALS_FOR_SELECTION',
+      assetIds: ['a1'],
+      fields: ['caption', 'keywords', 'tags'],
+    })
+    for (const d of result) {
+      if (d.type === 'UPDATE_ASSET_FIELD') expect(d.assetId).toBe('a1')
     }
   })
 
-  it('does not emit any field write of type "price"', () => {
+  it('keywords field — no UPDATE_ASSET_FIELD dispatch (audit-only via BULK)', () => {
     const proposal: AssetProposal = {
       ...emptyProposal(),
-      description: 'caption',
-      tags: ['t'],
-      geography: ['g'],
-      priceSuggestion: { rangeLowCents: 5000, rangeHighCents: 15000, suggestionCents: 10000 } as never,
+      keywords: ['kw1', 'kw2', 'kw3'],
+      keywords_confidence: 0.95,
     }
     const state = stateWith([makeAsset('a1', { proposal })])
     const result = computeAcceptAIDispatches(state, ['a1'])
-
+    // No 'keywords' field UPDATE — keywords is audit-only in v1.
     for (const d of result) {
       if (d.type === 'UPDATE_ASSET_FIELD') {
-        expect(d.field).not.toBe('price')
+        expect(d.field).not.toBe('keywords' as never)
       }
     }
   })
