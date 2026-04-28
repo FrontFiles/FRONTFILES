@@ -251,7 +251,7 @@ CREATE TABLE pricing_recommendations (
   basis_breakdown JSONB NOT NULL,             -- BasisContribution[]
   comparables JSONB NOT NULL,                 -- Comparable[] (anonymized; empty in v1)
   model_version TEXT NOT NULL,
-  format_defaults_version TEXT NOT NULL,      -- which format_defaults table version produced this
+  format_defaults_version INTEGER NOT NULL,   -- which format_defaults table version produced this (monotonic counter; matches pricing_format_defaults.table_version per F1 §3.1)
   input_snapshot_id UUID,                     -- nullable in v1; FK added in v2 when pricing_inputs ships
   superseded_at TIMESTAMPTZ                   -- set when a newer recommendation is generated
 );

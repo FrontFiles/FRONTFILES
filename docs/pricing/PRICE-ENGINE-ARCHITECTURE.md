@@ -1,10 +1,11 @@
 # Frontfiles Price Engine — Architecture Detail Brief (F1)
 
-**Status:** DRAFT — awaiting founder ratification before F2 (schema migration) composes
-**Date:** 2026-04-26
+**Status:** REVISED 2026-04-28 (post-ratification corrections; supersedes 2026-04-26 draft) — awaiting founder ratification of this revision before F2 (schema migration) composes
+**Date:** 2026-04-28
 **Predecessor:** `docs/pricing/PRICE-ENGINE-BRIEF.md` v3 (locks scope, authority model, inputs, surfaces, trust posture, v1/v2 staging)
 **Scope:** Architecture detail that PRICE-ENGINE-BRIEF v3 deferred to "F1 architecture work." Resolves the 9 open decisions in PRICE-ENGINE-BRIEF v3 §9. Specifies engine internals (composer, confidence), format_defaults table structure, platform floors structure, currency handling, refresh cadence, recalibration cadence, anonymization parameters (v2), analytics requirements, and engine quality measurement plan.
 **Does NOT:** invent specific currency values for `format_defaults` rows or `pricing_platform_floors` rows. Per CLAUDE.md item 16, monetary values are founder calibration — F1 specifies the structure + the calibration process; founder fills the values in a calibration pass before F3 (format_defaults adapter) ships.
+**Revision (2026-04-28):** founder-ratification audit produced six corrections. (1) §2.2 algorithm + §2.3 confidence table reconciled — `format_defaults` confidence scales to 1.0 when sole contributor, per the parent brief v3 §4.2.3 wording. (2) IQRPenalty formula dropped from §2.3 — the brief v3 §4.2.2 + F1 §5.4 dual gate is binary, leaving the formula as dead code; cleaner posture. (3) §4.1 inline `UNIQUE (...) WHERE` moved to a separate `CREATE UNIQUE INDEX ... WHERE` (PostgreSQL syntax requirement). (4) Version-column type drift reconciled to INTEGER across F1 + brief v3 §4.5. (5) §8 readiness-checklist cross-track item (pgvector) removed — AI-track concern, doesn't gate F2. (6) §11 References updated (UX-SPEC-V3 → UX-SPEC-V4; AI-PIPELINE-BRIEF path corrected). See §12 Revision History.
 
 ---
 
@@ -50,14 +51,23 @@ The composer combines partial recommendations from N adapters into a single reco
 Algorithm (locked):
 
 ```
-1. For each enabled adapter producing a non-null PartialRecommendation:
+1. Collect non-null partial recommendations from each enabled adapter.
+2. Sole-contributor scale-up (per §2.3 format_defaults confidence rule):
+   if format_defaults is the only contributing adapter (all others returned
+   null), set its confidence to 1.0 BEFORE step 3. Encodes the platform's
+   codified rate as a confident answer when no other signal exists, rather
+   than a 50%-confident hedge. The basisStatement records this case
+   ("limited data — Frontfiles standard rate" per brief v3 §4.3).
+3. For each contributing adapter:
    - effectiveWeight = configuredWeight × confidence
-2. Sum effectiveWeight across all contributing adapters; call this W_total
-3. If W_total = 0, return format_defaults-only recommendation
-   (format_defaults is always enabled; if even it returns null, error)
-4. recommendedCents = sum(partial.recommendedCents × partial.effectiveWeight) / W_total
-5. confidence = W_total / sum(configuredWeight) for contributing adapters
-6. basisBreakdown[] records each contribution: adapter, weight,
+4. Sum effectiveWeight across contributing adapters; call this W_total.
+5. W_total = 0 is a hard error (format_defaults is always enabled and
+   non-null by construction; its absence indicates a calibration / data
+   defect, not a routine state). The engine raises rather than emitting
+   a zero-confidence recommendation.
+6. recommendedCents = sum(partial.recommendedCents × partial.effectiveWeight) / W_total
+7. confidence = W_total / sum(configuredWeight across contributing adapters)
+8. basisBreakdown[] records each contribution: adapter, weight,
    contribution_cents, effectiveWeight / W_total
 ```
 
@@ -83,10 +93,10 @@ Per-adapter confidence is computed by each adapter independently. The formulas:
 | Adapter | Confidence formula |
 |---|---|
 | `creator_history` | `min(1.0, sampleSize / 10)` — saturates at N=10 (1.0); below N=3 returns null entirely (insufficient) |
-| `frontfiles_comparables` (v2) | `min(1.0, sampleSize / 25) × IQRPenalty` where `IQRPenalty = max(0, 1 - (IQR / median - 0.5) × 2)` — penalizes wide IQR; zero if IQR > 1.0×median |
-| `format_defaults` | Fixed 0.5 baseline; scales up to 1.0 when other adapters return null (proportional fallback) |
+| `frontfiles_comparables` (v2) | `min(1.0, sampleSize / 25)` — saturates at N=25. The IQR ≤ 0.5×median dual gate (per brief v3 §4.2.2 + F1 §5.4) is binary: outside the gate, adapter returns null; inside, no IQR-derived penalty applies. The earlier `IQRPenalty` formula was dropped on 2026-04-28 ratification audit — it operated entirely in the IQR/median > 0.5 region the gate already rules out, making it dead code. Posture-aligned: prefer admitting "no signal" to injecting noise. |
+| `format_defaults` | Baseline 0.5 when contributing alongside another non-null adapter; **scales to 1.0 when sole contributor** (per §2.2 step 2). Encodes "platform's codified rate" as a confident answer when no other signal exists, rather than a 50%-confident hedge. Implementation: the adapter always returns `confidence: 0.5`; the composer's §2.2 step 2 rewrites it to 1.0 if it's the only non-null partial. |
 
-Composer-level confidence per §2.2 step 5.
+Composer-level confidence per §2.2 step 7.
 
 ### 2.4 Recommendation freshness + caching
 
@@ -199,10 +209,17 @@ CREATE TABLE pricing_platform_floors (
   effective_from TIMESTAMPTZ NOT NULL DEFAULT now(),
   superseded_at TIMESTAMPTZ,
   calibrated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  calibrated_by UUID REFERENCES users(id),
-  UNIQUE (format, intrusion_level, licence_class, currency)
-    WHERE superseded_at IS NULL
+  calibrated_by UUID REFERENCES users(id)
+  -- (no inline UNIQUE — partial uniqueness requires a separate
+  --  CREATE UNIQUE INDEX ... WHERE in PostgreSQL; see below)
 );
+
+-- Partial unique index: only one "active" floor per (format, intrusion_level,
+-- licence_class, currency) combination at any given time. Superseded rows are
+-- preserved for audit but excluded from the uniqueness constraint.
+CREATE UNIQUE INDEX pricing_platform_floors_unique_active
+  ON pricing_platform_floors (format, intrusion_level, licence_class, currency)
+  WHERE superseded_at IS NULL;
 ```
 
 **Dimensions:** same as `format_defaults` minus `use_tier` (floors are below-which-engine-never-recommends; not segmented by use tier — protects against the engine ever recommending below FF's market positioning regardless of use tier).
@@ -377,7 +394,6 @@ Before F2 ships:
 - [ ] F2 schema migration includes seed migration with the above values
 - [ ] Decision on per-licence overrides confirmed (default: NO; per §5.1)
 - [ ] Decision on currency confirmed (default: EUR-only v1; per §5.2)
-- [ ] Decision on pgvector / vector storage confirmed (relevant if AI cluster embedding needed; per AI-PIPELINE-BRIEF E1.5 — separate concern, but flagged for parallel resolution)
 
 ---
 
@@ -412,8 +428,8 @@ PRICE-ENGINE-BRIEF v3 §11's 16 don't-do items still apply. Additional items fro
 
 - PRICE-ENGINE-BRIEF v3 (parent): `docs/pricing/PRICE-ENGINE-BRIEF.md` (this brief is the F1 detail brief that v3 §10 calls for)
 - UX brief (price field surfaces): `docs/upload/UX-BRIEF.md` v3 §4.4
-- UX spec (price visual treatment + "Why this price?" affordance): `docs/upload/UX-SPEC-V3.md` §9.3
-- AI pipeline brief (sister architecture): `docs/processing/AI-PIPELINE-BRIEF.md`
+- UX spec (price visual treatment + "Why this price?" affordance): `docs/upload/UX-SPEC-V4.md` §11 (V4 supersedes V3 per UX-SPEC-V4 §0)
+- AI pipeline brief (sister architecture): `src/lib/processing/AI-PIPELINE-BRIEF.md`
 - BP/Watermark audit (intrusion vocabulary): `docs/audits/BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26.md`
 - Existing fee decomposition (preserved): `src/lib/offer/pricing.ts`
 - Existing multipliers (preserved): `src/lib/types.ts`
@@ -422,4 +438,25 @@ PRICE-ENGINE-BRIEF v3 §11's 16 don't-do items still apply. Additional items fro
 
 ---
 
-End of price engine architecture detail brief (F1).
+## 12. Revision history
+
+### 2026-04-28 — post-ratification corrections
+
+Founder-ratification audit on 2026-04-28 produced six corrections. All local; no architectural change. The engine's intent + scope + trust posture from the source brief v3 stand unchanged.
+
+| # | Section | Change | Rationale |
+|---|---|---|---|
+| 1 | §2.2 algorithm + §2.3 confidence formulas | `format_defaults` confidence scales to 1.0 when sole contributor; algorithm step 2 added to make this explicit | §2.2 and §2.3 were inconsistent in v1 — §2.3 said "scales up to 1.0" but §2.2 algorithm didn't implement it. Resolved per founder pick (1a): align to brief v3 §4.2.3 wording; sole-contributor case asserts platform's codified rate as confident answer rather than 50%-confident hedge |
+| 2 | §2.3 confidence formula for `frontfiles_comparables` | IQRPenalty formula dropped | Dead code given the brief v3 §4.2.2 + F1 §5.4 dual gate (IQR ≤ 0.5×median). The penalty operated entirely in the IQR > 0.5×median region the gate already rules out. Founder pick (2a): drop the formula; binary gate suffices; matches "prefer no signal to noisy signal" posture |
+| 3 | §4.1 schema | Inline `UNIQUE (...) WHERE` moved to a separate `CREATE UNIQUE INDEX ... WHERE` | PostgreSQL syntax requirement — partial UNIQUE constraints aren't supported inline in `CREATE TABLE`; require a separate index statement |
+| 4 | §3.1 + brief v3 §4.5 type alignment | `format_defaults_version` aligned to INTEGER on both `pricing_recommendations` (was TEXT in brief v3) and `pricing_format_defaults.table_version` (already INTEGER in F1) | Type drift between brief and F1; INTEGER chosen as monotonic-counter fits the use case better than free-form string |
+| 5 | §8 readiness checklist | pgvector / vector-storage bullet removed | Cross-track scope (AI-pipeline concern, not F-track); pgvector is shipped per migration `20260419110000`; doesn't gate F2 |
+| 6 | §11 references | UX-SPEC-V3 cite → UX-SPEC-V4 §11; AI-PIPELINE-BRIEF path → `src/lib/processing/AI-PIPELINE-BRIEF.md` | Stale references; V3 retired per UX-SPEC-V4 §0; AI brief actual location |
+
+### 2026-04-26 — initial composition
+
+Composed alongside PRICE-ENGINE-BRIEF v3 (third revision same day). F1 detail brief that the brief's §10 two-stage approval gate calls for. Awaited ratification until 2026-04-28.
+
+---
+
+End of price engine architecture detail brief (F1, revised 2026-04-28).
