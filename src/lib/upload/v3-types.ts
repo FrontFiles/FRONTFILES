@@ -141,6 +141,26 @@ export interface V3ClusterProposalState {
   status: V3ClusterProposalStatus
 }
 
+// ── E6.C — Real-pipeline hydration payload shape ─────────────────────
+//
+// Structurally identical to src/lib/ai-suggestions/hydration.ts
+// ProposalView. Declared here so v3-types stays the canonical home for
+// the V3 reducer action union without depending on a server module.
+
+export interface V3HydrationProposal {
+  asset_id: string
+  generation_status: 'pending' | 'processing' | 'ready' | 'failed' | 'not_applicable'
+  caption: string | null
+  caption_confidence: number | null
+  keywords: string[] | null
+  keywords_confidence: number | null
+  tags: string[] | null
+  tags_confidence: number | null
+  cluster_id: string | null
+  cluster_confidence: number | null
+  rationale: string | null
+}
+
 // ── V3 Root State ───────────────────────────────────────────────────
 
 export interface V3State {
@@ -276,6 +296,19 @@ export type V3Action =
   | { type: 'RECEIVE_AI_CLUSTER_PROPOSAL'; proposal: V3ClusterProposalState }
   | { type: 'ACCEPT_AI_CLUSTER_PROPOSAL'; proposalId: string }
   | { type: 'DISMISS_AI_CLUSTER_PROPOSAL'; proposalId: string }
+
+  // ── E6.C — bootstrap real-pipeline hydration ──
+  // Replaces aiClusterProposals with the hydrated set + merges per-asset
+  // proposal data into existing assets. Only dispatched when
+  // FFF_AI_REAL_PIPELINE=true (UploadShell useEffect).
+  // Shape mirrors src/lib/ai-suggestions/hydration.ts HydrationResult.
+  | {
+      type: 'HYDRATE_REAL_AI_PROPOSALS'
+      payload: {
+        proposals: V3HydrationProposal[]
+        clusters: V3ClusterProposalState[]
+      }
+    }
 
   // ── Cluster bulk operations (Archive mode) ──
   | { type: 'BULK_EDIT_CAPTION_TEMPLATE'; clusterId: string; template: string }

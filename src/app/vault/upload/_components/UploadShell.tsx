@@ -28,7 +28,8 @@
 
 'use client'
 
-import { useCallback, useId, useReducer, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useId, useReducer, useRef, useState, type DragEvent } from 'react'
+import { fetchAiProposalsForBatch } from './lib/proposalApiClient'
 import {
   DndContext,
   PointerSensor,
@@ -62,6 +63,19 @@ interface Props {
   devSimulateFailure: number | null
   /** Dev-only AI cluster banner seeding (per C2.5 IPV-5). false in production. */
   devSeedBanners: boolean
+  /**
+   * E6.C — creator id for the bootstrap-hydration call. Only used when
+   * aiRealPipeline=true; mock-mode + simulation paths ignore it.
+   * Server page supplies from the authenticated session.
+   */
+  creatorId?: string
+  /**
+   * E6.C — server-resolved AI real-pipeline flag. Defaults to false.
+   * Server page reads `flags.aiRealPipeline` and passes the boolean.
+   * Mirrors the FFF_REAL_UPLOAD pattern (server-only flag projected via
+   * a server component prop), avoiding a NEXT_PUBLIC_ duplicate.
+   */
+  aiRealPipeline?: boolean
 }
 
 export default function UploadShell({
@@ -69,8 +83,49 @@ export default function UploadShell({
   devScenarioId,
   devSimulateFailure,
   devSeedBanners,
+  creatorId,
+  aiRealPipeline = false,
 }: Props) {
   const [state, dispatch] = useReducer(v3Reducer, { batchId, devScenarioId }, computeInitialState)
+
+  // E6.C — bootstrap real-pipeline hydration when the flag is on + creator
+  // id is present. Replaces simulation-derived proposal data with the
+  // server's view of asset_proposals + asset_proposal_clusters. Polling
+  // refresh per E6 §8.3 is a v2 enrichment; this MVP fires once on mount.
+  useEffect(() => {
+    if (!aiRealPipeline) return
+    if (!creatorId) return
+    if (!batchId) return
+    let cancelled = false
+    fetchAiProposalsForBatch(batchId, creatorId)
+      .then((result) => {
+        if (cancelled) return
+        if (result.optedOut) return // creator opted out — don't hydrate
+        // Map hydration's ClusterView → V3ClusterProposalState shape
+        const clusters = result.clusters.map((c) => ({
+          proposalId: c.id,
+          clusterName: c.proposed_name ?? c.rationale,
+          proposedAssetIds: c.member_asset_ids,
+          rationale: c.rationale,
+          confidence: c.silhouette_score ?? 0,
+          status: 'pending' as const,
+        }))
+        dispatch({
+          type: 'HYDRATE_REAL_AI_PROPOSALS',
+          payload: { proposals: result.proposals, clusters },
+        })
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error(
+          'UploadShell.bootstrap: hydration failed',
+          err instanceof Error ? err.message : String(err),
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [batchId, creatorId, aiRealPipeline])
 
   const layout = getLayoutState({
     assetsById: state.assetsById,

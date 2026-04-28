@@ -867,6 +867,59 @@ export function v3Reducer(state: V3State, action: V3Action): V3State {
         aiClusterProposals: [...state.aiClusterProposals, action.proposal],
       }
 
+    case 'HYDRATE_REAL_AI_PROPOSALS': {
+      // E6.C — bootstrap hydration when FFF_AI_REAL_PIPELINE=true.
+      // For each hydrated proposal, merge the AI-pipeline fields into the
+      // matching asset's existing proposal (preserving non-AI fields like
+      // priceSuggestion / privacySuggestion / licenceSuggestions /
+      // storyCandidates / geography that come from other pillars). When
+      // the asset has no existing proposal, construct a minimal one with
+      // defaults for non-AI fields.
+      const updatedAssets = { ...state.assetsById }
+      for (const propView of action.payload.proposals) {
+        const asset = updatedAssets[propView.asset_id]
+        if (!asset) continue // hydration may include assets not in current state
+
+        const overall = Math.max(
+          propView.caption_confidence ?? 0,
+          propView.tags_confidence ?? 0,
+          propView.keywords_confidence ?? 0,
+        )
+
+        const existing = asset.proposal
+        const merged: AssetProposal = {
+          // Preserved from existing proposal (other pillars) or defaults
+          title: existing?.title ?? '',
+          geography: existing?.geography ?? [],
+          priceSuggestion: existing?.priceSuggestion ?? null,
+          privacySuggestion: existing?.privacySuggestion ?? null,
+          licenceSuggestions: existing?.licenceSuggestions ?? [],
+          storyCandidates: existing?.storyCandidates ?? [],
+          // AI-pipeline values from hydration
+          description: propView.caption ?? '',
+          tags: propView.tags ?? [],
+          // E6.B widening fields
+          description_confidence: propView.caption_confidence ?? undefined,
+          keywords: propView.keywords ?? undefined,
+          keywords_confidence: propView.keywords_confidence ?? undefined,
+          tags_confidence: propView.tags_confidence ?? undefined,
+          cluster_id: propView.cluster_id,
+          cluster_confidence: propView.cluster_confidence ?? undefined,
+          // Backward-compat overall confidence (MAX-of-per-field) +
+          // synthesized factual rationale per E6 §6.3
+          confidence: overall,
+          rationale: propView.rationale ?? '',
+        }
+        updatedAssets[propView.asset_id] = { ...asset, proposal: merged }
+      }
+      return {
+        ...state,
+        assetsById: updatedAssets,
+        // Replace clusters wholesale — hydration is the source of truth
+        aiClusterProposals: action.payload.clusters,
+      }
+    }
+
     case 'ACCEPT_AI_CLUSTER_PROPOSAL': {
       const proposal = state.aiClusterProposals.find(p => p.proposalId === action.proposalId)
       if (!proposal) {
