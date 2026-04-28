@@ -1,7 +1,19 @@
-# Session Wrap — 2026-04-27
+# Session Wrap — 2026-04-27 (Morning)
 
-**Status:** Active handoff. Use the RESUME PROMPT in §6 for a fresh Claude session.
+> ⚠ **AI-TRACK RESUME OPTIONS SUPERSEDED.** A subsequent evening session
+> on 2026-04-27 ratified four AI-track architecture artifacts (E1 v2 +
+> E1.5 + E2 + E3 directives). For AI-track resume, read
+> `docs/SESSION-WRAP-2026-04-27-AI-TRACK.md` first. Specifically:
+> the §6 RESUME PROMPT and §7 one-shot prompts in this morning wrap
+> are stale on the AI track — the evening wrap supersedes them.
+>
+> The rest of this morning wrap (PR #15 merge, V4 redesign, founder
+> locks L1-L6, watermark posture, F1/BP-D1/WM-D1/WM-D3 status, the 8
+> pre-existing tsc errors) remains the canonical platform-state record.
+
+**Status:** Active handoff for non-AI-track resume. Use the RESUME PROMPT in §6 ONLY for non-AI-track work.
 **Supersedes:** `docs/SESSION-WRAP-2026-04-26.md` (the wrap from yesterday — its "ratify C1 + compose C2" default opener is now meaningless; C1+C2 shipped, then D2.1→D2.10 + follow-ups + dnd-fix all landed in two days).
+**Superseded on AI track by:** `docs/SESSION-WRAP-2026-04-27-AI-TRACK.md` (the evening wrap; ratifies E1 v2 + E1.5 + E2 + E3 directives).
 **Session scope:** D2.9 (layout polish + AI provenance + cover-in-sheet) shipped + D2.9 follow-up corrections + D2.10 (story metadata + per-field apply-to-all + select-all) shipped + D2.10 follow-up (embedded metadata inspector section) shipped + dnd-kit hydration warning silenced. Full V4 upload UI is officially complete and clean.
 
 ---
