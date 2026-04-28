@@ -911,7 +911,7 @@ Founder reviews the PR before merge. Specifically verify:
 | Item | What "approved" means |
 |---|---|
 | Migration filename uses ship-date timestamp | Not `2026-04-27` if ship is later |
-| Pricing constants in `models.ts` are `VERIFY_AT_E2_SHIP` | Replaced with verified-current Vertex strings before merge |
+| Version pin strings in `models.ts` are `VERIFY_AT_E2_SHIP` | Replaced with verified-current Vertex model version strings before merge. Pricing constants live in `cost.ts` (E3 scope per E2 don't-do #10) — not E2's concern. |
 | Cost ceiling defaults in `ai_pipeline_settings` seed | $500/day + $10000/month or amended values |
 | RLS service-role-only is honored on all 4 tables | No client-facing policies added |
 | Mock adapter covers photo/illustration; infographic/vector mirror illustration shape | Or explicit fixture-extension call |
