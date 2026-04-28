@@ -28,6 +28,9 @@ export interface EffectiveSettings {
   vision_jpeg_quality: number
   circuit_failure_threshold: number
   circuit_cooldown_ms: number
+  // E5: clustering knobs (per E5 §8.3 + migration 20260428000004)
+  cluster_min_size: number
+  cluster_min_samples: number | null
 }
 
 const DEV_MULTIPLIER = 0.1 // 10% of production cost ceilings in dev/preview
@@ -79,6 +82,12 @@ export async function getEffectiveSettings(): Promise<EffectiveSettings> {
     vision_jpeg_quality: data.vision_jpeg_quality,
     circuit_failure_threshold: data.circuit_failure_threshold,
     circuit_cooldown_ms: data.circuit_cooldown_ms,
+    // E5: defaults handle the case where this code runs before the
+    // clustering migration has applied (e.g., during dev that hasn't
+    // pulled the migration yet). Production reads the row values.
+    cluster_min_size: data.cluster_min_size ?? 3,
+    cluster_min_samples:
+      data.cluster_min_samples === undefined ? null : data.cluster_min_samples,
   }
 
   _cachedRow = result

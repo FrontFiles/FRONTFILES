@@ -24,9 +24,14 @@
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client'
 import { getStorageAdapter } from '@/lib/storage'
 
-import { reapStuckProcessingRows, reapStuckProposalRows } from '@/lib/processing/reaper'
+import {
+  reapStuckProcessingRows,
+  reapStuckProposalRows,
+  reapStuckClusteringJobs,
+} from '@/lib/processing/reaper'
 import { dispatchAssetForProcessing } from '@/lib/processing/dispatcher'
 import { dispatchAssetProposalForProcessing } from '@/lib/processing/proposal-dispatcher'
+import { dispatchBatchClusteringForProcessing } from '@/lib/processing/batch-clustering-dispatcher'
 
 interface PendingAsset {
   assetId: string
@@ -49,16 +54,30 @@ async function main(): Promise<void> {
     `process-derivatives: proposal reaper reset ${reapedProposals.length} stuck row(s)`,
   )
 
+  // 1c. Reaper — clustering stuck jobs (E5)
+  const reapedClustering = await reapStuckClusteringJobs()
+  // eslint-disable-next-line no-console
+  console.info(
+    `process-derivatives: clustering reaper reset ${reapedClustering.length} stuck batch(es)`,
+  )
+
   // 2a. Find pending derivative assets
   const pendingDerivatives = await findPendingAssets()
   // 2b. Find pending proposal assets (E4)
   const pendingProposals = await findPendingProposalAssets()
+  // 2c. Find batches needing clustering (E5)
+  const pendingClusterBatches = await findBatchesNeedingClustering()
   // eslint-disable-next-line no-console
   console.info(
-    `process-derivatives: pending — derivatives=${pendingDerivatives.length} proposals=${pendingProposals.length}`,
+    `process-derivatives: pending — derivatives=${pendingDerivatives.length} proposals=${pendingProposals.length} clustering=${pendingClusterBatches.length}`,
   )
 
-  if (pendingDerivatives.length === 0 && pendingProposals.length === 0) return
+  if (
+    pendingDerivatives.length === 0 &&
+    pendingProposals.length === 0 &&
+    pendingClusterBatches.length === 0
+  )
+    return
 
   // 3. Dispatch each kind
   const storage = getStorageAdapter()
@@ -103,10 +122,55 @@ async function main(): Promise<void> {
     }
   }
 
+  // E5 — clustering dispatch loop
+  let dispatchedClustering = 0
+  let failedClustering = 0
+  for (const batch of pendingClusterBatches) {
+    try {
+      await dispatchBatchClusteringForProcessing(batch.id, storage)
+      dispatchedClustering++
+    } catch (err) {
+      failedClustering++
+      // eslint-disable-next-line no-console
+      console.error(
+        'process-derivatives: clustering_dispatch_failed',
+        JSON.stringify({
+          code: 'clustering_dispatch_failed',
+          batch_id: batch.id,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      )
+    }
+  }
+
   // eslint-disable-next-line no-console
   console.info(
-    `process-derivatives: complete — derivatives=${dispatchedDerivatives}/${failedDerivatives} proposals=${dispatchedProposals}/${failedProposals}`,
+    `process-derivatives: complete — derivatives=${dispatchedDerivatives}/${failedDerivatives} proposals=${dispatchedProposals}/${failedProposals} clustering=${dispatchedClustering}/${failedClustering}`,
   )
+}
+
+async function findBatchesNeedingClustering(): Promise<Array<{ id: string }>> {
+  if (!isSupabaseConfigured()) return []
+  const client = getSupabaseClient()
+  // Definition: state='committed' AND clustering_started_at IS NULL AND
+  // clustering_completed_at IS NULL — i.e., committed batches that
+  // haven't been clustered yet (dispatch crashed or reaper reset them).
+  // Bounded sweep to prevent the script from running forever on a
+  // backlog; subsequent runs pick up the next batch.
+  const { data, error } = await client
+    .from('upload_batches')
+    .select('id')
+    .eq('state', 'committed')
+    .is('clustering_started_at', null)
+    .is('clustering_completed_at', null)
+    .order('committed_at', { ascending: true })
+    .limit(50)
+  if (error) {
+    throw new Error(
+      `process-derivatives: findBatchesNeedingClustering failed (${error.message})`,
+    )
+  }
+  return ((data ?? []) as Array<{ id: string }>).map((r) => ({ id: r.id }))
 }
 
 async function findPendingProposalAssets(): Promise<PendingAsset[]> {

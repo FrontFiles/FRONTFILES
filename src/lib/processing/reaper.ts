@@ -234,3 +234,72 @@ export async function reapStuckProposalRows(
     return reapedRow
   })
 }
+
+// ── E5 — clustering job reaper ──────────────────────────────
+//
+// Sweeps stuck Class B clustering jobs on upload_batches. A batch is
+// considered stuck when clustering_started_at is older than the timeout
+// AND clustering_completed_at IS NULL. Resets clustering_started_at to
+// NULL so the next worker tick can re-claim. Stamps clustering_error
+// with 'reaper_timeout' so analytics can distinguish reaper resets
+// from genuine retries.
+
+export interface ReapedClusteringJob {
+  batchId: string
+  stuckDurationSeconds: number
+}
+
+export async function reapStuckClusteringJobs(
+  timeoutSeconds?: number,
+): Promise<ReapedClusteringJob[]> {
+  const effectiveTimeout = timeoutSeconds ?? readTimeoutFromEnv()
+
+  if (!isSupabaseEnvPresent()) {
+    return []
+  }
+
+  const client = getSupabaseClient()
+  const cutoffIso = new Date(Date.now() - effectiveTimeout * 1000).toISOString()
+
+  const { data, error } = await client
+    .from('upload_batches')
+    .update({
+      clustering_started_at: null,
+      clustering_error: 'reaper_timeout',
+    })
+    .lt('clustering_started_at', cutoffIso)
+    .is('clustering_completed_at', null)
+    .select('id, clustering_started_at')
+
+  if (error) {
+    throw new Error(
+      `reaper: reapStuckClusteringJobs failed (${error.message ?? 'unknown'})`,
+    )
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string
+    clustering_started_at: string | null
+  }>
+
+  const now = Date.now()
+  return rows.map((r) => {
+    const stuckMs = r.clustering_started_at
+      ? now - new Date(r.clustering_started_at).getTime()
+      : 0
+    const reapedRow: ReapedClusteringJob = {
+      batchId: r.id,
+      stuckDurationSeconds: Math.round(stuckMs / 1000),
+    }
+    // eslint-disable-next-line no-console
+    console.warn(
+      'reaper.stuck_clustering_reset',
+      JSON.stringify({
+        code: 'stuck_clustering_reset',
+        batch_id: reapedRow.batchId,
+        stuck_duration_seconds: reapedRow.stuckDurationSeconds,
+      }),
+    )
+    return reapedRow
+  })
+}

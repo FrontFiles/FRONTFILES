@@ -62,6 +62,25 @@ export interface GenerateEmbeddingResult {
   latencyMs: number
 }
 
+// E5 — narrow generateText for cluster naming (model='pro' only).
+// CCP 7's broader scope (generateText for query understanding etc.)
+// remains a future expansion; this signature deliberately constrains
+// the model so each role has its own bump policy + regression sample
+// per E1.5 §3.1.
+export interface GenerateTextOpts {
+  prompt: string
+  model: 'pro'
+  region: VertexRegion
+}
+
+export interface GenerateTextResult {
+  output: string
+  modelVersion: string
+  inputTokens: number
+  outputTokens: number
+  latencyMs: number
+}
+
 // ── Typed error classes (per §8.3) ─────────────────────────────
 
 /** Auth failure (missing JSON, invalid creds). Circuit counts. */
@@ -343,6 +362,60 @@ export async function generateEmbedding(
     embedding: values,
     modelVersion: modelName,
     inputTokens: result.usageMetadata?.totalTokenCount ?? 0,
+    latencyMs,
+  }
+}
+
+/**
+ * Call Vertex Gemini text-only generation (E5 — cluster naming).
+ *
+ * Locked to model: 'pro' per E5-DIRECTIVE.md §9.2. Adding 'flash' here
+ * would expand to CCP 7's broader scope without the regression
+ * discipline that E1.5 §3.1 requires per role.
+ *
+ * @throws VertexAuthError | VertexQuotaError | VertexPermanentError |
+ *         VertexTransientError | VertexResponseError
+ */
+export async function generateText(opts: GenerateTextOpts): Promise<GenerateTextResult> {
+  const start = Date.now()
+  const client = (await getClient(opts.region)) as {
+    getGenerativeModel: (cfg: { model: string }) => {
+      generateContent: (req: {
+        contents: Array<{ role: string; parts: Array<{ text: string }> }>
+      }) => Promise<{
+        response: {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+          usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
+          modelVersion?: string
+        }
+      }>
+    }
+  }
+
+  const modelName = 'gemini-2.5-pro'
+  let result: Awaited<ReturnType<ReturnType<typeof client.getGenerativeModel>['generateContent']>>
+  try {
+    const model = client.getGenerativeModel({ model: modelName })
+    result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: opts.prompt }] }],
+    })
+  } catch (err) {
+    throw classifyError(err)
+  }
+
+  const latencyMs = Date.now() - start
+  const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text
+  if (text === undefined) {
+    throw new VertexResponseError(
+      `Empty response from gemini-pro; no text in candidates[0].content.parts[0].`,
+    )
+  }
+
+  return {
+    output: text,
+    modelVersion: result.response.modelVersion ?? modelName,
+    inputTokens: result.response.usageMetadata?.promptTokenCount ?? 0,
+    outputTokens: result.response.usageMetadata?.candidatesTokenCount ?? 0,
     latencyMs,
   }
 }

@@ -23,6 +23,8 @@ import {
   type BatchRow,
   type BatchState,
 } from './batch-store'
+import { dispatchBatchClusteringForProcessing } from '@/lib/processing/batch-clustering-dispatcher'
+import { getStorageAdapter } from '@/lib/storage'
 
 // ── Request / result types ─────────────────────────────────
 
@@ -97,8 +99,29 @@ export async function commitBatch(
     creatorId: req.creatorId,
   })
   switch (result.kind) {
-    case 'ok':
+    case 'ok': {
+      // E5 — fire-and-forget clustering dispatch. Per E5-DIRECTIVE.md §6.2,
+      // the trigger is `commitBatch` success — fire-and-forget after
+      // `transitionToCommitted` returns ok. The brief v3 + corrigenda PR
+      // already corrected the §4.1 wording from 'committing' to 'committed'.
+      // Errors logged but do NOT roll back the commit (the batch is
+      // canonical; the reaper + next worker tick recover from any
+      // dispatch-time crash).
+      dispatchBatchClusteringForProcessing(result.batch.id, getStorageAdapter()).catch(
+        (err) => {
+          // eslint-disable-next-line no-console
+          console.error(
+            'commit.dispatch: clustering_dispatch_failed',
+            JSON.stringify({
+              code: 'clustering_dispatch_failed',
+              batch_id: result.batch.id,
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          )
+        },
+      )
       return { ok: true, batch: result.batch }
+    }
     case 'not_found':
       return {
         ok: false,
