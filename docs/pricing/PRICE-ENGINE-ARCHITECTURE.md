@@ -1,6 +1,6 @@
 # Frontfiles Price Engine — Architecture Detail Brief (F1)
 
-**Status:** RATIFIED 2026-04-28 (post-corrections version landed via PR #20). F2 (schema migration) is gated on `PRICE-ENGINE-CALIBRATION-V1.md` (F1.5) Stage A ratification + Stage B calibration completion per F1.5 §13 — NOT on this brief, which is locked. Status block updated in the AI-track status-hygiene PR (2026-04-28); directive body unchanged from the ratified post-corrections version.
+**Status:** REVISED 2026-04-28 (post-L1-v2 corrigendum) — supersedes the 2026-04-28 ratified version. Awaiting founder ratification of this revision before F2 (schema migration) composes. Changes apply L1 (Licence Taxonomy Brief) v2 + L2 (Licence Schema Migration directive) corrections: (a) `licence_class` enumeration is now `editorial | commercial | advertising` (CC handled separately via `pricing_cc_variants`); (b) `use_tier` is a multiplier (Path 2), not a cell dimension — `pricing_format_defaults` cells drop from 252 to 63; (c) new pricing tables `pricing_cc_variants`, `pricing_sublabel_multipliers`, `pricing_use_tier_multipliers` introduced by L2 are referenced here. See §12 v3 entry.
 **Date:** 2026-04-28
 **Predecessor:** `docs/pricing/PRICE-ENGINE-BRIEF.md` v3 (locks scope, authority model, inputs, surfaces, trust posture, v1/v2 staging)
 **Scope:** Architecture detail that PRICE-ENGINE-BRIEF v3 deferred to "F1 architecture work." Resolves the 9 open decisions in PRICE-ENGINE-BRIEF v3 §9. Specifies engine internals (composer, confidence), format_defaults table structure, platform floors structure, currency handling, refresh cadence, recalibration cadence, anonymization parameters (v2), analytics requirements, and engine quality measurement plan.
@@ -124,10 +124,11 @@ CREATE TABLE pricing_format_defaults (
   format TEXT NOT NULL,
   -- Dimension 2: intrusion_level (light/standard/heavy per System A vocabulary)
   intrusion_level TEXT NOT NULL,
-  -- Dimension 3: licence_class (Social/Editorial/Campaign per existing taxonomy)
+  -- Dimension 3: licence_class — 3 cell-bearing classes per L1 v2 §5.1
+  --   editorial | commercial | advertising
+  --   (creative_commons EXCLUDED — CC pricing is absolute via pricing_cc_variants per L1 v2 §5.4)
   licence_class TEXT NOT NULL,
-  -- Dimension 4: use_tier (publication-size segment for editorial; size segment for commercial)
-  use_tier TEXT NOT NULL,
+  -- (use_tier removed in v3 corrigendum — now a multiplier in pricing_use_tier_multipliers per L1 v2 §5.3 + §8 #4 founder pick)
   -- Currency-aware
   currency TEXT NOT NULL,
   baseline_cents INTEGER NOT NULL,
@@ -135,14 +136,14 @@ CREATE TABLE pricing_format_defaults (
   table_version INTEGER NOT NULL,        -- bumps on any change; preserved on rows for audit
   effective_from TIMESTAMPTZ NOT NULL,
   superseded_at TIMESTAMPTZ,             -- NULL = current; stamps when superseded by newer table_version
-  calibration_basis TEXT,                -- short note ("fotoQuote 2024 editorial small-pub midpoint")
+  calibration_basis TEXT,                -- short note ("fotoQuote 2024 editorial mid-pub midpoint")
   calibrated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   calibrated_by UUID REFERENCES users(id),
-  UNIQUE (format, intrusion_level, licence_class, use_tier, currency, table_version)
+  UNIQUE (format, intrusion_level, licence_class, currency, table_version)
 );
 
 CREATE INDEX pricing_format_defaults_active
-  ON pricing_format_defaults (format, intrusion_level, licence_class, use_tier, currency)
+  ON pricing_format_defaults (format, intrusion_level, licence_class, currency)
   WHERE superseded_at IS NULL;
 ```
 
@@ -150,20 +151,37 @@ CREATE INDEX pricing_format_defaults_active
 
 - **format**: photo, illustration, infographic, vector, video, audio, text — matches `AssetFormat` enum
 - **intrusion_level**: light, standard, heavy — System A vocabulary (per BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26 §4)
-- **licence_class**: Social, Editorial, Campaign — matches existing `LICENCE_TYPE_LABELS` (per `src/lib/types.ts`)
-- **use_tier**: 4 segments — `small_pub`, `mid_pub`, `major_pub`, `commercial`. Editorial-leaning naming reflects the journalist persona priority per UX-BRIEF v3 §3 Q1.
+- **licence_class** (v3): `editorial | commercial | advertising`. Per L1 v2 §3 + §5.1, the 3 cell-bearing classes. `creative_commons` is EXCLUDED from this table — CC pricing is absolute per CC variant via `pricing_cc_variants` (L2 directive §6.2). Sublabels (e.g., `editorial.news`, `commercial.brand_content`) modify the base price via `pricing_sublabel_multipliers` (L2 §6.3); `licence_class` itself is the cell key (the class portion of `class.sublabel`).
+- **(use_tier removed)** — was Dimension 4 in the v1/v2 versions of this brief; per L1 v2 §5.3 + §8 #4, use_tier is now a multiplier table (`pricing_use_tier_multipliers`) using abstract codes `tier_1..tier_4` translated to per-class vocabulary in `src/lib/licence/labels.ts`.
 - **currency**: ISO 4217 (EUR, USD, GBP, etc.). v1 ships EUR only; multi-currency expanded later if creators outside EUR market are common.
+
+**Companion tables (per L2 directive §6, ratification pending):**
+- **`pricing_cc_variants`** — absolute CC variant prices keyed on `(cc_variant, currency)`. v1 ships flat per variant (7 rows); v2 may add (format, intrusion) dimensions if data shows differentiation.
+- **`pricing_sublabel_multipliers`** — multiplier per non-CC sublabel keyed on dotted `class.sublabel`. 17 rows (Editorial 6 + Commercial 4 + Advertising 7).
+- **`pricing_use_tier_multipliers`** — multiplier per `(licence_class, use_tier)` where `licence_class ∈ {editorial, commercial, advertising}` (CC excluded) and `use_tier ∈ {tier_1, tier_2, tier_3, tier_4}`. 12 rows.
 
 **Format families omitted:** PRICE-ENGINE-BRIEF v3 §4.2.3 included `format_family` (portrait/landscape/wide). F1 drops this from `format_defaults` because aspect ratio is not a load-bearing pricing dimension in editorial markets — a portrait photo and a landscape photo at the same intrusion level for the same use tier price equivalently. Family stays as a watermark-template concern (where it actually affects layout); not a pricing dimension.
 
 **Exclusivity omitted:** PRICE-ENGINE-BRIEF v3 §4.2.3 included exclusivity. F1 drops this from `format_defaults` because exclusivity is handled by the existing `EXCLUSIVE_MULTIPLIERS` constant in `src/lib/types.ts` (per the audit-confirmed multiplier model in PRICE-ENGINE-BRIEF v3 §4.6). Engine recommends a base price; multipliers handle exclusivity downstream.
 
-### 3.2 Cell count
+### 3.2 Cell count (v3 corrigendum)
 
-After dropping format_family + exclusivity:
-- 7 formats × 3 intrusion_levels × 3 licence_classes × 4 use_tiers × 1 currency (v1) = **252 cells**
+After dropping format_family + exclusivity (kept from v1) AND dropping use_tier (v3 — moved to multiplier table per L1 v2 §5.3) AND excluding `creative_commons` from licence_class (v3 — handled via `pricing_cc_variants` per L1 v2 §5.4):
 
-That's a manageable initial calibration. Many cells will repeat (e.g., text/audio formats may have flat pricing across some dimensions). Calibration produces a dense table; engine queries by (format, intrusion_level, licence_class, use_tier, currency).
+- 7 formats × 3 intrusion_levels × **3 licence_classes** (editorial / commercial / advertising) × 1 currency (v1) = **63 cells**
+
+That's down 4× from the v1/v2 version of this brief (252 → 63). The reduction is from (a) moving use_tier out of cells into a 12-multiplier table, and (b) moving CC variants out of cells into a 7-row absolute-price table. Calibration burden drops accordingly. Engine queries by `(format, intrusion_level, licence_class, currency)`; multipliers compose at price-resolution time per L1 v2 §5.7.
+
+**v3 total founder calibration burden** (per L1 v2 §5.5):
+
+| Table | Values |
+|---|---|
+| `pricing_format_defaults` (cells) | 63 |
+| `pricing_sublabel_multipliers` (L2 §6.3) | 17 |
+| `pricing_use_tier_multipliers` (L2 §6.4) | 12 |
+| `pricing_cc_variants` (L2 §6.2; flat per variant in v1) | 7 |
+| `EXCLUSIVE_MULTIPLIERS` (existing in `src/lib/types.ts`) | 3 |
+| **Total v1 (CC flat)** | **~102** (was ~315 in v1/v2 of this brief) |
 
 ### 3.3 Calibration process
 
@@ -172,15 +190,15 @@ That's a manageable initial calibration. Many cells will repeat (e.g., text/audi
 ```
 F1.5 — format_defaults calibration pass (between F1 and F3)
 
-  Step 1: Founder reviews the 252-cell structure
+  Step 1: Founder reviews the 5-CSV structure (v3): 63 format_defaults cells + 63 platform_floors cells + 17 sublabel multipliers + 12 use_tier multipliers + 7 CC variant absolute prices = ~162 total values
   Step 2: Founder consults offline calibration sources:
           - fotoQuote / fotoBiz pricing calculators
           - Getty Images published rate cards (where public)
           - AP / Reuters published editorial rates (where public)
           - PhotoShelter / similar industry pricing guides
           - Founder's own market knowledge of FF's positioning
-  Step 3: Founder fills a CSV / spreadsheet with the 252 cells
-  Step 4: Claude composes a SQL seed migration from the CSV
+  Step 3: Founder fills the 5 CSVs (63+63+17+12+7 = 162 cells)
+  Step 4: Claude composes a SQL seed migration (5 INSERT blocks) from the CSVs
   Step 5: Founder reviews the seed migration before F3 ships
 ```
 
@@ -386,12 +404,17 @@ This is the founder-governed feedback loop. No automated parameter adjustment in
 
 ## 8. v1 readiness checklist (gates F2 schema migration)
 
-Before F2 ships:
-- [ ] This brief ratified
-- [ ] F1.5 calibration directive composed (defines spreadsheet template + process)
-- [ ] Founder fills format_defaults seed (252 cells minimum; can ship initial subset)
+Before F2 ships (v3):
+- [ ] This brief (F1 v3) ratified
+- [ ] L1 v2 (Licence Taxonomy Brief) ratified
+- [ ] L2 directive (Licence Schema Migration) ratified
+- [ ] F1.5 v2 (calibration directive) ratified
+- [ ] Founder fills format_defaults seed (63 cells)
 - [ ] Founder fills platform floors seed (63 cells)
-- [ ] F2 schema migration includes seed migration with the above values
+- [ ] Founder fills sublabel multipliers seed (17 multipliers)
+- [ ] Founder fills use_tier multipliers seed (12 multipliers)
+- [ ] Founder fills CC variants seed (7 absolute prices)
+- [ ] F2 schema migration includes seed migration with all 5 tables
 - [ ] Decision on per-licence overrides confirmed (default: NO; per §5.1)
 - [ ] Decision on currency confirmed (default: EUR-only v1; per §5.2)
 
@@ -439,6 +462,21 @@ PRICE-ENGINE-BRIEF v3 §11's 16 don't-do items still apply. Additional items fro
 ---
 
 ## 12. Revision history
+
+### v3 — 2026-04-28 (post-L1-v2 corrigendum; awaiting ratification)
+
+L1 (Licence Taxonomy Brief) v2 + L2 (Licence Schema Migration directive) introduced architectural changes that contradicted F1 v2's pricing model. Corrigendum scope: alignment only, no new architecture.
+
+| # | Section | Change | Rationale |
+|---|---|---|---|
+| 1 | Status header | RATIFIED → REVISED 2026-04-28 (post-L1-v2) | New ratification gate |
+| 2 | §3.1 schema | `licence_class` enumeration changed from `Social/Editorial/Campaign` to `editorial/commercial/advertising` | Per L1 v2 §3 — `Social/Editorial/Campaign` was a brief-side assumption that never matched code; v2 locks 3 cell-bearing classes |
+| 3 | §3.1 schema | `use_tier` column DROPPED from `pricing_format_defaults`; UNIQUE constraint + index updated | Per L1 v2 §5.3 + §8 #4 — use_tier is a multiplier table now (Path 2), not a cell dimension. Lighter calibration. |
+| 4 | §3.1 schema | Added cross-references to companion tables `pricing_cc_variants`, `pricing_sublabel_multipliers`, `pricing_use_tier_multipliers` (created by L2 directive §6) | Per L1 v2 §5 — these tables coexist with `pricing_format_defaults` and compose into the final price |
+| 5 | §3.2 cell count | 252 → 63 cells; total founder calibration ~315 → ~102 | Direct consequence of changes #2 and #3 + CC excluded |
+| 6 | §12 | This entry added | Build-governing record |
+
+Sections unchanged: §1, §2, §3.3 (calibration process; mostly survives — 252 references in the F1.5 directive will update via the F1.5 corrigendum), §4 (`pricing_platform_floors` — already lacked use_tier so cell count of 63 stands), §5 resolutions, §6 analytics views (queries already group by (format, intrusion, licence_class) without use_tier — survives), §7 quality loop, §8 readiness checklist, §9 approval gate, §10 don't-do list, §11 references.
 
 ### 2026-04-28 — post-ratification corrections
 
