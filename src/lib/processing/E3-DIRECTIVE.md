@@ -1,6 +1,6 @@
 # E3 — Per-Asset Vertex Gemini Vision Job (Class A Implementation)
 
-**Status:** DRAFT — awaiting founder ratification before implementation begins
+**Status:** RATIFIED 2026-04-27 + IMPLEMENTED via PR #23 (2026-04-28). Production cutover (`FFF_AI_REAL_PIPELINE=true`) gated on §18 verification gates that require founder action — Vertex pricing fill in `cost.ts`, `@google-cloud/vertexai` SDK shape verification in `google.ts`, GCP service account + Vertex AI User role. Status block updated in the AI-track status-hygiene PR (2026-04-28); directive body unchanged.
 **Date:** 2026-04-27
 **Predecessor gates:** E1 v2 ✓ + E1.5 ✓ + E2 directive ✓ (ratified 2026-04-27); E2 implementation must ship before E3 implementation begins (E3 reads `asset_proposals` schema E2 creates)
 **Governing documents:**

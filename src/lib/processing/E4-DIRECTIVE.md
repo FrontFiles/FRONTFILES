@@ -1,6 +1,6 @@
 # E4 — AI Pipeline Worker Integration
 
-**Status:** DRAFT — awaiting founder ratification before implementation begins
+**Status:** RATIFIED 2026-04-27 + IMPLEMENTED via PR #24 (2026-04-28). Status block updated in the AI-track status-hygiene PR (2026-04-28); directive body unchanged.
 **Date:** 2026-04-27
 **Predecessor gates:** E1 v2 ✓ + E1.5 ✓ + E2 directive ✓ + E3 directive ✓ (all ratified 2026-04-27); E2 + E3 implementation must ship before E4 implementation begins (E4 wires the engine E3 makes live).
 **Governing documents:**

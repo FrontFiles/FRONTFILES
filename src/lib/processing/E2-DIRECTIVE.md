@@ -1,6 +1,6 @@
 # E2 — AI Suggestion Pipeline Schema + Service Skeleton
 
-**Status:** DRAFT — awaiting founder ratification before implementation begins
+**Status:** RATIFIED 2026-04-27 + IMPLEMENTED via PR #17 (2026-04-27). Status block updated in the AI-track status-hygiene PR (2026-04-28); directive body unchanged.
 **Date:** 2026-04-27
 **Predecessor gates passed:** E1 v2 (revised 2026-04-27, ratified) + E1.5 (composed 2026-04-27, ratified)
 **Governing documents:**

@@ -1,8 +1,8 @@
 # E6 — UI Integration (V4 Hydration + API + Audit Wire-Up)
 
-**Status:** DRAFT — awaiting founder ratification before implementation begins
+**Status:** RATIFIED 2026-04-28 + IMPLEMENTED in three PRs: E6.A server foundations via PR #26, E6.B per-field threshold + AssetProposal widening via PR #27, E6.C hydration bootstrap + reducer action via PR #28 (all 2026-04-28). E6.D V4 visual polish (per-field confidence display in `InspectorAIProposalDetail.tsx`) is a deferred small follow-on — not yet composed; gated on the AGENTS.md UI/design gate (locked one-line scope sentence + testable exit criteria). Production cutover (`FFF_AI_REAL_PIPELINE=true`) gated on the same founder action items as E3. Status block updated in the AI-track status-hygiene PR (2026-04-28); directive body unchanged.
 **Date:** 2026-04-28
-**Predecessor gates:** E1 v2 ✓ + E1.5 ✓ + E2 directive ✓ + E3 directive ✓ + E4 directive ✓ + E5 directive ✓ (E5 ratification pending PR #18 review). E2 + E3 + E4 + E5 implementations must ship before E6 implementation begins. UI-side, also depends on V4 redesign shipped via PR #15 (already on main).
+**Predecessor gates:** E1 v2 ✓ + E1.5 ✓ + E2 directive ✓ + E3 directive ✓ + E4 directive ✓ + E5 directive ✓ (all ratified 2026-04-27/-28; see each directive's Status block). E2 + E3 + E4 + E5 implementations shipped before E6 implementation began. UI-side, also depends on V4 redesign shipped via PR #15 (already on main).
 **Governing documents:**
 - `src/lib/processing/AI-PIPELINE-BRIEF.md` v2 (E1) §6 — surfaces; §7 — trust + governance
 - `src/lib/processing/AI-PIPELINE-ARCHITECTURE.md` (E1.5) §5 — confidence floors; §4.4 — caption length
