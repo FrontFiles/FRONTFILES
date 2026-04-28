@@ -1,6 +1,6 @@
 # Frontfiles Licence Taxonomy — Architecture Brief (L1)
 
-**Status:** DRAFT — awaiting founder ratification before any L2+ directive composes
+**Status:** REVISED 2026-04-28 (v2; sublabel-naming corrections to v1, no architectural change) — awaiting founder ratification of this revision before L2 composes. v1 ratified 2026-04-28 via PR #30; v2 amends 5 sublabel names per the post-ratification audit (§12 v2 entry).
 **Date:** 2026-04-28
 **Scope:** Frontfiles licence taxonomy — main classes, sublabels, schema shape, pricing implications, sequencing
 **Governs:** Phase L (licence taxonomy refactor) — runs in parallel with Phases B (backend), C (UI rebuild), E (AI pipeline). Phase F (price engine) is **gated on this brief** because the existing 8-value `LicenceType` enum cannot drive F1.5 calibration as currently shaped.
@@ -76,7 +76,7 @@ This brief resolves the mismatch at the source: by replacing the flat 8-value ta
 |---|---|---|---|
 | L1 | **Main licence classes** | Four peer-level values: `editorial` · `creative_commons` · `commercial` · `advertising` | A licence asset is governed by exactly one class at any given (class, sublabel) tuple it carries; multi-select carries multiple tuples but each tuple is class-anchored |
 | L2 | **Multi-select** | Yes — `vault_assets.enabled_licences` carries a SET of (class, sublabel) tuples | Creators offer the asset under multiple licences in parallel (e.g., Editorial + Commercial); buyer picks ONE tuple at checkout. Existing `enabled_licences text[]` shape preserved; only the *values* change. |
-| L3 | **Schema shape (Shape A)** | `enabled_licences text[]` with **dotted `class.sublabel` entries** | Examples: `['editorial.news', 'editorial.feature', 'commercial.brand_content']`, `['creative_commons.cc_by_nc', 'editorial.documentary']`. Single column, simple queries, smallest refactor. |
+| L3 | **Schema shape (Shape A)** | `enabled_licences text[]` with **dotted `class.sublabel` entries** | Examples: `['editorial.news', 'editorial.longform', 'commercial.brand_content']`, `['creative_commons.cc_by_nc', 'editorial.documentary']`. Single column, simple queries, smallest refactor. |
 | L4 | **CC pricing model** | **Absolute prices** in `pricing_cc_variants` table — NOT `base × multiplier` | CC0 = €0 (or platform admin fee TBD); CC-BY = small fee; CC-BY-NC = paid for commercial use only; etc. Each CC variant has one absolute price per (format, intrusion). CC class does NOT consume cells in `pricing_format_defaults`. |
 | L5 | **use_tier model** | Multiplier table per non-CC class — NOT a cell dimension (Path 2 from prior audit) | `pricing_use_tier_multipliers` keyed on `(class, use_tier)` — 4 use_tier values × 3 non-CC classes = 12 multipliers. Drops calibration burden 3× vs F1's original. |
 | L6 | **Editorial medium restriction** | **None in v1** — Editorial-licensed asset is licensed across all media | Drops Print/Digital/Web/Broadcast as Editorial-side licence dimensions. v2 enrichment if creators ask for medium-restricted Editorial offerings. |
@@ -104,17 +104,22 @@ The Commercial-vs-Advertising split is intentional and follows industry-standard
 
 | Main class | Sublabels |
 |---|---|
-| **Editorial** | `news` · `feature` · `documentary` · `book` · `op_ed` · `educational` |
+| **Editorial** | `news` · `longform` · `documentary` · `book` · `commentary` · `educational` |
 | **Creative Commons** | `cc0` · `cc_by` · `cc_by_sa` · `cc_by_nc` · `cc_by_nd` · `cc_by_nc_sa` · `cc_by_nc_nd` |
-| **Commercial** | `brand_content` · `corporate` · `merchandise` · `internal_training` |
-| **Advertising** | `print_ad` · `digital_social_ad` · `out_of_home` · `broadcast` · `native_influencer` |
+| **Commercial** | `brand_content` · `corporate_communications` · `merchandise` · `internal_training` |
+| **Advertising** | `print_ad` · `digital_ad` · `social_ad` · `out_of_home` · `broadcast` · `native_advertorial` · `influencer` |
 
-**Notes on sublabel choices:**
+**Notes on sublabel choices (v2):**
 
+- **Editorial / `commentary` (v2; was `op_ed` in v1)** — broader than the print-newspaper-specific "op-ed"; covers opinion writing, analysis, editorial cartoons, longform takes, podcast commentary. Aligns with the platform's multi-format reality (text + audio + video creators).
+- **Editorial / `longform` (v2; was `feature` in v1)** — generic disambiguation from `documentary`; kept format-agnostic (no `magazine_` prefix because longform also lives in digital essays + podcasts).
 - **Editorial / `educational`** — placed under Editorial because it's information-dissemination, not revenue-generation. Some platforms split Educational off as its own peer class; v1 keeps it under Editorial for simplicity.
 - **Editorial — no medium-restriction sublabels in v1** (per L6). An Editorial asset is licensed across all media. If a creator wants "print only" pricing later, that's a v2 enrichment via additional sublabels.
-- **Creative Commons — full 7 variants** (proposed). Curated 3-4 (e.g., CC0 + CC-BY + CC-BY-NC) is an alternative; founder picks. Full 7 is more cognitive load but more legally accurate.
-- **Commercial — no `sponsored_editorial` sublabel.** Sponsored editorial / branded journalism is paid promotional content; FTC native-advertising guidance treats it as advertising. It belongs under Advertising → `native_influencer`. Prior turn's draft put it under Commercial; that was wrong.
+- **Creative Commons — full 7 variants** (locked at v2 ratification). Per founder pick on §8 #2: legal completeness over reduced cognitive load. UI labels each variant verbatim with plain-English summary (per §6.1).
+- **Commercial / `corporate_communications` (v2; was `corporate` in v1)** — disambiguates from `brand_content` (marketing-side) and `internal_training` (training-specific). Captures annual reports, employee comms, executive bios, internal/external corporate-comms work.
+- **Commercial — no `sponsored_editorial` sublabel.** Sponsored editorial / branded journalism is paid promotional content; FTC native-advertising guidance treats it as advertising. It belongs under Advertising → `native_advertorial`. Prior turn's draft put it under Commercial; that was wrong.
+- **Advertising / `digital_ad` + `social_ad` split (v2; was `digital_social_ad` bundled in v1)** — programmatic display ads and paid-social ads are distinct products with distinct pricing models (CPM-based programmatic vs paid-social CPM/engagement). Schema reflects.
+- **Advertising / `native_advertorial` + `influencer` split (v2; was `native_influencer` bundled in v1)** — native advertorial is publisher-side paid editorial-style content; influencer endorsement is creator/talent-side paid placement. Different rights structure (publisher owns native; talent licenses to brand for influencer) and different pricing model (CPM-based vs flat-fee per post).
 - **Advertising sublabels are medium-anchored** because medium IS the load-bearing distinction within advertising (an OOH billboard licence and a print-ad licence price differently). Medium restriction within Advertising is appropriate; medium restriction within Editorial is not (per L6).
 
 ### 4.3 Schema shape (Shape A)
@@ -130,25 +135,25 @@ ALTER TABLE vault_assets DROP CONSTRAINT vault_assets_licences_valid;
 ALTER TABLE vault_assets ADD CONSTRAINT vault_assets_licences_valid CHECK (
   enabled_licences <@ ARRAY[
     -- Editorial (6)
-    'editorial.news', 'editorial.feature', 'editorial.documentary',
-    'editorial.book', 'editorial.op_ed', 'editorial.educational',
+    'editorial.news', 'editorial.longform', 'editorial.documentary',
+    'editorial.book', 'editorial.commentary', 'editorial.educational',
     -- Creative Commons (7)
     'creative_commons.cc0',
     'creative_commons.cc_by', 'creative_commons.cc_by_sa',
     'creative_commons.cc_by_nc', 'creative_commons.cc_by_nd',
     'creative_commons.cc_by_nc_sa', 'creative_commons.cc_by_nc_nd',
     -- Commercial (4)
-    'commercial.brand_content', 'commercial.corporate',
+    'commercial.brand_content', 'commercial.corporate_communications',
     'commercial.merchandise', 'commercial.internal_training',
-    -- Advertising (5)
-    'advertising.print_ad', 'advertising.digital_social_ad',
+    -- Advertising (7)
+    'advertising.print_ad', 'advertising.digital_ad', 'advertising.social_ad',
     'advertising.out_of_home', 'advertising.broadcast',
-    'advertising.native_influencer'
+    'advertising.native_advertorial', 'advertising.influencer'
   ]
 );
 ```
 
-**Total enumerated values: 22** (6 + 7 + 4 + 5).
+**Total enumerated values: 24** (6 + 7 + 4 + 7).
 
 ### 4.4 TypeScript shape
 
@@ -158,21 +163,21 @@ ALTER TABLE vault_assets ADD CONSTRAINT vault_assets_licences_valid CHECK (
 export type LicenceClass = 'editorial' | 'creative_commons' | 'commercial' | 'advertising'
 
 export type LicenceSublabel =
-  // Editorial
-  | 'editorial.news' | 'editorial.feature' | 'editorial.documentary'
-  | 'editorial.book' | 'editorial.op_ed' | 'editorial.educational'
-  // Creative Commons
+  // Editorial (6)
+  | 'editorial.news' | 'editorial.longform' | 'editorial.documentary'
+  | 'editorial.book' | 'editorial.commentary' | 'editorial.educational'
+  // Creative Commons (7)
   | 'creative_commons.cc0'
   | 'creative_commons.cc_by' | 'creative_commons.cc_by_sa'
   | 'creative_commons.cc_by_nc' | 'creative_commons.cc_by_nd'
   | 'creative_commons.cc_by_nc_sa' | 'creative_commons.cc_by_nc_nd'
-  // Commercial
-  | 'commercial.brand_content' | 'commercial.corporate'
+  // Commercial (4)
+  | 'commercial.brand_content' | 'commercial.corporate_communications'
   | 'commercial.merchandise' | 'commercial.internal_training'
-  // Advertising
-  | 'advertising.print_ad' | 'advertising.digital_social_ad'
+  // Advertising (7)
+  | 'advertising.print_ad' | 'advertising.digital_ad' | 'advertising.social_ad'
   | 'advertising.out_of_home' | 'advertising.broadcast'
-  | 'advertising.native_influencer'
+  | 'advertising.native_advertorial' | 'advertising.influencer'
 
 // Helpers
 export function getClass(s: LicenceSublabel): LicenceClass {
@@ -194,7 +199,7 @@ Existing 8-value entries map to new dotted entries as follows. Picks marked **re
 | `commercial` | `commercial.brand_content` | Default sublabel within Commercial |
 | `broadcast` | `advertising.broadcast` | Was structurally wrong (medium ≠ licence); reclassified to Advertising |
 | `print` | (dropped from this asset's enabled set) | MEDIUM, not licence. Backfill emits a one-time creator notification: "Your asset previously offered 'print' use. Editorial-licensed assets now cover all media; if you want print-restricted Advertising specifically, enable `advertising.print_ad`." |
-| `digital` | (dropped — same as `print`) | Notification suggests `advertising.digital_social_ad` if applicable |
+| `digital` | (dropped — same as `print`) | Notification suggests `advertising.digital_ad` or `advertising.social_ad` if applicable |
 | `web` | (dropped — same as `print`) | Same |
 | `merchandise` | `commercial.merchandise` | Direct rename |
 | `creative_commons` | `creative_commons.cc_by` (**review**) | Default to CC-BY because it's the most permissive of the attribution-required variants. Backfill flags every such asset for creator review (toast on next edit; admin batch tool for review). |
@@ -224,11 +229,11 @@ That's the v1 founder calibration target — down from F1.5's original 252 by 4x
 ```
 Editorial × 6 sublabels = 6 multipliers
 Commercial × 4 sublabels = 4 multipliers
-Advertising × 5 sublabels = 5 multipliers
-Total: 15 sublabel multipliers
+Advertising × 7 sublabels = 7 multipliers   (v2; was 5 in v1)
+Total: 17 sublabel multipliers              (v2; was 15 in v1)
 ```
 
-Founder calibrates each as a single number (e.g., `editorial.news = 1.0` anchor; `editorial.feature = 1.2`; `editorial.documentary = 1.4`; etc.).
+Founder calibrates each as a single number (e.g., `editorial.news = 1.0` anchor; `editorial.longform = 1.2`; `editorial.documentary = 1.4`; etc.).
 
 ### 5.3 use_tier multipliers (L5)
 
@@ -266,13 +271,13 @@ But many cells will be `0` (e.g., CC0 across all formats/intrusions = free) or r
 | Table | Values to fill |
 |---|---|
 | `pricing_format_defaults` (cells) | 63 |
-| `pricing_sublabel_multipliers` | 15 |
+| `pricing_sublabel_multipliers` | 17 (v2; was 15 in v1) |
 | `pricing_use_tier_multipliers` | 12 |
 | `pricing_cc_variants` (if flat per variant) | 7 |
 | `pricing_cc_variants` (if varying by format/intrusion) | up to 147 (likely ~20-30 distinct) |
 | `EXCLUSIVE_MULTIPLIERS` (existing) | 3 (no change) |
-| **Total v1 (CC flat)** | **~100** |
-| **Total v1 (CC by format/intrusion)** | **~120-240** |
+| **Total v1 (CC flat)** | **~102** (v2; was ~100 in v1) |
+| **Total v1 (CC by format/intrusion)** | **~122-242** (v2; was ~120-240 in v1) |
 
 Recommend CC-flat for v1. ~100 calibration values is tractable for a founder calibration pass; 240 is not. CC-by-format becomes a v2 enrichment if data shows variant prices need format differentiation.
 
@@ -489,6 +494,22 @@ To keep subsequent sessions from drifting:
 ---
 
 ## 12. Revision history
+
+### v2 — 2026-04-28 (sublabel-naming corrections; no architectural change)
+
+Post-ratification audit of v1 surfaced five sublabel-naming concerns. Founder delegated the resolution call ("you decide the best"); all 5 amendments applied. Sublabel count: 22 → 24. Architectural locks in §3 unchanged.
+
+| # | v1 | v2 | Why |
+|---|---|---|---|
+| 1 | `editorial.op_ed` | `editorial.commentary` | "Op-ed" is print-newspaper-specific; "commentary" matches the platform's multi-format reality (text + audio + video creators). Broader and less era-specific. |
+| 2 | `editorial.feature` | `editorial.longform` | Disambiguates from `documentary` (both were longform); kept format-agnostic (no `magazine_` prefix because longform also lives in digital essays + podcasts). |
+| 3 | `commercial.corporate` | `commercial.corporate_communications` | "Corporate" alone overlapped with `brand_content` and `internal_training`. Industry term `corporate_communications` captures annual reports, employee comms, executive bios. |
+| 4 | `advertising.digital_social_ad` | `advertising.digital_ad` + `advertising.social_ad` (split) | Programmatic display and paid-social are distinct products with distinct pricing (CPM-based programmatic vs paid-social CPM/engagement). Schema reflects. |
+| 5 | `advertising.native_influencer` | `advertising.native_advertorial` + `advertising.influencer` (split) | Publisher-side native advertorial and creator/talent-side influencer have different rights structure (publisher-owned vs talent-licensed) and pricing model (CPM-based vs flat-fee per post). |
+
+**Sections touched in v2:** §4.2 (sublabel table) · §4.3 (CHECK enumeration) · §4.4 (TypeScript types) · §3 (L3 row example) · §5.2 (sublabel multiplier count: 15 → 17) · §5.5 (total calibration: ~100 → ~102) · §12 (this entry).
+
+**Sections unchanged:** §1, §2, §3 (other rows), §4.1, §4.5 (backfill mapping — none of the legacy 8 values map to v2-renamed entries), §5.1 (cell count 63 unchanged), §5.3, §5.4, §5.6, §5.7, §6, §7 (sequencing), §8 (open decisions; #1 closed by v2), §9, §10, §11.
 
 ### v1 — 2026-04-28 (initial composition)
 
