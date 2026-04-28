@@ -636,7 +636,6 @@ export async function writeAuditEvent(event: AuditEvent): Promise<void> {
 ### 5.6 `settings.ts` — settings reader with env multipliers
 
 ```typescript
-import { env } from '@/lib/env'
 import { getSupabaseClient } from '@/lib/db/client'
 
 export interface EffectiveSettings {
@@ -674,7 +673,12 @@ export async function getEffectiveSettings(): Promise<EffectiveSettings> {
   if (error || !data) {
     throw new Error(`Failed to read ai_pipeline_settings: ${error?.message ?? 'no row'}`)
   }
-  const isProd = env.NODE_ENV === 'production'
+  // Live read of NODE_ENV (NOT the Zod-parsed snapshot from `env`) so vi.stubEnv-based
+  // tests can flip prod/dev mode per case. Aligns with the codebase's `flags` getter
+  // pattern — CCP Pattern-a Option 2b; see src/lib/env.ts. The Zod-parsed `env` is
+  // frozen at module load and cannot be re-stubbed once `getEffectiveSettings` has
+  // imported it.
+  const isProd = process.env.NODE_ENV === 'production'
   const result: EffectiveSettings = {
     daily_cap_cents: isProd
       ? data.daily_cap_cents
@@ -907,7 +911,7 @@ Founder reviews the PR before merge. Specifically verify:
 | Item | What "approved" means |
 |---|---|
 | Migration filename uses ship-date timestamp | Not `2026-04-27` if ship is later |
-| Pricing constants in `models.ts` are `VERIFY_AT_E2_SHIP` | Replaced with verified-current Vertex strings before merge |
+| Version pin strings in `models.ts` are `VERIFY_AT_E2_SHIP` | Replaced with verified-current Vertex model version strings before merge. Pricing constants live in `cost.ts` (E3 scope per E2 don't-do #10) — not E2's concern. |
 | Cost ceiling defaults in `ai_pipeline_settings` seed | $500/day + $10000/month or amended values |
 | RLS service-role-only is honored on all 4 tables | No client-facing policies added |
 | Mock adapter covers photo/illustration; infographic/vector mirror illustration shape | Or explicit fixture-extension call |

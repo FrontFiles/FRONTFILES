@@ -78,7 +78,7 @@ The pipeline has **two job classes**, both shipping in v1 per D-U2:
 - Idempotency: UNIQUE `(asset_id)` on `asset_proposals` table prevents duplicate rows; replay overwrites the proposal row and refreshes `asset_embeddings.updated_at`
 
 **Class B — Batch-scoped clustering job (v1, per D-U2):**
-- Trigger: deferred batch analysis. Fires when (a) a batch transitions to `'committing'` state per `upload_batches`, OR (b) explicit creator action ("Re-analyze this session"). Does NOT fire per-asset.
+- Trigger: deferred batch analysis. Fires fire-and-forget when (a) `commitBatch` succeeds (i.e., `transitionToCommitted` returns `ok` and `upload_batches.state='committed'` is written), OR (b) explicit creator action ("Re-analyze this session"). Does NOT fire per-asset. The `upload_batches.state` enum permits `'committing'` but no current code path writes that value — the v1 commit RPC is single-step `'open' → 'committed'`. The string `'committing'` in `src/lib/upload/v3-types.ts` is the UI-side commit-in-flight phase (per `V3State.commit.phase`), distinct from the DB state per migration `20260419000001`'s COMMENT.
 - Inputs: embeddings of all assets in the batch (already populated by Class A in `asset_embeddings`); `vault_assets.captured_at`; `asset_proposals.caption`
 - Outputs: cluster assignments + cluster confidence (Silhouette score per cluster) + AI-suggested cluster names (via `gemini-2.5-pro`)
 - Concurrency: one job per batch; bounded by batch size (max ~2,000 assets per UX-BRIEF v3 §3 Q2)
@@ -151,7 +151,7 @@ v1 ships image-format proposals only. Non-image formats receive `generation_stat
 **Story group clustering pipeline:**
 
 ```
-1. Trigger: batch state transitions to 'committing' (per upload_batches state machine)
+1. Trigger: commitBatch success (state='committed' written per upload_batches state machine; fire-and-forget after the success branch returns)
    OR explicit creator "Re-analyze session" action
 2. Query: SELECT ae.embedding, va.captured_at, ap.caption
    FROM asset_embeddings ae
