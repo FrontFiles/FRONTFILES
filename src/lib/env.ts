@@ -103,6 +103,13 @@ const envSchema = z.object({
       'Reaper stuck-row timeout in seconds. Pending rows whose processing_started_at is older than this are reset by reaper.ts. Default 600.',
     ),
 
+  FFF_AI_REAL_PIPELINE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .describe(
+      'Gates real Vertex AI calls in the AI suggestion pipeline. `false` → mock adapter is selected regardless of NODE_ENV. `true` → real Vertex adapter; requires GOOGLE_APPLICATION_CREDENTIALS + GOOGLE_CLOUD_PROJECT_ID. Production cutover happens via this flag flip after E2-E6 land.',
+    ),
+
   // ─── Required: Newsroom verification (NR-D5b-i) ───────────────
   NEWSROOM_VERIFICATION_HMAC_SECRET: z.string().min(1, {
     message:
@@ -270,6 +277,7 @@ const rawEnv = {
   FFF_STORAGE_FS_ROOT: process.env.FFF_STORAGE_FS_ROOT,
   FFF_STORAGE_SUPABASE_BUCKET: process.env.FFF_STORAGE_SUPABASE_BUCKET,
   FFF_PROCESSING_TIMEOUT_SECONDS: process.env.FFF_PROCESSING_TIMEOUT_SECONDS,
+  FFF_AI_REAL_PIPELINE: process.env.FFF_AI_REAL_PIPELINE,
   NEWSROOM_VERIFICATION_HMAC_SECRET: process.env.NEWSROOM_VERIFICATION_HMAC_SECRET,
   SCANNER_GCV_PROJECT_ID: process.env.SCANNER_GCV_PROJECT_ID,
   SCANNER_GCV_API_KEY: process.env.SCANNER_GCV_API_KEY,
@@ -388,6 +396,9 @@ export const flags = {
   },
   get economicV1Ui(): boolean {
     return process.env.FFF_ECONOMIC_V1_UI === 'true'
+  },
+  get aiRealPipeline(): boolean {
+    return process.env.FFF_AI_REAL_PIPELINE === 'true'
   },
 }
 

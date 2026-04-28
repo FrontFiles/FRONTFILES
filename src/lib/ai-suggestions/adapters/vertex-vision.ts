@@ -1,30 +1,42 @@
 /**
- * Frontfiles — Vertex Gemini Vision adapter (E2 STUB)
+ * Frontfiles — Vertex Gemini Vision adapter (E3 real implementation)
  *
- * Production adapter shell. The real implementation lands in E3
- * alongside the @google-cloud/vertexai SDK install. Until then, any
- * call here throws NotImplementedError so the production code path
- * cannot silently fall through to a misconfigured state.
+ * Per E3-DIRECTIVE.md §15.
  *
- * The E3 directive (src/lib/processing/E3-DIRECTIVE.md) governs the
- * real implementation contract.
+ * Translates the engine's adapter contract into the @/lib/ai/google.ts
+ * Vertex client wrapper. The wrapper handles SDK loading, region routing,
+ * auth, and typed errors; this adapter just builds the prompt + schema
+ * and unwraps the response into the engine's expected shape.
  *
  * SERVER-ONLY.
  */
 
+import { analyseImage as vertexAnalyseImage } from '@/lib/ai/google'
+import { buildPrompt, VISION_RESPONSE_JSON_SCHEMA } from '../prompt-builder'
 import type { VisionAdapter, AnalyseImageOpts, AnalyseImageResult } from './types'
-
-class NotImplementedError extends Error {
-  constructor() {
-    super(
-      'vertex-vision adapter not yet implemented — lands in E3 alongside the @google-cloud/vertexai SDK install.',
-    )
-    this.name = 'NotImplementedError'
-  }
-}
+import type { VisionResponse } from '../schema'
 
 export const vertexVisionAdapter: VisionAdapter = {
-  async analyseImage(_opts: AnalyseImageOpts): Promise<AnalyseImageResult> {
-    throw new NotImplementedError()
+  async analyseImage(opts: AnalyseImageOpts): Promise<AnalyseImageResult> {
+    const prompt = buildPrompt(opts.format, opts.taxonomyTopN)
+
+    const result = await vertexAnalyseImage({
+      imageBytes: opts.imageBytes,
+      imageMime: opts.imageMime,
+      prompt,
+      responseSchema: VISION_RESPONSE_JSON_SCHEMA,
+      model: 'flash',
+      region: opts.region,
+    })
+
+    // The wrapper returns parsed JSON as `output: unknown` — caller
+    // validates via Zod (engine.ts step 7). Adapter returns the raw
+    // shape; engine owns validation + filtering.
+    return {
+      response: result.output as VisionResponse,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      modelVersion: result.modelVersion,
+    }
   },
 }

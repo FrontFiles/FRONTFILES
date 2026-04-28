@@ -117,6 +117,11 @@ export type AuditEventType =
   // AI
   | 'ai.vision.analyse'
   | 'ai.gemini.call'
+  | 'ai.gemini.cache_hit'
+  | 'ai.gemini.circuit_open'
+  | 'ai.gemini.circuit_close'
+  | 'ai.gemini.quota_exceeded'
+  | 'ai.gemini.caption_truncated'
   | 'ai.cache.hit'
   | 'ai.cache.miss'
   // KYC

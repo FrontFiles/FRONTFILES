@@ -2,12 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Mock supabase so settings.ts can read PROD_DEFAULTS without a live DB.
 const mockSingle = vi.fn()
-const mockEq = vi.fn(() => ({ single: mockSingle }))
+const mockEq = vi.fn(() => ({ single: mockSingle, eq: mockEq, maybeSingle: vi.fn() }))
 const mockSelect = vi.fn(() => ({ eq: mockEq }))
 const mockFrom = vi.fn(() => ({ select: mockSelect }))
 
 vi.mock('@/lib/db/client', () => ({
   getSupabaseClient: () => ({ from: mockFrom }),
+  // Force dual-mode → false in this test suite. The engine skips the
+  // production-only paths (cache / quota / cost / embedding), exercising
+  // only the adapter + caption-guard + Zod validation.
+  isSupabaseConfigured: () => false,
 }))
 
 import { generateAssetProposal } from '../engine'
@@ -48,15 +52,17 @@ describe('generateAssetProposal (mock-mode end-to-end)', () => {
       assetId: '00000000-0000-0000-0000-000000000001',
       creatorId: '00000000-0000-0000-0000-000000000002',
       format: 'photo',
-      imageBytes: STUB_BYTES,
-      imageMime: 'image/jpeg',
+      originalBytes: STUB_BYTES,
       region: 'europe-west4',
+      taxonomyTopN: [],
     })
-    expect(result.caption).toMatch(/photo/i)
-    expect(result.keywords).toContain('photo')
-    expect(result.caption_confidence).toBeGreaterThan(0)
-    expect(result.keywords.length).toBeGreaterThanOrEqual(3)
-    expect(result.keywords.length).toBeLessThanOrEqual(8)
+    expect(result.visionResponse.caption).toMatch(/photo/i)
+    expect(result.visionResponse.keywords).toContain('photo')
+    expect(result.visionResponse.caption_confidence).toBeGreaterThan(0)
+    expect(result.visionResponse.keywords.length).toBeGreaterThanOrEqual(3)
+    expect(result.visionResponse.keywords.length).toBeLessThanOrEqual(8)
+    expect(result.cacheHit).toBe(false)
+    expect(result.region).toBe('europe-west4')
   })
 
   it('returns the illustration fixture for an illustration asset', async () => {
@@ -64,12 +70,12 @@ describe('generateAssetProposal (mock-mode end-to-end)', () => {
       assetId: '00000000-0000-0000-0000-000000000003',
       creatorId: '00000000-0000-0000-0000-000000000002',
       format: 'illustration',
-      imageBytes: STUB_BYTES,
-      imageMime: 'image/jpeg',
+      originalBytes: STUB_BYTES,
       region: 'europe-west4',
+      taxonomyTopN: [],
     })
-    expect(result.caption).toMatch(/illustration/i)
-    expect(result.keywords).toContain('illustration')
+    expect(result.visionResponse.caption).toMatch(/illustration/i)
+    expect(result.visionResponse.keywords).toContain('illustration')
   })
 
   it('returns the infographic fixture for an infographic asset', async () => {
@@ -77,11 +83,12 @@ describe('generateAssetProposal (mock-mode end-to-end)', () => {
       assetId: '00000000-0000-0000-0000-000000000004',
       creatorId: '00000000-0000-0000-0000-000000000002',
       format: 'infographic',
-      imageBytes: STUB_BYTES,
-      imageMime: 'image/jpeg',
+      originalBytes: STUB_BYTES,
       region: 'us-central1',
+      taxonomyTopN: [],
     })
-    expect(result.caption).toMatch(/infographic/i)
+    expect(result.visionResponse.caption).toMatch(/infographic/i)
+    expect(result.region).toBe('us-central1')
   })
 
   it('returns the vector fixture for a vector asset', async () => {
@@ -89,37 +96,38 @@ describe('generateAssetProposal (mock-mode end-to-end)', () => {
       assetId: '00000000-0000-0000-0000-000000000005',
       creatorId: '00000000-0000-0000-0000-000000000002',
       format: 'vector',
-      imageBytes: STUB_BYTES,
-      imageMime: 'image/jpeg',
+      originalBytes: STUB_BYTES,
       region: 'europe-west4',
+      taxonomyTopN: [],
     })
-    expect(result.caption).toMatch(/vector/i)
+    expect(result.visionResponse.caption).toMatch(/vector/i)
   })
 
-  it('throws when FFF_AI_REAL_PIPELINE=true (production stub not implemented in E2)', async () => {
-    process.env.FFF_AI_REAL_PIPELINE = 'true'
-    await expect(
-      generateAssetProposal({
-        assetId: '00000000-0000-0000-0000-000000000001',
-        creatorId: '00000000-0000-0000-0000-000000000002',
-        format: 'photo',
-        imageBytes: STUB_BYTES,
-        imageMime: 'image/jpeg',
-        region: 'europe-west4',
-      }),
-    ).rejects.toThrow(/not yet implemented/i)
-  })
-
-  it('result shape passes Zod VisionResponseSchema', async () => {
+  it('result.visionResponse passes Zod VisionResponseSchema', async () => {
     const { VisionResponseSchema } = await import('../schema')
     const result = await generateAssetProposal({
       assetId: '00000000-0000-0000-0000-000000000001',
       creatorId: '00000000-0000-0000-0000-000000000002',
       format: 'photo',
-      imageBytes: STUB_BYTES,
-      imageMime: 'image/jpeg',
+      originalBytes: STUB_BYTES,
       region: 'europe-west4',
+      taxonomyTopN: [],
     })
-    expect(() => VisionResponseSchema.parse(result)).not.toThrow()
+    expect(() => VisionResponseSchema.parse(result.visionResponse)).not.toThrow()
+  })
+
+  it('mock-mode skips real pipeline (cost stays 0; cacheHit false)', async () => {
+    const result = await generateAssetProposal({
+      assetId: '00000000-0000-0000-0000-000000000001',
+      creatorId: '00000000-0000-0000-0000-000000000002',
+      format: 'photo',
+      originalBytes: STUB_BYTES,
+      region: 'europe-west4',
+      taxonomyTopN: [],
+    })
+    // Dual-mode is off (mocked isSupabaseConfigured=false) → engine skips
+    // cache/quota/cost/embedding. costCents stays 0.
+    expect(result.costCents).toBe(0)
+    expect(result.cacheHit).toBe(false)
   })
 })
