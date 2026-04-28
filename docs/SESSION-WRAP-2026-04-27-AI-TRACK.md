@@ -7,6 +7,56 @@
 
 ---
 
+> ## UPDATE — 2026-04-27 (late evening, post-PR#16 + PR#17)
+>
+> Since this wrap was first written, the on-machine verification +
+> PR open work landed:
+>
+> - **PR #16 merged** (`chore/tsc-baseline-cleanup`) — cleaned the
+>   pre-existing tsc baseline. The wrap's "8 pre-existing tolerated"
+>   was actually 9 (the 8 in option (e) + 1 Stripe SDK API-version
+>   drift that surfaced with the 2026-04-27 SDK refresh). Baseline
+>   is now **0 errors**.
+> - **PR #17 open** (`feat/ai-e2-schema-skeleton`) — 3 commits, 24
+>   files, +6454/-204. All 8 E2 verification gates green this session:
+>   tsc 0; vitest 48/48 ai-suggestions + 1946/1976 full; `supabase db
+>   reset` clean; RLS = `t` on all 4 new tables; singleton seeded with
+>   E1.5 defaults; rollback drops 4 tables to 0 rows + clean re-apply;
+>   `bun run build` exit 0; no new routes.
+> - **`settings.ts` patch inside the E2 implementation** — uses
+>   `process.env.NODE_ENV` (live read) not `env.NODE_ENV` (frozen
+>   Zod-parsed snapshot). Required for `vi.stubEnv`-based tests to
+>   pass. Aligns with the codebase's `flags` getter pattern (CCP
+>   Pattern-a Option 2b — see `src/lib/env.ts`). E2 directive §5.6
+>   needs a post-merge corrigendum.
+>
+> ### What this means for the NEXT session
+>
+> - **§3 ratification gates table:** E2 implementation row is now
+>   "PR #17 open" (was "on-machine verification pending"). E3 / E4
+>   directives still ratified, awaiting implementation slots.
+>   E5 / E6 directives still not composed.
+> - **§5 founder action items 1, 2:** DONE (verify E2 + open PR).
+>   Items 3-7 (E3 + E4 implementation slots, GCP service account +
+>   Vertex AI User role, Vertex pricing + SDK verification at E3
+>   ship) remain. Items 8-12 (WM-D1, WM-D3, F1 ratification, F1.5
+>   compose, BP-D1) remain.
+> - **§6 RESUME PROMPT default opener:** options (a) and (e) are
+>   DONE. **New default after PR #17 merges: option (b) — implement
+>   E3**. While PR #17 sits in review, options (c) compose-E5 and
+>   (d) ratify-F1 remain valid parallel work; option (e) is moot.
+> - **§7 one-shot prompts:** "Verify E2 + open PR" and "Cleanup the
+>   8 pre-existing tsc errors" are DONE; preserved as historical
+>   record.
+> - **§8 state-to-verify commands:** still useful, with two
+>   adjustments: the `tsc baseline 8` expectation is now `0`; main
+>   HEAD will be PR #17's merge commit (currently `e2bd02e` =
+>   PR #16's merge if PR #17 hasn't merged yet).
+>
+> Rest of this wrap below remains current as historical record.
+
+---
+
 ## 1. What this doc is
 
 A cold-start handoff for the AI track specifically. Drop the RESUME PROMPT in §6 into a fresh Claude session and the new agent picks up where this session stopped on the AI pipeline.
