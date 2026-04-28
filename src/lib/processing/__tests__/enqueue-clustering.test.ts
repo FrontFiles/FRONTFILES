@@ -3,8 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockMaybeSingle = vi.fn()
 const mockSelect = vi.fn(() => ({ maybeSingle: mockMaybeSingle }))
 const mockSingle = vi.fn()
-const mockSelectSingle = vi.fn(() => ({ single: mockSingle }))
-const mockEqUserId = vi.fn(() => ({ select: mockSelectSingle }))
+// Production chain: .from('users').select('ai_region').eq('id', creatorId).single()
+// 4 levels — eq() returns single() directly, no extra select() in between.
+const mockEqUserId = vi.fn(() => ({ single: mockSingle }))
 const mockSelectUsers = vi.fn(() => ({ eq: mockEqUserId }))
 
 const mockIs = vi.fn(() => ({ select: mockSelect }))

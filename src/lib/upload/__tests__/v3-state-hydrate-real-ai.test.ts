@@ -89,7 +89,7 @@ describe('HYDRATE_REAL_AI_PROPOSALS', () => {
       tags: ['old'],
       geography: ['Lisbon'],
       priceSuggestion: null,
-      privacySuggestion: 'public',
+      privacySuggestion: 'PUBLIC',
       licenceSuggestions: ['editorial'],
       confidence: 0.5,
       rationale: 'old rationale',
@@ -110,7 +110,7 @@ describe('HYDRATE_REAL_AI_PROPOSALS', () => {
     expect(merged.tags_confidence).toBe(0.9)
     // Other-pillar fields preserved
     expect(merged.geography).toEqual(['Lisbon'])
-    expect(merged.privacySuggestion).toBe('public')
+    expect(merged.privacySuggestion).toBe('PUBLIC')
     expect(merged.licenceSuggestions).toEqual(['editorial'])
     // Backward-compat overall = MAX-of-per-field
     expect(merged.confidence).toBe(0.9)
