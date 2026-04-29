@@ -2,7 +2,7 @@ format,intrusion_level,licence_class,currency,baseline_cents,calibration_basis
 photo,light,editorial,EUR,,
 photo,light,commercial,EUR,,
 photo,light,advertising,EUR,,
-photo,standard,editorial,EUR,,
+photo,standard,editorial,EUR,22000,"Mid-market anchor: 2x above Reuters self-service (~€110), ~20% below format.com per-image guidance (~€275); back-solves to €550 at major_pub (multiplier 2.5x) matching format.com full-page rate, and €88-132 at small_pub matching wire territory. Sources researched 2026-04-28 (NUJ Freelance Fees Guide; format.com magazine resources; Reuters self-service)."
 photo,standard,commercial,EUR,,
 photo,standard,advertising,EUR,,
 photo,heavy,editorial,EUR,,
