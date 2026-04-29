@@ -1,7 +1,7 @@
 # Frontfiles Licence Taxonomy — Architecture Brief (L1)
 
-**Status:** REVISED 2026-04-28 (v2; sublabel-naming corrections to v1, no architectural change) — awaiting founder ratification of this revision before L2 composes. v1 ratified 2026-04-28 via PR #30; v2 amends 5 sublabel names per the post-ratification audit (§12 v2 entry).
-**Date:** 2026-04-28
+**Status:** REVISED 2026-04-29 (v2.2; architectural change — drop `intrusion_level` from pricing dimension per Stage B 2026-04-28 founder discovery; supersedes v2). v2 sublabel-naming corrections retained. v1 ratified 2026-04-28 via PR #30; v2 ratified 2026-04-28 via PR #32; v2.2 awaiting founder ratification (§12 v2.2 entry).
+**Date:** 2026-04-29
 **Scope:** Frontfiles licence taxonomy — main classes, sublabels, schema shape, pricing implications, sequencing
 **Governs:** Phase L (licence taxonomy refactor) — runs in parallel with Phases B (backend), C (UI rebuild), E (AI pipeline). Phase F (price engine) is **gated on this brief** because the existing 8-value `LicenceType` enum cannot drive F1.5 calibration as currently shaped.
 **Supersedes:** the flat 8-value `LicenceType` enum in `src/lib/types.ts:360-378` (legacy; Phase L decommissions it after backfill stabilises)
@@ -12,6 +12,8 @@
 - `docs/pricing/PRICE-ENGINE-ARCHITECTURE.md` (F1) §3.1 (licence_class as cell dimension; assumed `Social/Editorial/Campaign`)
 - `docs/pricing/PRICE-ENGINE-CALIBRATION-V1.md` (F1.5) §3 (hard prerequisite: verify `LICENCE_TYPE_LABELS` — verification done in this brief, drift confirmed)
 - `docs/audits/BLUE-PROTOCOL-USER-FACING-COPY-AUDIT-2026-04-26.md` (BP-D7 — language discipline; "Creative Commons" alone is not legally meaningful)
+- `docs/audits/BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26.md` §4 (System A vocabulary — `intrusion_level` cross-system observations; v2.2 lock anchor)
+- `src/lib/processing/profiles.ts:60-169` (SEED_PROFILES — source of truth for the watermark `intrusionLevel` vocabulary; v2.2 lock anchor)
 - Consumers (must update through Phase L): `src/lib/transaction/{types,reducer,context,finalization}.ts`, `src/lib/special-offer/{types,services}.ts`, `src/lib/fulfilment/types.ts`, `src/app/api/special-offer/route.ts`, `src/app/vault/upload/_components/{SessionDefaultsPopover,inspector/InspectorFieldEditor}.tsx`
 
 ---
@@ -77,7 +79,7 @@ This brief resolves the mismatch at the source: by replacing the flat 8-value ta
 | L1 | **Main licence classes** | Four peer-level values: `editorial` · `creative_commons` · `commercial` · `advertising` | A licence asset is governed by exactly one class at any given (class, sublabel) tuple it carries; multi-select carries multiple tuples but each tuple is class-anchored |
 | L2 | **Multi-select** | Yes — `vault_assets.enabled_licences` carries a SET of (class, sublabel) tuples | Creators offer the asset under multiple licences in parallel (e.g., Editorial + Commercial); buyer picks ONE tuple at checkout. Existing `enabled_licences text[]` shape preserved; only the *values* change. |
 | L3 | **Schema shape (Shape A)** | `enabled_licences text[]` with **dotted `class.sublabel` entries** | Examples: `['editorial.news', 'editorial.longform', 'commercial.brand_content']`, `['creative_commons.cc_by_nc', 'editorial.documentary']`. Single column, simple queries, smallest refactor. |
-| L4 | **CC pricing model** | **Absolute prices** in `pricing_cc_variants` table — NOT `base × multiplier` | CC0 = €0 (or platform admin fee TBD); CC-BY = small fee; CC-BY-NC = paid for commercial use only; etc. Each CC variant has one absolute price per (format, intrusion). CC class does NOT consume cells in `pricing_format_defaults`. |
+| L4 | **CC pricing model** | **Absolute prices** in `pricing_cc_variants` table — NOT `base × multiplier` | CC0 = €0 (or platform admin fee TBD); CC-BY = small fee; CC-BY-NC = paid for commercial use only; etc. Per v2.2: each CC variant has one absolute price per (cc_variant[, format]). CC class does NOT consume cells in `pricing_format_defaults`. |
 | L5 | **use_tier model** | Multiplier table per non-CC class — NOT a cell dimension (Path 2 from prior audit) | `pricing_use_tier_multipliers` keyed on `(class, use_tier)` — 4 use_tier values × 3 non-CC classes = 12 multipliers. Drops calibration burden 3× vs F1's original. |
 | L6 | **Editorial medium restriction** | **None in v1** — Editorial-licensed asset is licensed across all media | Drops Print/Digital/Web/Broadcast as Editorial-side licence dimensions. v2 enrichment if creators ask for medium-restricted Editorial offerings. |
 | L7 | **Engine return shape (α)** | `recommendPrice(asset, context) → Recommendation[]` — one per enabled class | Brief v3 §4.4 single-`Recommendation` shape replaced. Cart/offer carries the (class, sublabel) tuple selected at checkout, not the whole array. |
@@ -210,17 +212,58 @@ Existing 8-value entries map to new dotted entries as follows. Picks marked **re
 
 ## 5. Pricing implications (corrigendum to F1 + F1.5; lands in L4 directive)
 
-### 5.1 Cell count and structure
+**v2.2 corrigendum:** §5 sections rewritten to drop `intrusion_level` from pricing dimensions per path-(1) (Stage B 2026-04-28 founder discovery; v2.2 §12 entry; cascades A through F follow). §5.0 (new) makes the pricing dimensions explicit lock-in. §5.1, §5.4, §5.5, §5.7 reflect the new shape. §5.2, §5.3, §5.6 unchanged.
 
-`pricing_format_defaults` is keyed on (format, intrusion_level, **licence_class**, currency). v1 ships EUR only.
+### 5.0 Pricing dimensions — what does and doesn't drive price (v2.2)
 
-**Excluded from cells:** Creative Commons (handled separately per L4 / §5.4); use_tier (handled as multiplier per L5 / §5.3).
+**The pricing engine reads exactly these dimensions for any (format, licence) pair:**
 
 ```
-Cells = 7 formats × 3 intrusion_levels × 3 classes (editorial, commercial, advertising) × 1 currency = 63
+final_price = format_default(format, licence_class)        # baseline cell
+            × sublabel_multiplier(sublabel)                # use-type refinement
+            × use_tier_multiplier(class, use_tier)         # audience size
+            × exclusivity_multiplier(exclusivity_tier)     # exclusivity premium
+
+# CC variants override — direct lookup, no multiplier chain:
+if class == 'creative_commons':
+    final_price = cc_variant_price(sublabel[, format])     # absolute
 ```
 
-That's the v1 founder calibration target — down from F1.5's original 252 by 4x.
+**These dimensions DO drive price** (locked v2.2):
+
+- **`format`** — photo / illustration / infographic / vector / video / audio / text (creator-side asset shape)
+- **`licence_class`** — editorial / commercial / advertising / creative_commons (use-rights category)
+- **`sublabel`** — within class (e.g., `editorial.news` vs `editorial.documentary`)
+- **`use_tier`** — buyer audience size (small_pub / mid_pub / major_pub / wire_syndication for editorial; per-class vocabulary per §5.3)
+- **`exclusivity_tier`** — existing `EXCLUSIVE_MULTIPLIERS` per F1 §4.6
+- **CC variant** — for `creative_commons` class only (absolute price per §5.4)
+
+**These dimensions DO NOT drive price** (locked v2.2):
+
+- **`intrusion_level` (light / standard / heavy)** — this is the creator's chosen WATERMARK INTENSITY on the public preview image (System A vocabulary per `BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26.md` §4; defined at `src/lib/processing/profiles.ts:60-169` SEED_PROFILES). It governs **preview protection only**. The licensed file delivered to the buyer is the original, unwatermarked file. Pricing has zero structural reason to vary by the creator's preview-protection choice.
+- **medium / channel / format-size** (print vs digital vs broadcast) — explicitly out of scope for Editorial v1 per L6. Advertising sublabels are medium-anchored because medium IS load-bearing within Advertising; Editorial / Commercial / CC are media-agnostic.
+- **geography** — not in v1 model. v2 enrichment if creators / buyers ask for region-restricted licensing.
+- **time window / reach beyond use_tier** — handled implicitly by sublabel + use_tier in v1.
+
+**Why intrusion_level was incorrectly in pricing through v2:**
+
+The `intrusion_level` dimension was inherited into `pricing_format_defaults` cell key from `vault_assets.intrusion_level` (a watermark-system column, present because System A's compositor needed it). The cell key was constructed without explicit founder ratification of the economic logic. The 0.7× / 1.3× ratios in `CALIBRATION-PROCESS.md` §4 Phase 3 were drift defaults; no documented economic story justified them. Founder discovery during Stage B 2026-04-28 surfaced the architectural error; v2.2 corrects it.
+
+**`vault_assets.intrusion_level` STAYS** — it remains valid as the creator's watermark choice for preview generation (already shipped in `supabase/migrations/20260417100001/2/3_watermark_profile_*.sql`). Just no longer queried by the pricing engine.
+
+### 5.1 Cell count and structure (v2.2)
+
+`pricing_format_defaults` is keyed on (format, **licence_class**, currency). v1 ships EUR only.
+
+**Excluded from cells:** Creative Commons (handled separately per L4 / §5.4); `use_tier` (handled as multiplier per L5 / §5.3); `intrusion_level` (per §5.0 — not a pricing dimension).
+
+```
+Cells = 7 formats × 3 classes (editorial, commercial, advertising) × 1 currency = 21
+```
+
+That's the v2.2 founder calibration target — down from v2's 63 (and from F1.5's original 252).
+
+**Editorial-only v1 scope** (per Stage B 2026-04-28 session log §3.1/3.2; commercial + advertising deferred to v2): **7 cells**.
 
 ### 5.2 Sublabel multipliers
 
@@ -234,6 +277,8 @@ Total: 17 sublabel multipliers              (v2; was 15 in v1)
 ```
 
 Founder calibrates each as a single number (e.g., `editorial.news = 1.0` anchor; `editorial.longform = 1.2`; `editorial.documentary = 1.4`; etc.).
+
+**v1 editorial-only scope per Stage B**: 6 editorial sublabel multipliers; commercial + advertising rows stay in CSV shape as forward-compat placeholders (per L2 schema CHECK accepting both).
 
 ### 5.3 use_tier multipliers (L5)
 
@@ -254,32 +299,42 @@ Per-class use_tier vocabulary differs (per prior audit Path 1 → Path 2 transit
 
 UI displays the right vocabulary based on selected class (the codes are abstract; the labels render contextually).
 
-### 5.4 CC variants (absolute price table)
+**v1 editorial-only scope per Stage B**: 4 editorial use_tier multipliers; commercial + advertising rows as forward-compat placeholders.
 
-`pricing_cc_variants` keyed on `(cc_variant, format, intrusion_level)`. v1 ships EUR only.
+### 5.4 CC variants (absolute price table) (v2.2)
+
+`pricing_cc_variants` keyed on `(cc_variant, format)` (v2.2; intrusion_level dropped per §5.0). v1 ships EUR only.
 
 ```
-7 CC variants × 7 formats × 3 intrusion_levels × 1 currency = 147 cells absolute
+v2 (pre-v2.2):  7 variants × 7 formats × 3 intrusions × 1 currency = 147 cells absolute
+v2.2:           7 variants × 7 formats × 1 currency               = 49 cells absolute (if varying by format)
+v1 recommended: 7 variants flat per variant                       = 7 cells absolute
 ```
 
-But many cells will be `0` (e.g., CC0 across all formats/intrusions = free) or repeat (e.g., CC-BY may carry the same admin fee across formats). Practical calibration burden is much lower than 147 — likely ~20-30 distinct values, with the rest derivable by ratio.
+Many cells will be `0` (e.g., CC0 across all formats = free) or repeat (e.g., CC-BY may carry the same admin fee across formats). Practical calibration burden is much lower than 49 — likely ~10-15 distinct values if varying by format, with the rest derivable by ratio.
 
-**Open question for the L4 corrigendum directive:** whether CC pricing varies by (format, intrusion) at all, or is just per-variant flat. If flat per-variant: 7 absolute prices total. Founder decides at L4.
+**Open question for the L4 corrigendum directive:** whether CC pricing varies by `format` at all, or is just per-variant flat. If flat per-variant: 7 absolute prices total. Founder decides at L4 (recommended: flat for v1).
 
-### 5.5 Total founder calibration burden
+### 5.5 Total founder calibration burden (v2.2)
 
-| Table | Values to fill |
-|---|---|
-| `pricing_format_defaults` (cells) | 63 |
-| `pricing_sublabel_multipliers` | 17 (v2; was 15 in v1) |
-| `pricing_use_tier_multipliers` | 12 |
-| `pricing_cc_variants` (if flat per variant) | 7 |
-| `pricing_cc_variants` (if varying by format/intrusion) | up to 147 (likely ~20-30 distinct) |
-| `EXCLUSIVE_MULTIPLIERS` (existing) | 3 (no change) |
-| **Total v1 (CC flat)** | **~102** (v2; was ~100 in v1) |
-| **Total v1 (CC by format/intrusion)** | **~122-242** (v2; was ~120-240 in v1) |
+| Table | Values to fill (v2.2) | v2 baseline | Δ |
+|---|---|---|---|
+| `pricing_format_defaults` (cells; full scope) | 21 | 63 | -42 |
+| `pricing_format_defaults` (cells; v1 editorial-only scope per Stage B) | **7** | n/a | new scope |
+| `pricing_sublabel_multipliers` | 17 (unchanged) | 17 | — |
+| `pricing_sublabel_multipliers` (v1 editorial-only) | **6** | n/a | new scope |
+| `pricing_use_tier_multipliers` | 12 (unchanged) | 12 | — |
+| `pricing_use_tier_multipliers` (v1 editorial-only) | **4** | n/a | new scope |
+| `pricing_cc_variants` (flat per variant — recommended) | 7 (unchanged) | 7 | — |
+| `pricing_cc_variants` (varying by format) | up to 49 (~10-15 distinct) | 147 (~20-30 distinct) | -98 |
+| `EXCLUSIVE_MULTIPLIERS` (existing) | 3 (unchanged) | 3 | — |
+| **Total v2.2 full scope (CC flat)** | **60** | 102 | -42 |
+| **Total v2.2 v1 editorial-only scope** | **~31** | n/a | new scope |
+| **Total v2.2 full scope (CC by format)** | **~80** | ~122-242 | -42 to -162 |
 
-Recommend CC-flat for v1. ~100 calibration values is tractable for a founder calibration pass; 240 is not. CC-by-format becomes a v2 enrichment if data shows variant prices need format differentiation.
+**Recommend CC-flat for v1.** ~31 calibration values for v1 editorial-only scope is highly tractable (was ~60 under v2 with intrusion in scope). Path-(1) cascade (cascade A–F per Stage B 2026-04-28 follow-on plan composed 2026-04-29) implements this reduction.
+
+**v1 editorial-only Stage B status (post Phase α.3, per `docs/pricing/calibration/CANONICAL-SOURCES.md` §11):** all 7 `format_defaults` editorial cells calibrated and ready for L5 regeneration drop-in (photo €220 HIGH; illustration €200 MEDIUM-HIGH; infographic €280 MEDIUM; vector €150 MEDIUM; video €300 MEDIUM-HIGH; audio €130 MEDIUM-HIGH; text €350 HIGH).
 
 ### 5.6 Engine return shape (L7 / α)
 
@@ -299,24 +354,24 @@ Each `Recommendation` carries:
 - `basis_breakdown` per F1
 - A `tier_matrix` field with the 4 use_tier prices (display-only; surfaces in upload UI per L8 / γ)
 
-L4 corrigendum locks the precise shape change against F1 §4.4.
+L4 corrigendum locks the precise shape change against F1 §4.4. (L4b BRIEF v4 — PR #35, merged 8d95b89 — already locked the `Recommendation[]` per-asset wrapper; v2.2 path-(1) is dimension-only and does not affect the wrapper shape.)
 
-### 5.7 Buyer-side at checkout
+### 5.7 Buyer-side at checkout (v2.2)
 
 Buyer picks (licence_class, sublabel, use_tier, exclusivity_tier). Final price computed at checkout:
 
 ```
-final_price = format_default(format, intrusion, class)
+final_price = format_default(format, class)
             × sublabel_multiplier(sublabel)
             × use_tier_multiplier(class, use_tier)
             × exclusivity_multiplier(exclusivity_tier)
 
 # CC variants override — direct lookup, no multiplier chain:
 if class == 'creative_commons':
-    final_price = cc_variant_price(sublabel)  # absolute
+    final_price = cc_variant_price(sublabel[, format])  # absolute
 ```
 
-The multiplier chain is the same shape F1's existing model uses; only the cell-vs-multiplier split changes.
+The multiplier chain is the same shape F1's existing model uses; `intrusion_level` is dropped from `format_default()` lookup per §5.0. The cell-vs-multiplier split otherwise unchanged.
 
 ---
 
@@ -385,19 +440,19 @@ Phase L — Licence Taxonomy Refactor (8 directives)
        • F1 §3.1: licence_class is `editorial | commercial | advertising` (3, not 3 with CC); CC handled separately
        • F1 §4.1: schema additions for pricing_cc_variants, pricing_sublabel_multipliers, pricing_use_tier_multipliers
        • F1 §4.4: Recommendation shape — wrap in AssetRecommendations with array of per-class entries
-       • F1.5 §3.2: cell count math 63 (not 252)
-       • F1.5 §6.1, §7.1: new CSV templates reflect new dimensions
+       • F1.5 §3.2: cell count math (v2.2: 21, not 63 or 252)
+       • F1.5 §6.1, §7.1: new CSV templates reflect new dimensions (no intrusion_level column per v2.2)
        • Founder ratifies before L5 tooling resumes
 
   L5 — F1.5 tooling RESUMES (was blocked here pending L1-L4)
-       • Bootstrap script generates new CSV set:
-           - format_defaults_v1_eur.csv (63 rows)
-           - sublabel_multipliers_v1.csv (15 rows)
-           - use_tier_multipliers_v1.csv (12 rows)
+       • Bootstrap script generates new CSV set per v2.2 shape:
+           - format_defaults_v1_eur.csv (21 rows full scope; 7 rows v1 editorial-only)
+           - sublabel_multipliers_v1.csv (17 rows full; 6 v1)
+           - use_tier_multipliers_v1.csv (12 rows full; 4 v1)
            - cc_variants_v1_eur.csv (7 rows for flat CC variant pricing)
        • Converter script emits SQL seed for all four tables
        • Templates + process notes per F1.5
-       • Founder calibration pass (~100 values; 6-10 hr offline)
+       • Founder calibration pass (~31 v1 editorial-only values; ~60 full scope; hours not days)
 
   L6 — F2-F11 (engine + adapters + UI) — ships against new taxonomy
        • F2 schema migration absorbs L2 + L4 changes
@@ -422,7 +477,7 @@ Phase L — Licence Taxonomy Refactor (8 directives)
 
 **Phase F is gated on L1-L4.** F1.5 tooling cannot ship until the licence taxonomy is locked and F1+F1.5 reflect the new model. F1.5 → F2 → F3+ all sit downstream of L4 ratification.
 
-**Realistic calendar: L1-L4 = 1 week of audit-first composition + founder ratification. L5 founder calibration = 6-10 hours offline. L6-L8 = ongoing through F-track ship.**
+**Realistic calendar: L1-L4 = 1 week of audit-first composition + founder ratification. L5 founder calibration = ~hours under v2.2 v1-editorial-only scope (was 6-10 hr under v2). L6-L8 = ongoing through F-track ship.**
 
 ---
 
@@ -430,15 +485,16 @@ Phase L — Licence Taxonomy Refactor (8 directives)
 
 These do NOT block L1 ratification but must be resolved in their respective downstream directives:
 
-1. **Sublabel naming review** (§4.2) — founder may amend any of the 22 proposed values before L2 composes. Naming-only change; no architectural impact.
+1. **Sublabel naming review** (§4.2) — founder may amend any of the 24 proposed values before L2 composes. Naming-only change; no architectural impact.
 2. **CC variant curation vs full 7** (§4.2) — full 7 is proposed; curated 3-4 is alternative for cognitive-load reduction. Decided at L2.
-3. **CC pricing shape — flat per variant or vary by (format, intrusion)?** (§5.4) — recommend flat for v1 (7 prices); v2 enrichment if data shows differentiation needed. Decided at L4.
+3. **CC pricing shape — flat per variant or vary by `format`?** (§5.4; v2.2-updated) — recommend flat for v1 (7 prices); v2 enrichment if data shows differentiation needed. Decided at L4.
 4. **use_tier vocabulary per class** (§5.3) — proposed as `small_pub/mid_pub/major_pub/wire_syndication` for editorial, `small_business/mid/enterprise/fortune500` for commercial, `local/regional/national/global` for advertising. Founder amends at L4.
 5. **Buyer-side use_tier picker UX** — at checkout, how does the buyer indicate their tier? (Dropdown? Inferred from buyer profile?) Decided in L7 UI directive.
 6. **Backfill defaults for legacy `creative_commons` assets** (§4.5) — proposed default `cc_by` with creator review flag. Founder amends at L3.
 7. **`pricing_cc_variants` numerical values** — founder calibration in L5.
 8. **Sublabel multiplier values + use_tier multiplier values** — founder calibration in L5.
 9. **Whether to drop `LicenceType` legacy enum entirely at L8 or keep it as a backward-compat alias** — decided at L8 based on backfill stability.
+10. **Social licence (v2.2-pending L1 v2.1 amendment)** — per Stage B 2026-04-28 §3.2, v1 scope = Editorial + CC + Social. Social licence draft composed 2026-04-28 (`docs/licence/SOCIAL-LICENCE-SPEC-V1-DRAFT.md`); 4 outstanding corrections + architectural placement lock (sublabel under editorial vs new top-level class) pending founder decision before L1 v2.1 amendment composes.
 
 ---
 
@@ -473,6 +529,8 @@ To keep subsequent sessions from drifting:
 10. **Don't expose engine cost (per BP-D7 + F1) or licence-rights certifications (per BP-D7) in any creator- or buyer-facing copy.** Trust language stays advisory: "Recommended licence pricing", "Suggested CC variant", never "Verified" / "Certified" / "Authoritative".
 11. **Don't introduce a `media[]` column.** v1 explicitly drops the medium dimension as a separate column (per §2.2 + L6). Medium is encoded in Advertising sublabels only; Editorial/Commercial/CC are media-agnostic.
 12. **Don't require `licence_class` as a stored column on `vault_assets`.** It's derived from `enabled_licences` entries via `getClass()` helper. Storing it separately introduces sync risk.
+13. **Don't re-introduce `intrusion_level` (or any watermark-related dimension) into pricing tables.** Per v2.2 §5.0: watermark intensity is creator preview-protection only, not a pricing input. The licensed file delivered to the buyer is the original, unwatermarked file. Pricing has zero structural reason to vary by the creator's preview-protection choice. `vault_assets.intrusion_level` stays as a watermark-system column; pricing engine MUST NOT query it.
+14. **Don't introduce new pricing dimensions (geography, medium, time-window, reach) without an explicit founder ratification + new economic-story doc.** The current pricing dimension set per §5.0 is locked at v2.2. v2 enrichment may add geography or medium-restriction; each addition requires its own L1 amendment with explicit economic justification, NOT a quiet schema add.
 
 ---
 
@@ -485,15 +543,60 @@ To keep subsequent sessions from drifting:
 - Sister architecture (price engine): `docs/pricing/PRICE-ENGINE-BRIEF.md` v3 + `PRICE-ENGINE-ARCHITECTURE.md` (F1) + `PRICE-ENGINE-CALIBRATION-V1.md` (F1.5)
 - Trust language posture: `docs/audits/BLUE-PROTOCOL-USER-FACING-COPY-AUDIT-2026-04-26.md` (BP-D7)
 - Standing posture: root `CLAUDE.md` (item 9 — protect terminology; item 14 — red-team for broken mappings)
+- **v2.2 path-(1) anchors:**
+  - `docs/audits/BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26.md` §4 (System A vocabulary cross-system observations; intrusion_level is watermark, not pricing)
+  - `src/lib/processing/profiles.ts:60-169` (SEED_PROFILES — source of truth for `intrusionLevel: 'light' | 'standard' | 'heavy'` watermark vocabulary)
+  - `supabase/migrations/20260417100001_watermark_profile_enums.sql`, `20260417100002_watermark_profile_tables.sql`, `20260417100003_watermark_profile_indexes.sql` (already-shipped watermark layer; `vault_assets.intrusion_level` STAYS per §5.0)
+  - `docs/pricing/calibration/STAGE-B-SESSION-LOG-2026-04-28.md` (founder discovery + v1 scope decisions: Editorial + CC + Social only; commercial + advertising deferred to v2)
+  - `docs/pricing/calibration/CANONICAL-SOURCES.md` (Phase α — 5-tier authority hierarchy + §11 path-(1)-ready 7-cell editorial spec drop-in)
 - Future:
-  - `docs/licence/L2-DIRECTIVE.md` (schema migration + new module — TBD on Stage A approval)
+  - `docs/licence/L2-DIRECTIVE.md` (schema migration + new module — composed PR #33; v2.2 cascade B = narrow comment amendment per L2 §11 don't-do #9)
   - `docs/licence/L3-DIRECTIVE.md` (backfill + dual-read — TBD)
-  - `docs/pricing/F1-CORRIGENDUM-LICENCE-TAXONOMY.md` (L4 — TBD)
-  - `docs/pricing/PRICE-ENGINE-CALIBRATION-V1.md` revision (L4 — TBD)
+  - `docs/pricing/PRICE-ENGINE-ARCHITECTURE.md` (F1 v4 corrigendum — cascade C; v3 → v4 drops `intrusion_level` from `pricing_format_defaults` + `pricing_platform_floors` schemas + indexes). Replaces the v2-era reference to a separate `F1-CORRIGENDUM-*` file; L4a PR #34 confirmed the corrigenda land directly in F1/F1.5 docs, not a dedicated corrigendum doc.
+  - `docs/pricing/PRICE-ENGINE-CALIBRATION-V1.md` (F1.5 v3 corrigendum — cascade C; v2 → v3 drops intrusion column from CSV schemas in §6 / §6A / §6B)
+  - L1 v2.1 amendment (social licence) — pending founder resolution of 4 corrections + placement lock per `docs/licence/SOCIAL-LICENCE-SPEC-V1-DRAFT.md`
 
 ---
 
 ## 12. Revision history
+
+### v2.2 — 2026-04-29 (architectural change — drop `intrusion_level` from pricing dimension)
+
+**Composition note:** This v2.2 entry was originally composed 2026-04-29 evening on the working tree of branch `docs/pricing-stage-b-editorial-format-defaults`; the working-tree composition was lost on 2026-04-30 during a runbook git operation that overwrote unstaged changes. The current entry is **reconstructed 2026-04-30 from session-context recall** — substantive content (cascade impact table, §5.0 dimension lock, §10 don't-do additions) preserved verbatim; minor phrasing in §11 references and v2.2 reasoning narrative may differ from the original. Founder review against intent recommended before merge.
+
+**Trigger:** Founder discovery during Stage B 2026-04-28 calibration session. While deriving editorial cells under v2's 7×3×3=63 schema, founder asked "what's the difference between light, standard and heavy?" Audit revealed `intrusion_level` was inherited into `pricing_format_defaults` cell key from System A watermark vocabulary (per `BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26.md` §4; `src/lib/processing/profiles.ts:60-169` SEED_PROFILES). Watermark intensity governs preview protection only; the licensed file delivered to the buyer is the original (unwatermarked); pricing has zero structural reason to vary by the creator's preview-protection choice. Founder verdict: "watermark has nothing to do with the suggested price for the asset."
+
+**Decision:** Path (1) — drop `intrusion_level` from pricing entirely. Alternative paths considered:
+- Path (2) repurpose dimension to "use intrusion" — required new data source (buyer-side picker / creator-declared field) which is its own UX + data-model decision. Deferred.
+- Path (3) keep with watermark semantic + add economic story — rejected per founder ("that's stupid"). Watermark and pricing are orthogonal concerns.
+
+**Cascade impact (this is amendment A; cascades B-F follow per Stage B 2026-04-28 follow-on plan composed 2026-04-29):**
+
+| # | Section | Change |
+|---|---|---|
+| 1 | §5.0 (NEW) | Add explicit "Pricing dimensions — what does and doesn't drive price" section; locks the 6 dimensions that DO drive price + the 4 that don't (intrusion_level / medium / geography / time-window-or-reach beyond use_tier) |
+| 2 | §5.1 | Cell formula: 7 × 3 × 3 = 63 → **7 × 3 = 21**. Cell key: (format, intrusion_level, licence_class, currency) → (format, licence_class, currency). v1 editorial-only Stage B scope = **7 cells** |
+| 3 | §5.4 | CC variants key: (cc_variant, format, intrusion_level) → (cc_variant, format). Cell count if varying by format: 147 → **49**. v1 flat-per-variant unchanged at 7 |
+| 4 | §5.5 | Calibration burden table rewritten: format_defaults full scope 63 → 21 (v1 ed-only = 7); CC by format 147 → 49; total v2.2 full scope CC-flat 102 → **60**; total v1 editorial-only scope = **~31** |
+| 5 | §5.7 | Final price formula: drop intrusion arg from `format_default()` lookup |
+| 6 | §10 | New don't-do #13 (don't re-introduce intrusion as pricing dimension) + #14 (don't add new pricing dimensions without explicit founder ratification + economic-story doc) |
+| 7 | §11 | Add references to CANONICAL-SOURCES.md (Phase α composition), STAGE-B-SESSION-LOG, watermark audit doc, profiles.ts source-of-truth, and already-shipped watermark migrations |
+| 8 | §12 | This entry |
+| 9 | Top status block | v2.2 status + dating |
+
+**Sections unchanged in v2.2:** §1 (purpose), §2 (current state), §3 (locked decisions L1-L10 — intrusion was never a top-level locked decision; it was a downstream cell-key choice that drifted in via watermark vocabulary), §4 (taxonomy + sublabels), §5.2 (sublabel multipliers — 17 unchanged; v1 editorial-only = 6), §5.3 (use_tier multipliers — 12 unchanged; v1 editorial-only = 4), §5.6 (engine return shape — Recommendation didn't reference intrusion; L4b BRIEF v4 wrapper unaffected), §6 (trust + governance), §7 (sequencing — minor edits to L4/L5 estimates reflecting new shape), §8 (open decisions — added #10 social licence pending), §9 (approval gate).
+
+**Stage B Phase α companion artifact:** `docs/pricing/calibration/CANONICAL-SOURCES.md` (composed 2026-04-29 in same session) — 5-tier source authority hierarchy (1A direct rate cards → 1B authoritative-but-no-public-tariff → 2 published commercial rates → 3 stock floor → 4 heuristic); per-format source registry; EU collecting societies cross-reference (VG Bild-Kunst, GEMA, SACEM, ALCS, VG Wort, etc.); §11 path-(1)-ready cell spec for the 7 editorial cells (photo €220, illustration €200, infographic €280, vector €150, video €300, audio €130, text €350).
+
+**Already-shipped watermark layer (no migration action needed):** `vault_assets.intrusion_level` + `watermark_profiles` + `watermark_intrusion_level` enum + indexes already landed in `supabase/migrations/20260417100001/2/3_watermark_profile_*.sql`. These are correct System A surface; cascade B-F do NOT touch them. `vault_assets.intrusion_level` STAYS as a watermark-system column; pricing engine MUST NOT query it.
+
+**Cascade sequencing (post-v2.2 ratification):**
+- **Cascade A** — this amendment (L1 v2.2)
+- **Cascade B** — L2 directive amendment (NARROW: L2 only defines `pricing_cc_variants`, `pricing_sublabel_multipliers`, `pricing_use_tier_multipliers` per L2 §11 don't-do #9; cascade B = drop `(format, intrusion)` speculation from L2 §6.2 line 206 comment; tighten §11 don't-do #9; ~10 min)
+- **Cascade C** — L4a F1 v4 + F1.5 v3 corrigenda (drop intrusion_level from `pricing_format_defaults` + `pricing_platform_floors` schemas + indexes; F1.5 CSV schemas drop intrusion column; ~30 min). L4b BRIEF v4 unaffected (`Recommendation[]` shape is taxonomy-driven, not intrusion-driven; no L4b corrigendum).
+- **Cascade D** — L5 tooling rebuild (regenerate 5 CSVs without intrusion column; v1 fill scope is editorial-only ~31 cells, not 162; tests update; CALIBRATION-PROCESS.md §2/§4/§6 rewrite; ~45 min)
+- **Cascade E** — DEFERRED. Original opener listed "pricing engine TypeScript update" but that work is downstream of F2 (schema migration) + F3 (`format_defaults` adapter), neither of which exists yet (`src/lib/pricing/` does not exist; no `pricing_*` migrations). Re-evaluate after F2 + F3 ship against cascade-D-regenerated CSVs.
+- **Cascade F** — drop reverted format_defaults CSV; populate 7-row CSV from CANONICAL-SOURCES.md §11 spec values (~15 min)
 
 ### v2 — 2026-04-28 (sublabel-naming corrections; no architectural change)
 
@@ -517,4 +620,4 @@ Composed after audit-first review of `LicenceType` enum drift surfaced during F1
 
 ---
 
-End of licence taxonomy brief (L1, 2026-04-28).
+End of licence taxonomy brief (L1 v2.2, 2026-04-29).
