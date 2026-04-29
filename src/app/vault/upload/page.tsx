@@ -1,7 +1,7 @@
 /**
- * Frontfiles Upload V3 — Page Surface (C2.1; dev-only fixture loader added in C2.2)
+ * Frontfiles Upload V4 — Page Surface (D2.1; dev-only fixture loader carried over from C2.2)
  *
- * Spec: UX-SPEC-V3.md §2 + C2.1-DIRECTIVE §3.2.
+ * Spec: UX-SPEC-V4.md §2 + D2.1-DIRECTIVE §6.1.
  *
  * Server component shell. Generates batch id server-side and hands it
  * to the client shell. Wraps in CreatorGate (preserves auth-gating).
@@ -19,10 +19,11 @@
  */
 
 import { CreatorGate } from '@/components/platform/CreatorGate'
-// D2.1: route to V4 shell. The C2 UploadShell at ./_components/UploadShell
-// is now dormant (per D2.1 §8 dormant-flag pass) and is no longer imported
-// from any production code path. Rollback safety: flip this import back
-// to './_components/UploadShell' to revert.
+// D2.1: imports the V4 shell from ./_components/UploadShell. The C2 V3
+// shell that previously lived at this path was REPLACED (not moved aside)
+// per D2.1 §8 dormant-flag pass — see UploadShell.tsx line 7. To revert to
+// the C2 V3 implementation, check out the pre-D2.1 git history of
+// ./_components/UploadShell.tsx.
 import UploadShell from './_components/UploadShell'
 import { SCENARIO_IDS, type ScenarioId } from '@/lib/upload/v2-scenario-registry'
 
