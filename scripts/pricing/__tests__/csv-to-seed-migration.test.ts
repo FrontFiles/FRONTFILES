@@ -1,9 +1,10 @@
 /**
- * Tests for scripts/pricing/csv-to-seed-migration.ts (L5 implementation, F1.5 v2 §10).
+ * Tests for scripts/pricing/csv-to-seed-migration.ts (L5 implementation, F1.5 v3 §10; cascade D per L1 v2.2).
  *
  * Covers:
  *   - parseCsv: header parsing, quoted fields, CRLF
  *   - per-CSV validation (errors block, warnings allow continuation)
+ *   - v3 stale-template check (rejects v2-shape CSVs with intrusion_level column)
  *   - cross-CSV check (floors vs defaults × min use_tier multiplier)
  *   - SQL generation (5 INSERT blocks; correct columns; dollar-quoted basis)
  */
@@ -28,7 +29,6 @@ import {
 // ── Fixture builders ──────────────────────────────────────────────────
 
 const FORMATS = ['photo', 'illustration', 'infographic', 'vector', 'video', 'audio', 'text'] as const
-const INTRUSION_LEVELS = ['light', 'standard', 'heavy'] as const
 const CLASSES = ['editorial', 'commercial', 'advertising'] as const
 const TIERS = ['tier_1', 'tier_2', 'tier_3', 'tier_4'] as const
 const CC = ['cc0', 'cc_by', 'cc_by_sa', 'cc_by_nc', 'cc_by_nd', 'cc_by_nc_sa', 'cc_by_nc_nd'] as const
@@ -52,34 +52,31 @@ const SUBLABELS = [
   'advertising.influencer',
 ] as const
 
+// v3 fixture (cascade D): 7 formats × 3 classes = 21 rows; intrusion_level dropped per L1 v2.2 §5.0.
 function fullDefaults(): Array<Record<string, string>> {
   const rows: Array<Record<string, string>> = []
   for (const f of FORMATS)
-    for (const i of INTRUSION_LEVELS)
-      for (const l of CLASSES)
-        rows.push({
-          format: f,
-          intrusion_level: i,
-          licence_class: l,
-          currency: 'EUR',
-          baseline_cents: '20000',
-          calibration_basis: 'fotoQuote 2026 mid editorial photo midpoint',
-        })
+    for (const l of CLASSES)
+      rows.push({
+        format: f,
+        licence_class: l,
+        currency: 'EUR',
+        baseline_cents: '20000',
+        calibration_basis: 'fotoQuote 2026 mid editorial photo midpoint',
+      })
   return rows
 }
 
 function fullFloors(): Array<Record<string, string>> {
   const rows: Array<Record<string, string>> = []
   for (const f of FORMATS)
-    for (const i of INTRUSION_LEVELS)
-      for (const l of CLASSES)
-        rows.push({
-          format: f,
-          intrusion_level: i,
-          licence_class: l,
-          currency: 'EUR',
-          min_cents: '5000',
-        })
+    for (const l of CLASSES)
+      rows.push({
+        format: f,
+        licence_class: l,
+        currency: 'EUR',
+        min_cents: '5000',
+      })
   return rows
 }
 
@@ -136,7 +133,7 @@ describe('parseCsv', () => {
 // ── validateFormatDefaults tests ─────────────────────────────────────
 
 describe('validateFormatDefaults', () => {
-  it('accepts a full valid 63-row fixture', () => {
+  it('accepts a full valid 21-row fixture', () => {
     const r = validateFormatDefaults(fullDefaults())
     expect(r.errors).toEqual([])
   })
@@ -144,7 +141,7 @@ describe('validateFormatDefaults', () => {
   it('errors on row count mismatch', () => {
     const rows = fullDefaults().slice(0, 10)
     const r = validateFormatDefaults(rows)
-    expect(r.errors.some((e) => e.includes('expected 63 rows'))).toBe(true)
+    expect(r.errors.some((e) => e.includes('expected 21 rows'))).toBe(true)
   })
 
   it('errors on unknown format', () => {
@@ -183,11 +180,11 @@ describe('validateFormatDefaults', () => {
     expect(r.warnings.some((w) => w.includes('outside sanity bounds'))).toBe(true)
   })
 
-  it('errors on duplicate (format, intrusion, class) tuple', () => {
+  it('errors on duplicate (format, licence_class) tuple', () => {
     const rows = fullDefaults()
     rows[1] = { ...rows[0] }
     const r = validateFormatDefaults(rows)
-    expect(r.errors.some((e) => e.includes('duplicate'))).toBe(true)
+    expect(r.errors.some((e) => e.includes('duplicate (format, licence_class)'))).toBe(true)
   })
 
   it('warns on empty calibration_basis', () => {
@@ -196,12 +193,31 @@ describe('validateFormatDefaults', () => {
     const r = validateFormatDefaults(rows)
     expect(r.warnings.some((w) => w.includes('calibration_basis is empty'))).toBe(true)
   })
+
+  // v3 stale-template check (cascade D per L1 v2.2 §5.0; F1.5 v3 §6.4):
+  // a CSV produced by the v2 bootstrap carries an `intrusion_level` column
+  // that is incompatible with the v3 cell shape. Reject hard.
+  it('rejects a v2-shape stale-template CSV (carries intrusion_level column)', () => {
+    const rows = [
+      {
+        format: 'photo',
+        intrusion_level: 'standard',
+        licence_class: 'editorial',
+        currency: 'EUR',
+        baseline_cents: '20000',
+        calibration_basis: 'stale v2 fixture',
+      },
+    ]
+    const r = validateFormatDefaults(rows)
+    expect(r.errors.some((e) => e.includes('stale v2-shape CSV detected'))).toBe(true)
+    expect(r.errors.some((e) => e.includes('F1.5 v3 §6.4'))).toBe(true)
+  })
 })
 
 // ── validatePlatformFloors tests ─────────────────────────────────────
 
 describe('validatePlatformFloors', () => {
-  it('accepts a full valid 63-row fixture', () => {
+  it('accepts a full valid 21-row fixture', () => {
     const r = validatePlatformFloors(fullFloors())
     expect(r.errors).toEqual([])
   })
@@ -209,7 +225,7 @@ describe('validatePlatformFloors', () => {
   it('errors on missing rows', () => {
     const rows = fullFloors().slice(0, 5)
     const r = validatePlatformFloors(rows)
-    expect(r.errors.some((e) => e.includes('expected 63 rows'))).toBe(true)
+    expect(r.errors.some((e) => e.includes('expected 21 rows'))).toBe(true)
   })
 
   it('errors on negative min_cents', () => {
@@ -217,6 +233,23 @@ describe('validatePlatformFloors', () => {
     rows[0].min_cents = '-100'
     const r = validatePlatformFloors(rows)
     expect(r.errors.some((e) => e.includes('positive integer'))).toBe(true)
+  })
+
+  // v3 stale-template check (cascade D per L1 v2.2 §5.0; F1.5 v3 §7.4):
+  // mirrors the format_defaults check.
+  it('rejects a v2-shape stale-template CSV (carries intrusion_level column)', () => {
+    const rows = [
+      {
+        format: 'photo',
+        intrusion_level: 'standard',
+        licence_class: 'editorial',
+        currency: 'EUR',
+        min_cents: '5000',
+      },
+    ]
+    const r = validatePlatformFloors(rows)
+    expect(r.errors.some((e) => e.includes('stale v2-shape CSV detected'))).toBe(true)
+    expect(r.errors.some((e) => e.includes('F1.5 v3 §7.4'))).toBe(true)
   })
 })
 
@@ -300,10 +333,10 @@ describe('validateCcVariants', () => {
 describe('validateFloorsBelowDefaults', () => {
   it('passes when floors ≤ baseline × min(use_tier_mult)', () => {
     const defaults: FormatDefaultRow[] = [
-      { format: 'photo', intrusion_level: 'standard', licence_class: 'editorial', currency: 'EUR', baseline_cents: 20000, calibration_basis: 'x' },
+      { format: 'photo', licence_class: 'editorial', currency: 'EUR', baseline_cents: 20000, calibration_basis: 'x' },
     ]
     const floors: PlatformFloorRow[] = [
-      { format: 'photo', intrusion_level: 'standard', licence_class: 'editorial', currency: 'EUR', min_cents: 5000 },
+      { format: 'photo', licence_class: 'editorial', currency: 'EUR', min_cents: 5000 },
     ]
     const useTierMults: UseTierMultiplierRow[] = [
       { licence_class: 'editorial', use_tier: 'tier_1', multiplier: 0.5 },
@@ -316,10 +349,10 @@ describe('validateFloorsBelowDefaults', () => {
 
   it('warns when floor exceeds baseline × min(use_tier_mult)', () => {
     const defaults: FormatDefaultRow[] = [
-      { format: 'photo', intrusion_level: 'standard', licence_class: 'editorial', currency: 'EUR', baseline_cents: 10000, calibration_basis: 'x' },
+      { format: 'photo', licence_class: 'editorial', currency: 'EUR', baseline_cents: 10000, calibration_basis: 'x' },
     ]
     const floors: PlatformFloorRow[] = [
-      { format: 'photo', intrusion_level: 'standard', licence_class: 'editorial', currency: 'EUR', min_cents: 8000 },
+      { format: 'photo', licence_class: 'editorial', currency: 'EUR', min_cents: 8000 },
     ]
     const useTierMults: UseTierMultiplierRow[] = [
       { licence_class: 'editorial', use_tier: 'tier_1', multiplier: 0.5 },
@@ -337,10 +370,10 @@ describe('generateSeedSql', () => {
   function tinyInput(): Parameters<typeof generateSeedSql>[0] {
     return {
       defaults: [
-        { format: 'photo', intrusion_level: 'standard', licence_class: 'editorial', currency: 'EUR', baseline_cents: 20000, calibration_basis: 'fotoQuote midpoint' },
+        { format: 'photo', licence_class: 'editorial', currency: 'EUR', baseline_cents: 20000, calibration_basis: 'fotoQuote midpoint' },
       ],
       floors: [
-        { format: 'photo', intrusion_level: 'standard', licence_class: 'editorial', currency: 'EUR', min_cents: 5000 },
+        { format: 'photo', licence_class: 'editorial', currency: 'EUR', min_cents: 5000 },
       ],
       sublabelMults: [{ sublabel: 'editorial.news', multiplier: 1.0 }],
       useTierMults: [{ licence_class: 'editorial', use_tier: 'tier_2', multiplier: 1.0 }],
@@ -358,6 +391,24 @@ describe('generateSeedSql', () => {
     expect(sql).toContain('INSERT INTO pricing_sublabel_multipliers')
     expect(sql).toContain('INSERT INTO pricing_use_tier_multipliers')
     expect(sql).toContain('INSERT INTO pricing_cc_variants')
+  })
+
+  // v3 cell-shape assertions (cascade D per L1 v2.2 §5.0):
+  // format_defaults + platform_floors INSERT shapes drop intrusion_level
+  // from both column lists and per-row values.
+  it('format_defaults INSERT column list omits intrusion_level (v3)', () => {
+    const sql = generateSeedSql(tinyInput())
+    // Match the format_defaults column-list line (between INSERT INTO and VALUES).
+    const block = sql.split('INSERT INTO pricing_format_defaults')[1].split('VALUES')[0]
+    expect(block).toContain('format, licence_class, currency, baseline_cents')
+    expect(block).not.toContain('intrusion_level')
+  })
+
+  it('platform_floors INSERT column list omits intrusion_level (v3)', () => {
+    const sql = generateSeedSql(tinyInput())
+    const block = sql.split('INSERT INTO pricing_platform_floors')[1].split('VALUES')[0]
+    expect(block).toContain('format, licence_class, currency, min_cents')
+    expect(block).not.toContain('intrusion_level')
   })
 
   it('uses dollar-quoted strings for calibration_basis (avoids single-quote escaping)', () => {

@@ -1,5 +1,5 @@
 /**
- * Frontfiles — Bootstrap calibration CSVs (L5 implementation, F1.5 v2 §9)
+ * Frontfiles — Bootstrap calibration CSVs (L5 implementation, F1.5 v3 §9; cascade D per L1 v2.2)
  *
  * Generates the 5 empty CSV templates the founder fills during the
  * Stage B calibration pass. Idempotent: safe to re-run if dimensions
@@ -10,13 +10,20 @@
  *   bun run scripts/pricing/bootstrap-calibration-csvs.ts
  *
  * Outputs (all in docs/pricing/calibration/):
- *   - format_defaults_v1_eur.csv     (63 rows + header)
- *   - platform_floors_v1_eur.csv     (63 rows + header)
+ *   - format_defaults_v1_eur.csv     (21 rows + header; was 63 in v2)
+ *   - platform_floors_v1_eur.csv     (21 rows + header; was 63 in v2)
  *   - sublabel_multipliers_v1.csv    (17 rows + header; editorial.news = 1.000 anchor)
  *   - use_tier_multipliers_v1.csv    (12 rows + header; tier_2 = 1.000 anchor per class)
  *   - cc_variants_v1_eur.csv         (7 rows + header; cc0 = 0 anchor)
  *
- * Per F1.5 v2 §9.3: when L2 implementation lands and ships
+ * v3 (cascade D) drops `intrusion_level` from `format_defaults` +
+ * `platform_floors` headers + iteration loops per L1 v2.2 §5.0 +
+ * F1 v4 §3.1 + §4.1: watermark intensity is preview-protection only,
+ * not a pricing input. `vault_assets.intrusion_level` STAYS as a
+ * watermark-system column (per `src/lib/processing/profiles.ts`
+ * SEED_PROFILES); the pricing engine MUST NOT consume it.
+ *
+ * Per F1.5 v3 §9.3: when L2 implementation lands and ships
  * `src/lib/licence/types.ts`, this script SHOULD migrate to import
  * LICENCE_SUBLABELS / CC_VARIANTS / USE_TIERS from there. v1 uses
  * inline literal lists (the F1.5 §9.3 fallback path) so the bootstrap
@@ -28,7 +35,7 @@
 import fs from 'fs'
 import path from 'path'
 
-// ── Dimension enumerations (per L1 v2 §4.2 + F1.5 v2 §3) ──────────────
+// ── Dimension enumerations (per L1 v2.2 §4.2 + F1.5 v3 §3) ────────────
 
 const FORMATS = [
   'photo',
@@ -40,7 +47,10 @@ const FORMATS = [
   'text',
 ] as const
 
-const INTRUSION_LEVELS = ['light', 'standard', 'heavy'] as const
+// (INTRUSION_LEVELS removed in v3 per L1 v2.2 §5.0 — watermark intensity is
+//  not a pricing input. The watermark vocabulary remains valid in
+//  src/lib/processing/profiles.ts:60-169 SEED_PROFILES, but the pricing
+//  engine MUST NOT consume it. See F1 v4 §10 don't-do #22.)
 
 /** v2: 3 cell-bearing classes; creative_commons excluded (handled via cc_variants table). */
 const CELL_LICENCE_CLASSES = ['editorial', 'commercial', 'advertising'] as const
@@ -86,18 +96,16 @@ const CALIBRATION_DIR = path.resolve(__dirname, '..', '..', 'docs', 'pricing', '
 // ── CSV builders ──────────────────────────────────────────────────────
 
 function buildFormatDefaultsCsv(): string {
-  const rows: string[] = ['format,intrusion_level,licence_class,currency,baseline_cents,calibration_basis']
+  const rows: string[] = ['format,licence_class,currency,baseline_cents,calibration_basis']
   for (const f of FORMATS)
-    for (const i of INTRUSION_LEVELS)
-      for (const l of CELL_LICENCE_CLASSES) rows.push(`${f},${i},${l},EUR,,`)
+    for (const l of CELL_LICENCE_CLASSES) rows.push(`${f},${l},EUR,,`)
   return rows.join('\n') + '\n'
 }
 
 function buildPlatformFloorsCsv(): string {
-  const rows: string[] = ['format,intrusion_level,licence_class,currency,min_cents']
+  const rows: string[] = ['format,licence_class,currency,min_cents']
   for (const f of FORMATS)
-    for (const i of INTRUSION_LEVELS)
-      for (const l of CELL_LICENCE_CLASSES) rows.push(`${f},${i},${l},EUR,`)
+    for (const l of CELL_LICENCE_CLASSES) rows.push(`${f},${l},EUR,`)
   return rows.join('\n') + '\n'
 }
 
@@ -192,8 +200,8 @@ function main(): void {
   console.log(`▶ Generating calibration CSV templates in ${CALIBRATION_DIR}`)
 
   const tasks: Array<{ name: string; rowCount: number; build: () => string }> = [
-    { name: 'format_defaults_v1_eur.csv', rowCount: 63, build: buildFormatDefaultsCsv },
-    { name: 'platform_floors_v1_eur.csv', rowCount: 63, build: buildPlatformFloorsCsv },
+    { name: 'format_defaults_v1_eur.csv', rowCount: 21, build: buildFormatDefaultsCsv },
+    { name: 'platform_floors_v1_eur.csv', rowCount: 21, build: buildPlatformFloorsCsv },
     { name: 'sublabel_multipliers_v1.csv', rowCount: 17, build: buildSublabelMultipliersCsv },
     { name: 'use_tier_multipliers_v1.csv', rowCount: 12, build: buildUseTierMultipliersCsv },
     { name: 'cc_variants_v1_eur.csv', rowCount: 7, build: buildCcVariantsCsv },
