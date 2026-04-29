@@ -1,10 +1,10 @@
 # L2 — Licence Taxonomy Schema Migration + TypeScript Module Skeleton
 
-**Status:** DRAFT — awaiting founder ratification before implementation begins
-**Date:** 2026-04-28
-**Predecessor gates:** L1 v2 ratified (PR #31, expected to merge before L2 implementation ships); 24-sublabel taxonomy locked
+**Status:** DRAFT v1.1 — awaiting founder ratification (v1 composed 2026-04-28; v1.1 cascade B amendment 2026-04-30 per L1 v2.2 §10 don't-do #13 + §5.4 — doc-only changes; no schema impact). See §13 revision history.
+**Date:** 2026-04-30 (v1.1 amendment); 2026-04-28 (v1 draft)
+**Predecessor gates:** L1 v2 ratified via PR #32 (merged 2026-04-28); L1 v2.2 cascade A amendment (PR-A2; awaiting ratification at time of v1.1 composition) — v1.1 amendment lands cascade B per L1 v2.2 §12 cascade impact table; 24-sublabel taxonomy locked
 **Governing documents:**
-- `docs/licence/LICENCE-TAXONOMY-BRIEF.md` v2 (L1) — taxonomy locks (§3), schema shape (§4.3), TypeScript shape (§4.4), pricing implications (§5)
+- `docs/licence/LICENCE-TAXONOMY-BRIEF.md` v2.2 (L1; cascade A awaiting ratification) — taxonomy locks (§3), schema shape (§4.3), TypeScript shape (§4.4), pricing implications (§5; v2.2 §5.0 dropped `intrusion_level` from pricing dimensions)
 - `src/lib/types.ts:360-378` (`LicenceType`) — legacy 8-value enum; UNCHANGED in L2 (kept for dual-read until L8)
 - `supabase/migrations/20260413230002_vault_asset_tables.sql:73-105` — existing CHECK constraint shape this migration extends
 - `supabase/migrations/20260420000000_rls_all_tables.sql` — RLS conventions for new system pricing tables (mirror service-role-only pattern from `pricing_recommendations` provisioning when F-track lands)
@@ -172,7 +172,7 @@ COMMENT ON CONSTRAINT vault_assets_licences_valid ON vault_assets IS
 
 ### 6.2 `pricing_cc_variants` — absolute CC variant prices
 
-Per L1 v2 §5.4: CC pricing is **absolute** (CC0 = €0; CC-BY = small admin fee; CC-BY-NC = paid; etc.) — NOT base × multiplier. v1 ships **flat per variant** (no format/intrusion variation); the L4 corrigendum will confirm this or upgrade to format/intrusion-varying.
+Per L1 v2.2 §5.4: CC pricing is **absolute** (CC0 = €0; CC-BY = small admin fee; CC-BY-NC = paid; etc.) — NOT base × multiplier. v1 ships **flat per variant**; the L4 corrigendum (cascade C) will confirm this or upgrade to per-`format` variation only. `intrusion_level` is forbidden from pricing entirely per L1 v2.2 §5.0; see §11 don't-do #13.
 
 ```sql
 -- ─── Phase 2: create pricing_cc_variants ────────────────────────
@@ -203,7 +203,7 @@ CREATE UNIQUE INDEX pricing_cc_variants_unique_active
   WHERE superseded_at IS NULL;
 
 COMMENT ON TABLE pricing_cc_variants IS
-  'L2: absolute CC variant prices. CC pricing is variant-driven (per L1 v2 §5.4); does NOT compose with pricing_format_defaults base × multiplier chain. v1 = flat per variant; v2 may add (format, intrusion) dimensions if L4 corrigendum confirms.';
+  'L2: absolute CC variant prices. CC pricing is variant-driven (per L1 v2.2 §5.4); does NOT compose with pricing_format_defaults base × multiplier chain. v1 = flat per variant; v2 may add (format) dimension if L4 corrigendum confirms. intrusion_level is forbidden per L1 v2.2 §5.0 and §10 #13.';
 
 ALTER TABLE pricing_cc_variants ENABLE ROW LEVEL SECURITY;
 
@@ -706,25 +706,54 @@ To keep L2 implementation from drifting:
 6. **Don't add CHECK constraints rejecting CC-NC + Commercial / CC-NC + Advertising combinations.** Per L1 v2 §6.3 — legitimate dual-licensing. Schema must allow.
 7. **Don't make use_tier multipliers class-dependent at the schema level.** Per L1 v2 §5.3 + §8 #4 founder pick — abstract codes (`tier_1..tier_4`); per-class vocabulary lives in `labels.ts`, not the schema.
 8. **Don't fill any calibration values in L2.** All 3 new tables ship empty. L5 founder calibration fills `pricing_cc_variants` (7 rows), `pricing_sublabel_multipliers` (17 rows), and `pricing_use_tier_multipliers` (12 rows).
-9. **Don't introduce `pricing_format_defaults` in L2.** That's F-track L4 corrigendum + F2 schema migration territory. L2 only ships the licence-specific tables.
+9. **Don't introduce `pricing_format_defaults` or `pricing_platform_floors` in L2.** Both are F-track L4 corrigendum + F2 schema migration territory. L2 only ships the licence-specific tables (`pricing_cc_variants`, `pricing_sublabel_multipliers`, `pricing_use_tier_multipliers`).
 10. **Don't introduce a `licence_class` column on `vault_assets`.** Per L1 v2 §10 don't-do #12 — derived from `enabled_licences` via `getClass()` helper. Storing introduces sync risk.
 11. **Don't introduce a `media[]` column.** Per L1 v2 §10 don't-do #11. Medium is encoded in Advertising sublabels only.
 12. **Don't introduce default values for any new column.** Provenance fields (`effective_from`, `calibrated_at`) default to `now()` only. Numeric/text columns require explicit values.
+13. **Don't introduce `intrusion_level` (or any watermark-related dimension) into any pricing table.** Per L1 v2.2 §5.0 + §10 don't-do #13: watermark intensity is creator preview-protection only, not a pricing input. The licensed file delivered to the buyer is the original, unwatermarked file. `vault_assets.intrusion_level` (already shipped in `supabase/migrations/20260417100001/2/3_watermark_profile_*.sql`) stays as a watermark-system column; pricing engine and `pricing_*` tables MUST NOT reference it.
 
 ---
 
 ## 12. References
 
-- L1 v2 brief: `docs/licence/LICENCE-TAXONOMY-BRIEF.md` (taxonomy + schema lock)
+- L1 v2.2 brief: `docs/licence/LICENCE-TAXONOMY-BRIEF.md` v2.2 (taxonomy + schema lock; v2.2 §5.0 + §10 don't-do #13 drives this v1.1 cascade B amendment)
 - Legacy enum: `src/lib/types.ts:360-378` (`LicenceType`)
 - Existing CHECK: `supabase/migrations/20260413230002_vault_asset_tables.sql:73-105`
 - RLS conventions: `supabase/migrations/20260420000000_rls_all_tables.sql`
 - Sister directive (mirror structure): `src/lib/processing/E2-DIRECTIVE.md` (AI-pipeline schema; same migration + module + verification-gate format)
 - Multiplier-pattern precedent: `src/lib/types.ts:381-397` (`EXCLUSIVE_MULTIPLIERS`)
 - Future L3 (backfill + dual-read): `docs/licence/L3-DIRECTIVE.md` (TBD; composes after L2 ratifies)
-- Future L4 (F1 + F1.5 corrigenda): `docs/pricing/F1-CORRIGENDUM-LICENCE-TAXONOMY.md` (TBD)
+- Future L4 (F1 + F1.5 corrigenda — cascade C per L1 v2.2): `docs/pricing/PRICE-ENGINE-ARCHITECTURE.md` v3 → v4 + `docs/pricing/PRICE-ENGINE-CALIBRATION-V1.md` v2 → v3 (per L4a PR #34 precedent — corrigenda land in existing files, not a separate `F1-CORRIGENDUM-*` doc)
 - Future L5 (calibration tooling resumes): `docs/pricing/PRICE-ENGINE-CALIBRATION-V1.md` (revised at L4)
 
 ---
 
-End of L2 schema migration directive (2026-04-28).
+## 13. Revision history
+
+### v1.1 — 2026-04-30 (cascade B amendment per L1 v2.2 §10 don't-do #13 + §5.4)
+
+**Trigger:** L1 v2.2 amendment (cascade A; PR-A2) drops `intrusion_level` from any pricing-table cell key per founder discovery during Stage B 2026-04-28. Per L1 v2.2 §12 cascade impact table, cascade B = narrow L2 amendment. L2 itself does not define `pricing_format_defaults` or `pricing_platform_floors` (those are F-track L4 + F2 territory per §11 don't-do #9), so cascade B's scope is limited to the `pricing_cc_variants` forward-compat language + the don't-do list.
+
+**Changes (doc-only; no schema impact):**
+
+| # | Surface | Change |
+|---|---|---|
+| 1 | Top status block | v1 → v1.1; date 2026-04-28 → 2026-04-30 (v1.1 amendment); predecessor gates updated to reference L1 v2.2 + cascade A; governing-documents reference updated to v2.2 |
+| 2 | §6.2 paragraph (line ~175) | v1 ships flat per variant; L4 corrigendum may upgrade to per-`format` only (was: "format/intrusion-varying"). Added explicit "intrusion_level forbidden per L1 v2.2 §5.0" cross-reference. |
+| 3 | §6.2 `COMMENT ON TABLE pricing_cc_variants` (line ~206) | Forward-compat speculation `(format, intrusion) dimensions` → `(format) dimension` only; added "intrusion_level is forbidden per L1 v2.2 §5.0 and §10 #13" |
+| 4 | §11 don't-do #9 | Tightened to forbid both `pricing_format_defaults` AND `pricing_platform_floors` from L2 (was `pricing_format_defaults` only); enumerated the 3 licence-specific tables L2 actually ships |
+| 5 | §11 NEW don't-do #13 | Forbids `intrusion_level` from any pricing table; cross-refs L1 v2.2 §5.0 + §10 #13; notes already-shipped watermark migrations |
+| 6 | §12 References | `L1 v2 brief` → `L1 v2.2 brief`; `Future L4: F1-CORRIGENDUM-LICENCE-TAXONOMY.md (TBD)` → actual cascade C targets (`PRICE-ENGINE-ARCHITECTURE.md` v3→v4 + `PRICE-ENGINE-CALIBRATION-V1.md` v2→v3) per L4a PR #34 precedent |
+| 7 | §13 (this entry) | Revision history added |
+
+**Sections unchanged:** §1 (purpose), §2 (audit findings), §3 (prerequisites), §4 (scope), §5 (files), §6.1 (CHECK), §6.3-§6.6 (other table specs + DOWN + RLS), §7 (TypeScript), §8 (tests), §9 (verification gates), §10 (approval gate), §11 don't-dos #1-#8, #10-#12.
+
+**Migration impact:** none. v1 migration was unshipped at v1.1 composition; v1.1 ships the same migration as v1 with updated comments only.
+
+### v1 — 2026-04-28 (initial composition)
+
+Composed per L1 v2 §3 + §4.3 + §5 to lay the schema substrate for the new 4-class licence taxonomy. Three new tables (`pricing_cc_variants`, `pricing_sublabel_multipliers`, `pricing_use_tier_multipliers`); CHECK constraint expansion; reversible DOWN; service-role-only RLS; new `src/lib/licence/` module; tests for schema constraints + helpers + label exhaustiveness. Ships dormant — no engine code, no backfill, no UI integration.
+
+---
+
+End of L2 schema migration directive (v1.1, 2026-04-30; v1 2026-04-28).
