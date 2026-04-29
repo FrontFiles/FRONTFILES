@@ -1,7 +1,7 @@
 # Frontfiles Price Engine — Architecture Detail Brief (F1)
 
-**Status:** REVISED 2026-04-28 (post-L1-v2 corrigendum) — supersedes the 2026-04-28 ratified version. Awaiting founder ratification of this revision before F2 (schema migration) composes. Changes apply L1 (Licence Taxonomy Brief) v2 + L2 (Licence Schema Migration directive) corrections: (a) `licence_class` enumeration is now `editorial | commercial | advertising` (CC handled separately via `pricing_cc_variants`); (b) `use_tier` is a multiplier (Path 2), not a cell dimension — `pricing_format_defaults` cells drop from 252 to 63; (c) new pricing tables `pricing_cc_variants`, `pricing_sublabel_multipliers`, `pricing_use_tier_multipliers` introduced by L2 are referenced here. See §12 v3 entry.
-**Date:** 2026-04-28
+**Status:** REVISED 2026-04-30 (v4; cascade C per L1 v2.2 §12 — drops `intrusion_level` from pricing dimensions per Stage B 2026-04-28 founder discovery; supersedes v3). Awaiting founder ratification of this revision before F2 (schema migration) composes. v4 changes: (a) `intrusion_level` removed from `pricing_format_defaults` + `pricing_platform_floors` cell keys, indexes, and dimension lists — per L1 v2.2 §5.0, watermark intensity is preview-protection only and is not a pricing input; (b) cell counts drop 63 → 21 (full scope) and a new v1 editorial-only Stage B scope of 7 cells is recorded; (c) §10 adds don't-do #22 (don't re-introduce intrusion as pricing dimension); (d) §11 references add L1 v2.2 + CANONICAL-SOURCES.md + STAGE-B-SESSION-LOG + already-shipped watermark migrations. v3 changes (post-L1-v2 corrigendum) retained: (e) `licence_class` enumeration is `editorial | commercial | advertising` (CC handled separately via `pricing_cc_variants`); (f) `use_tier` is a multiplier (Path 2), not a cell dimension; (g) new pricing tables `pricing_cc_variants`, `pricing_sublabel_multipliers`, `pricing_use_tier_multipliers` introduced by L2 are referenced here. See §12 v4 entry.
+**Date:** 2026-04-30 (v4); 2026-04-28 (v3)
 **Predecessor:** `docs/pricing/PRICE-ENGINE-BRIEF.md` v3 (locks scope, authority model, inputs, surfaces, trust posture, v1/v2 staging)
 **Scope:** Architecture detail that PRICE-ENGINE-BRIEF v3 deferred to "F1 architecture work." Resolves the 9 open decisions in PRICE-ENGINE-BRIEF v3 §9. Specifies engine internals (composer, confidence), format_defaults table structure, platform floors structure, currency handling, refresh cadence, recalibration cadence, anonymization parameters (v2), analytics requirements, and engine quality measurement plan.
 **Does NOT:** invent specific currency values for `format_defaults` rows or `pricing_platform_floors` rows. Per CLAUDE.md item 16, monetary values are founder calibration — F1 specifies the structure + the calibration process; founder fills the values in a calibration pass before F3 (format_defaults adapter) ships.
@@ -84,7 +84,7 @@ recommendedCents = (23000 × 0.48 + 20000 × 0.20) / 0.68 = 22118 (≈€221)
 confidence = 0.68 / (0.6 + 0.4) = 0.68
 ```
 
-basis statement renders as: *"Recommended €221. Based on your past sales of similar work (7 sales, 71% of recommendation) and Frontfiles standard rate for editorial photo at standard intrusion (29% of recommendation). Confidence 68%."*
+basis statement renders as: *"Recommended €221. Based on your past sales of similar work (7 sales, 71% of recommendation) and Frontfiles standard rate for editorial photo (29% of recommendation). Confidence 68%."* (v4: dropped "at standard intrusion" — intrusion_level no longer a pricing dimension per L1 v2.2 §5.0.)
 
 ### 2.3 Confidence formula
 
@@ -122,13 +122,12 @@ CREATE TABLE pricing_format_defaults (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   -- Dimension 1: format (matches AssetFormat enum from src/lib/types.ts)
   format TEXT NOT NULL,
-  -- Dimension 2: intrusion_level (light/standard/heavy per System A vocabulary)
-  intrusion_level TEXT NOT NULL,
-  -- Dimension 3: licence_class — 3 cell-bearing classes per L1 v2 §5.1
+  -- Dimension 2: licence_class — 3 cell-bearing classes per L1 v2.2 §5.1
   --   editorial | commercial | advertising
-  --   (creative_commons EXCLUDED — CC pricing is absolute via pricing_cc_variants per L1 v2 §5.4)
+  --   (creative_commons EXCLUDED — CC pricing is absolute via pricing_cc_variants per L1 v2.2 §5.4)
   licence_class TEXT NOT NULL,
-  -- (use_tier removed in v3 corrigendum — now a multiplier in pricing_use_tier_multipliers per L1 v2 §5.3 + §8 #4 founder pick)
+  -- (intrusion_level removed in v4 corrigendum per L1 v2.2 §5.0 — watermark intensity is preview-protection only, not a pricing input)
+  -- (use_tier removed in v3 corrigendum — now a multiplier in pricing_use_tier_multipliers per L1 v2.2 §5.3 + §8 #4 founder pick)
   -- Currency-aware
   currency TEXT NOT NULL,
   baseline_cents INTEGER NOT NULL,
@@ -139,49 +138,51 @@ CREATE TABLE pricing_format_defaults (
   calibration_basis TEXT,                -- short note ("fotoQuote 2024 editorial mid-pub midpoint")
   calibrated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   calibrated_by UUID REFERENCES users(id),
-  UNIQUE (format, intrusion_level, licence_class, currency, table_version)
+  UNIQUE (format, licence_class, currency, table_version)
 );
 
 CREATE INDEX pricing_format_defaults_active
-  ON pricing_format_defaults (format, intrusion_level, licence_class, currency)
+  ON pricing_format_defaults (format, licence_class, currency)
   WHERE superseded_at IS NULL;
 ```
 
 **Dimensions explained:**
 
 - **format**: photo, illustration, infographic, vector, video, audio, text — matches `AssetFormat` enum
-- **intrusion_level**: light, standard, heavy — System A vocabulary (per BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26 §4)
-- **licence_class** (v3): `editorial | commercial | advertising`. Per L1 v2 §3 + §5.1, the 3 cell-bearing classes. `creative_commons` is EXCLUDED from this table — CC pricing is absolute per CC variant via `pricing_cc_variants` (L2 directive §6.2). Sublabels (e.g., `editorial.news`, `commercial.brand_content`) modify the base price via `pricing_sublabel_multipliers` (L2 §6.3); `licence_class` itself is the cell key (the class portion of `class.sublabel`).
-- **(use_tier removed)** — was Dimension 4 in the v1/v2 versions of this brief; per L1 v2 §5.3 + §8 #4, use_tier is now a multiplier table (`pricing_use_tier_multipliers`) using abstract codes `tier_1..tier_4` translated to per-class vocabulary in `src/lib/licence/labels.ts`.
+- **licence_class** (v3+): `editorial | commercial | advertising`. Per L1 v2.2 §3 + §5.1, the 3 cell-bearing classes. `creative_commons` is EXCLUDED from this table — CC pricing is absolute per CC variant via `pricing_cc_variants` (L2 directive §6.2). Sublabels (e.g., `editorial.news`, `commercial.brand_content`) modify the base price via `pricing_sublabel_multipliers` (L2 §6.3); `licence_class` itself is the cell key (the class portion of `class.sublabel`).
+- **(intrusion_level removed in v4)** — was Dimension 2 in the v1/v2/v3 versions of this brief; per L1 v2.2 §5.0, watermark intensity governs creator preview-protection only, not pricing. The licensed file delivered to the buyer is the original (unwatermarked); pricing has zero structural reason to vary by the creator's preview-protection choice. `vault_assets.intrusion_level` STAYS as a watermark-system column (already shipped via `supabase/migrations/20260417100001/2/3_watermark_profile_*.sql`); the pricing engine MUST NOT query it.
+- **(use_tier removed)** — was Dimension 4 in the v1/v2 versions of this brief; per L1 v2.2 §5.3 + §8 #4, use_tier is now a multiplier table (`pricing_use_tier_multipliers`) using abstract codes `tier_1..tier_4` translated to per-class vocabulary in `src/lib/licence/labels.ts`.
 - **currency**: ISO 4217 (EUR, USD, GBP, etc.). v1 ships EUR only; multi-currency expanded later if creators outside EUR market are common.
 
 **Companion tables (per L2 directive §6, ratification pending):**
-- **`pricing_cc_variants`** — absolute CC variant prices keyed on `(cc_variant, currency)`. v1 ships flat per variant (7 rows); v2 may add (format, intrusion) dimensions if data shows differentiation.
+- **`pricing_cc_variants`** — absolute CC variant prices keyed on `(cc_variant, currency)`. v1 ships flat per variant (7 rows); v2 may add (format) dimension only per L1 v2.2 §5.4.
 - **`pricing_sublabel_multipliers`** — multiplier per non-CC sublabel keyed on dotted `class.sublabel`. 17 rows (Editorial 6 + Commercial 4 + Advertising 7).
 - **`pricing_use_tier_multipliers`** — multiplier per `(licence_class, use_tier)` where `licence_class ∈ {editorial, commercial, advertising}` (CC excluded) and `use_tier ∈ {tier_1, tier_2, tier_3, tier_4}`. 12 rows.
 
-**Format families omitted:** PRICE-ENGINE-BRIEF v3 §4.2.3 included `format_family` (portrait/landscape/wide). F1 drops this from `format_defaults` because aspect ratio is not a load-bearing pricing dimension in editorial markets — a portrait photo and a landscape photo at the same intrusion level for the same use tier price equivalently. Family stays as a watermark-template concern (where it actually affects layout); not a pricing dimension.
+**Format families omitted:** PRICE-ENGINE-BRIEF v3 §4.2.3 included `format_family` (portrait/landscape/wide). F1 drops this from `format_defaults` because aspect ratio is not a load-bearing pricing dimension in editorial markets — a portrait photo and a landscape photo for the same use tier price equivalently. Family stays as a watermark-template concern (where it actually affects layout); not a pricing dimension.
 
 **Exclusivity omitted:** PRICE-ENGINE-BRIEF v3 §4.2.3 included exclusivity. F1 drops this from `format_defaults` because exclusivity is handled by the existing `EXCLUSIVE_MULTIPLIERS` constant in `src/lib/types.ts` (per the audit-confirmed multiplier model in PRICE-ENGINE-BRIEF v3 §4.6). Engine recommends a base price; multipliers handle exclusivity downstream.
 
-### 3.2 Cell count (v3 corrigendum)
+### 3.2 Cell count (v4 corrigendum)
 
-After dropping format_family + exclusivity (kept from v1) AND dropping use_tier (v3 — moved to multiplier table per L1 v2 §5.3) AND excluding `creative_commons` from licence_class (v3 — handled via `pricing_cc_variants` per L1 v2 §5.4):
+After dropping format_family + exclusivity (kept from v1) AND dropping use_tier (v3 — moved to multiplier table per L1 v2.2 §5.3) AND excluding `creative_commons` from licence_class (v3 — handled via `pricing_cc_variants` per L1 v2.2 §5.4) AND dropping intrusion_level (v4 — per L1 v2.2 §5.0; watermark intensity is preview-protection only, not a pricing input):
 
-- 7 formats × 3 intrusion_levels × **3 licence_classes** (editorial / commercial / advertising) × 1 currency (v1) = **63 cells**
+- 7 formats × **3 licence_classes** (editorial / commercial / advertising) × 1 currency (v1) = **21 cells**
 
-That's down 4× from the v1/v2 version of this brief (252 → 63). The reduction is from (a) moving use_tier out of cells into a 12-multiplier table, and (b) moving CC variants out of cells into a 7-row absolute-price table. Calibration burden drops accordingly. Engine queries by `(format, intrusion_level, licence_class, currency)`; multipliers compose at price-resolution time per L1 v2 §5.7.
+That's down 12× from the v1/v2 version of this brief and 3× from v3 (252 → 63 → 21). The v4 step drops `intrusion_level` per L1 v2.2 §5.0 founder discovery — the dimension was inherited into the cell key from the watermark vocabulary (`vault_assets.intrusion_level` shipped for the System A compositor) without explicit founder ratification of the economic logic; founder discovery during Stage B 2026-04-28 surfaced the architectural error. Calibration burden drops accordingly. Engine queries by `(format, licence_class, currency)`; multipliers compose at price-resolution time per L1 v2.2 §5.7.
 
-**v3 total founder calibration burden** (per L1 v2 §5.5):
+**v1 editorial-only Stage B scope** (per Stage B 2026-04-28 §3.1/3.2; commercial + advertising deferred to v2): **7 cells** (one editorial cell per format). Calibrated drop-in values land via `docs/pricing/calibration/CANONICAL-SOURCES.md` §11.
 
-| Table | Values |
-|---|---|
-| `pricing_format_defaults` (cells) | 63 |
-| `pricing_sublabel_multipliers` (L2 §6.3) | 17 |
-| `pricing_use_tier_multipliers` (L2 §6.4) | 12 |
-| `pricing_cc_variants` (L2 §6.2; flat per variant in v1) | 7 |
-| `EXCLUSIVE_MULTIPLIERS` (existing in `src/lib/types.ts`) | 3 |
-| **Total v1 (CC flat)** | **~102** (was ~315 in v1/v2 of this brief) |
+**v4 total founder calibration burden** (per L1 v2.2 §5.5):
+
+| Table | Full scope (v4) | v1 editorial-only Stage B scope |
+|---|---|---|
+| `pricing_format_defaults` (cells) | 21 (was 63 in v3) | 7 |
+| `pricing_sublabel_multipliers` (L2 §6.3) | 17 (unchanged) | 6 |
+| `pricing_use_tier_multipliers` (L2 §6.4) | 12 (unchanged) | 4 |
+| `pricing_cc_variants` (L2 §6.2; flat per variant in v1) | 7 (unchanged) | 7 |
+| `EXCLUSIVE_MULTIPLIERS` (existing in `src/lib/types.ts`) | 3 (unchanged) | 3 |
+| **Total** | **~60** (was ~102 in v3; ~315 in v1/v2 of this brief) | **~31** (Stage B path-(1) target) |
 
 ### 3.3 Calibration process
 
@@ -190,14 +191,18 @@ That's down 4× from the v1/v2 version of this brief (252 → 63). The reduction
 ```
 F1.5 — format_defaults calibration pass (between F1 and F3)
 
-  Step 1: Founder reviews the 5-CSV structure (v3): 63 format_defaults cells + 63 platform_floors cells + 17 sublabel multipliers + 12 use_tier multipliers + 7 CC variant absolute prices = ~162 total values
+  Step 1: Founder reviews the 5-CSV structure (v4): 21 format_defaults cells + 21 platform_floors cells + 17 sublabel multipliers + 12 use_tier multipliers + 7 CC variant absolute prices = ~78 total values (full scope)
+          v1 editorial-only Stage B scope: 7 + 7 + 6 + 4 + 7 = ~31 total values
   Step 2: Founder consults offline calibration sources:
           - fotoQuote / fotoBiz pricing calculators
           - Getty Images published rate cards (where public)
           - AP / Reuters published editorial rates (where public)
           - PhotoShelter / similar industry pricing guides
           - Founder's own market knowledge of FF's positioning
-  Step 3: Founder fills the 5 CSVs (63+63+17+12+7 = 162 cells)
+          (Stage B Phase α completed the 5-tier source authority hierarchy
+           per docs/pricing/calibration/CANONICAL-SOURCES.md; §11 of that
+           doc carries the v1 editorial cell drop-in spec.)
+  Step 3: Founder fills the 5 CSVs (21+21+17+12+7 = 78 cells full scope; or 7+7+6+4+7 = 31 v1 editorial-only)
   Step 4: Claude composes a SQL seed migration (5 INSERT blocks) from the CSVs
   Step 5: Founder reviews the seed migration before F3 ships
 ```
@@ -220,7 +225,7 @@ Per PRICE-ENGINE-BRIEF v3 §4.5.1:
 CREATE TABLE pricing_platform_floors (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   format TEXT NOT NULL,
-  intrusion_level TEXT NOT NULL,
+  -- (intrusion_level removed in v4 corrigendum per L1 v2.2 §5.0 — watermark intensity is preview-protection only, not a pricing input)
   licence_class TEXT NOT NULL,
   currency TEXT NOT NULL,
   min_cents INTEGER NOT NULL,
@@ -232,19 +237,19 @@ CREATE TABLE pricing_platform_floors (
   --  CREATE UNIQUE INDEX ... WHERE in PostgreSQL; see below)
 );
 
--- Partial unique index: only one "active" floor per (format, intrusion_level,
--- licence_class, currency) combination at any given time. Superseded rows are
--- preserved for audit but excluded from the uniqueness constraint.
+-- Partial unique index: only one "active" floor per (format, licence_class,
+-- currency) combination at any given time. Superseded rows are preserved for
+-- audit but excluded from the uniqueness constraint.
 CREATE UNIQUE INDEX pricing_platform_floors_unique_active
-  ON pricing_platform_floors (format, intrusion_level, licence_class, currency)
+  ON pricing_platform_floors (format, licence_class, currency)
   WHERE superseded_at IS NULL;
 ```
 
-**Dimensions:** same as `format_defaults` minus `use_tier` (floors are below-which-engine-never-recommends; not segmented by use tier — protects against the engine ever recommending below FF's market positioning regardless of use tier).
+**Dimensions:** same as `format_defaults` minus `use_tier` (floors are below-which-engine-never-recommends; not segmented by use tier — protects against the engine ever recommending below FF's market positioning regardless of use tier). v4 also drops `intrusion_level` from this table per L1 v2.2 §5.0 (same rationale as `format_defaults` §3.1).
 
 ### 4.2 Cell count
 
-7 formats × 3 intrusion_levels × 3 licence_classes × 1 currency (v1) = **63 cells**. Even smaller calibration pass.
+7 formats × 3 licence_classes × 1 currency (v1) = **21 cells** (v4; was 63 in v3 — same `intrusion_level` drop math as §3.2). Even smaller calibration pass. **v1 editorial-only Stage B scope: 7 cells** (one floor per format).
 
 ### 4.3 Calibration process
 
@@ -256,7 +261,7 @@ Per PRICE-ENGINE-BRIEF v3 §4.5.1:
 
 ```
 After composer produces recommendedCents:
-  platformMin = lookup pricing_platform_floors for (format, intrusion_level, licence_class, currency)
+  platformMin = lookup pricing_platform_floors for (format, licence_class, currency)
   creatorMin = lookup pricing_admin_settings.creator_floors for (creator, format)
   effectiveFloor = max(platformMin or 0, creatorMin or 0)
   if recommendedCents < effectiveFloor:
@@ -365,7 +370,7 @@ Per §5.6, three metrics ship in v1 as SQL views over `pricing_audit_log`:
 -- View 1: acceptance_rate_per_cell
 CREATE VIEW pricing_acceptance_rate AS
   SELECT
-    asset.format, asset.intrusion_level, asset.licence_class,
+    asset.format, asset.licence_class,
     COUNT(*) FILTER (WHERE event_type = 'recommendation_generated') AS gen_count,
     COUNT(*) FILTER (WHERE event_type = 'recommendation_accepted') AS accepted_count,
     -- ratio with NULL-safe division
@@ -373,10 +378,13 @@ CREATE VIEW pricing_acceptance_rate AS
   FROM pricing_audit_log
   JOIN vault_assets asset ON asset.id = pricing_audit_log.asset_id
   WHERE event_at >= now() - interval '90 days'
-  GROUP BY 1, 2, 3;
+  GROUP BY 1, 2;
 
 -- View 2: override_delta_distribution (similar pattern)
 -- View 3: floor_clamp_frequency (similar pattern)
+-- (v4 corrigendum: dropped asset.intrusion_level from SELECT/GROUP BY — pricing
+--  cells no longer keyed on intrusion per L1 v2.2 §5.0; vault_assets.intrusion_level
+--  remains a watermark-system column but pricing analytics MUST NOT group by it.)
 ```
 
 These views ship as part of F2 (schema migration) so they're queryable from day one.
@@ -404,16 +412,16 @@ This is the founder-governed feedback loop. No automated parameter adjustment in
 
 ## 8. v1 readiness checklist (gates F2 schema migration)
 
-Before F2 ships (v3):
-- [ ] This brief (F1 v3) ratified
-- [ ] L1 v2 (Licence Taxonomy Brief) ratified
-- [ ] L2 directive (Licence Schema Migration) ratified
-- [ ] F1.5 v2 (calibration directive) ratified
-- [ ] Founder fills format_defaults seed (63 cells)
-- [ ] Founder fills platform floors seed (63 cells)
-- [ ] Founder fills sublabel multipliers seed (17 multipliers)
-- [ ] Founder fills use_tier multipliers seed (12 multipliers)
-- [ ] Founder fills CC variants seed (7 absolute prices)
+Before F2 ships (v4):
+- [ ] This brief (F1 v4) ratified
+- [ ] L1 v2.2 (Licence Taxonomy Brief — cascade A) ratified (PR #45 merged 2026-04-29)
+- [ ] L2 v1.1 directive (Licence Schema Migration — cascade B) ratified (PR #44)
+- [ ] F1.5 v3 (calibration directive — cascade C) ratified (this PR)
+- [ ] Founder fills format_defaults seed — full scope: 21 cells; v1 editorial-only Stage B scope: **7 cells** (per CANONICAL-SOURCES.md §11 drop-in)
+- [ ] Founder fills platform floors seed — full scope: 21 cells; v1 editorial-only Stage B scope: 7 cells
+- [ ] Founder fills sublabel multipliers seed (17 multipliers; v1 editorial-only: 6)
+- [ ] Founder fills use_tier multipliers seed (12 multipliers; v1 editorial-only: 4)
+- [ ] Founder fills CC variants seed (7 absolute prices; flat per variant per L1 v2.2 §5.4)
 - [ ] F2 schema migration includes seed migration with all 5 tables
 - [ ] Decision on per-licence overrides confirmed (default: NO; per §5.1)
 - [ ] Decision on currency confirmed (default: EUR-only v1; per §5.2)
@@ -444,6 +452,7 @@ PRICE-ENGINE-BRIEF v3 §11's 16 don't-do items still apply. Additional items fro
 19. **Don't load multiple currencies into format_defaults in v1.** EUR only. Other currencies require their own F1.5-equivalent calibration directives.
 20. **Don't run a background recompute scheduler in v1.** Refresh on-view / on-action only. Per §5.3.
 21. **Don't expose individual creator prices in cross-creator comparables aggregates** even when sample size is high. K-anonymity threshold of ≥ 5 distinct creators per cohort. Per §5.4.
+22. **Don't re-introduce `intrusion_level` (or any watermark-related dimension) into `pricing_format_defaults`, `pricing_platform_floors`, or any other pricing table.** Per L1 v2.2 §5.0 + §10 don't-do #13: watermark intensity is creator preview-protection only, not a pricing input. The licensed file delivered to the buyer is the original (unwatermarked); pricing has zero structural reason to vary by the creator's preview-protection choice. `vault_assets.intrusion_level` STAYS as a watermark-system column (already shipped via `supabase/migrations/20260417100001/2/3_watermark_profile_*.sql`); the pricing engine MUST NOT query it.
 
 ---
 
@@ -453,17 +462,52 @@ PRICE-ENGINE-BRIEF v3 §11's 16 don't-do items still apply. Additional items fro
 - UX brief (price field surfaces): `docs/upload/UX-BRIEF.md` v3 §4.4
 - UX spec (price visual treatment + "Why this price?" affordance): `docs/upload/UX-SPEC-V4.md` §11 (V4 supersedes V3 per UX-SPEC-V4 §0)
 - AI pipeline brief (sister architecture): `src/lib/processing/AI-PIPELINE-BRIEF.md`
-- BP/Watermark audit (intrusion vocabulary): `docs/audits/BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26.md`
+- BP/Watermark audit (intrusion vocabulary; clarifies intrusion_level is watermark, not pricing): `docs/audits/BLUE-PROTOCOL-WATERMARK-AUDIT-2026-04-26.md` §4
 - Existing fee decomposition (preserved): `src/lib/offer/pricing.ts`
 - Existing multipliers (preserved): `src/lib/types.ts`
-- Future: F1.5 calibration directive: `docs/pricing/PRICE-ENGINE-CALIBRATION-V1.md` (TO BE CREATED)
-- Future: F2 schema migration: TBD when F1.5 ratifies
+- **v4 cascade C anchors:**
+  - `docs/licence/LICENCE-TAXONOMY-BRIEF.md` v2.2 (cascade A; §5.0 pricing dimensions lock — this is the authority anchor for the v4 intrusion_level drop)
+  - `docs/pricing/calibration/CANONICAL-SOURCES.md` (Phase α; §11 path-(1)-ready 7-cell editorial spec drop-in for cascade F regeneration)
+  - `docs/pricing/calibration/STAGE-B-SESSION-LOG-2026-04-28.md` (founder discovery + v1 scope decisions: editorial + CC + social only; commercial + advertising deferred to v2)
+  - Already-shipped watermark migrations (no migration action needed; `vault_assets.intrusion_level` STAYS as watermark column; pricing engine MUST NOT query): `supabase/migrations/20260417100001_watermark_profile_enums.sql`, `20260417100002_watermark_profile_tables.sql`, `20260417100003_watermark_profile_indexes.sql`
+  - SEED_PROFILES source-of-truth for watermark `intrusionLevel` vocabulary: `src/lib/processing/profiles.ts:60-169`
+- Future: F1.5 calibration directive: `docs/pricing/PRICE-ENGINE-CALIBRATION-V1.md` (v3 corrigendum lands as cascade C alongside this F1 v4)
+- Future: F2 schema migration: TBD when F1.5 v3 ratifies + Stage B values land
 
 ---
 
 ## 12. Revision history
 
+### v4 — 2026-04-30 (cascade C per L1 v2.2; awaiting ratification)
+
+L1 (Licence Taxonomy Brief) v2.2 §5.0 locks the pricing-engine dimension set and explicitly drops `intrusion_level` from pricing per Stage B 2026-04-28 founder discovery. F1 v4 brings the F1 pricing tables into structural compliance with the L1 v2.2 lock; corrigendum scope is dimension-drop only (no new architecture; engine internals + composer + confidence model + adapter contracts unchanged from v3 + 2026-04-28 corrections).
+
+| # | Section | Change | Rationale |
+|---|---|---|---|
+| 1 | Status header | REVISED 2026-04-28 (v3) → REVISED 2026-04-30 (v4; cascade C per L1 v2.2) | New ratification gate per cascade C |
+| 2 | §2.2 basis statement example | Drop "at standard intrusion" from runtime basis-statement language | Engine no longer differentiates by intrusion per L1 v2.2 §5.0; runtime copy aligns |
+| 3 | §3.1 schema | `intrusion_level` column DROPPED from `pricing_format_defaults`; UNIQUE constraint + INDEX updated to `(format, licence_class, currency[, table_version])`; dimension bullet removed; `cc_variants` v2 speculation rephrased to drop "(format, intrusion)" → "(format) only per L1 v2.2 §5.4"; format-families paragraph rephrased to drop "at the same intrusion level" | Per L1 v2.2 §5.0 — watermark intensity is preview-protection only, not a pricing input |
+| 4 | §3.2 cell count | 252 → 63 (v3) → **21** (v4). New v1 editorial-only Stage B scope = **7 cells**. Calibration burden table rewritten: total ~102 → ~60 (full scope) and ~31 (v1 ed-only). Engine query-by tuple reduced to `(format, licence_class, currency)` | Direct consequence of #3 |
+| 5 | §3.3 calibration process | Step 1 + Step 3 cell-count narrative updated to v4 numbers (21+21+17+12+7 = ~78 full scope; 7+7+6+4+7 = ~31 v1 ed-only). Step 2 references CANONICAL-SOURCES.md Phase α 5-tier source authority hierarchy | Reflects new shape; v1 ed-only Stage B path-(1) target |
+| 6 | §4.1 schema | `intrusion_level` column DROPPED from `pricing_platform_floors`; partial UNIQUE INDEX updated to `(format, licence_class, currency)` | Same rationale as #3 — floors mirror defaults shape |
+| 7 | §4.2 cell count | 63 → **21** (full scope); v1 editorial-only Stage B scope = 7 floors | Same math as §3.2 |
+| 8 | §4.4 floor enforcement | Lookup tuple updated to `(format, licence_class, currency)` | Same rationale as #3 |
+| 9 | §6 analytics view | View 1 SELECT/GROUP BY drops `asset.intrusion_level`; comment added that v4 corrigendum forbids grouping pricing analytics by `vault_assets.intrusion_level` (the column STAYS as a watermark surface, but pricing analytics MUST NOT use it) | Per L1 v2.2 §5.0 — analytics align with cell key |
+| 10 | §8 readiness checklist | Cell counts updated (21 / 21); v1 ed-only Stage B scope explicitly added; gate references updated to v2.2 / v1.1 / v3 | Reflects v4 shape + cascade A / B / C versioning |
+| 11 | §10 don't-do | New item #22 — don't re-introduce `intrusion_level` (or any watermark-related dimension) into pricing tables | Per L1 v2.2 §5.0 + §10 don't-do #13 |
+| 12 | §11 references | Add L1 v2.2 (cascade A authority anchor), CANONICAL-SOURCES.md Phase α + §11 7-cell drop-in, STAGE-B-SESSION-LOG, already-shipped watermark migrations, SEED_PROFILES source-of-truth | Per L1 v2.2 §11 cascade C reference set |
+| 13 | §12 | This entry added; v3 entry marked superseded | Build-governing record |
+| 14 | Closing line | "End of price engine architecture detail brief (F1, revised 2026-04-28)" → "End of F1 brief (v4, 2026-04-30)" | Versioning |
+
+**Sections unchanged in v4:** §1 (purpose), §2.1 (recommendation function), §2.3 (confidence formulas — no intrusion reference), §2.4 (freshness), §5 (resolved IPs §5.1-§5.7 — no intrusion as pricing dimension), §7 (engine quality + recalibration loop — no intrusion reference; flagged-cell criteria still apply per cell shape), §9 (approval gate — two-stage model holds; cascade C inserts a new gate but the two-stage shape is unchanged).
+
+**Already-shipped watermark layer (no migration action needed in cascade C):** `vault_assets.intrusion_level` + `watermark_profiles` + `watermark_intrusion_level` enum + indexes already landed in `supabase/migrations/20260417100001/2/3_watermark_profile_*.sql`. These are correct System A surface; cascade C does NOT touch them. `vault_assets.intrusion_level` STAYS as a watermark-system column; pricing engine MUST NOT query it (don't-do #22 enforces this at the architecture layer).
+
+**L4b BRIEF v4 unaffected:** the `Recommendation[]` per-asset wrapper is taxonomy-driven (one Recommendation per enabled `licence_class`), not intrusion-driven. No L4b corrigendum needed for cascade C.
+
 ### v3 — 2026-04-28 (post-L1-v2 corrigendum; awaiting ratification)
+
+**Superseded by v4 (cascade C per L1 v2.2 §12) — v3's `intrusion_level` cell-key entries are the architectural error v4 corrects. v3 entry retained below for audit trail.**
 
 L1 (Licence Taxonomy Brief) v2 + L2 (Licence Schema Migration directive) introduced architectural changes that contradicted F1 v2's pricing model. Corrigendum scope: alignment only, no new architecture.
 
@@ -497,4 +541,4 @@ Composed alongside PRICE-ENGINE-BRIEF v3 (third revision same day). F1 detail br
 
 ---
 
-End of price engine architecture detail brief (F1, revised 2026-04-28).
+End of F1 brief (v4, 2026-04-30).
